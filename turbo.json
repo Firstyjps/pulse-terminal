@@ -13,6 +13,10 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
+    "test": {
+      "dependsOn": ["^typecheck"],
+      "outputs": []
+    },
     "clean": {
       "cache": false
     }

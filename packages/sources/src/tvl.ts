@@ -1,5 +1,5 @@
-import type { TvlResponse } from "./types";
-import { fetchJson } from "./_helpers";
+import type { TvlResponse } from "./types.js";
+import { fetchJson } from "./_helpers.js";
 
 type LlamaHistorical = { date: number; tvl: number };
 type LlamaChain = {

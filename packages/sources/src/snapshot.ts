@@ -1,10 +1,10 @@
-import type { FundflowSnapshot } from "./types";
-import { getOverview } from "./overview";
-import { getStablecoins } from "./stablecoins";
-import { getETFFlows } from "./etf";
-import { getFutures } from "./futures";
-import { getDexVolume } from "./dex";
-import { getTVL } from "./tvl";
+import type { FundflowSnapshot } from "./types.js";
+import { getOverview } from "./overview.js";
+import { getStablecoins } from "./stablecoins.js";
+import { getETFFlows } from "./etf.js";
+import { getFutures } from "./futures.js";
+import { getDexVolume } from "./dex.js";
+import { getTVL } from "./tvl.js";
 
 /**
  * Render a FundflowSnapshot as a compact markdown brief, suitable for sending

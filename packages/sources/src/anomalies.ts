@@ -4,9 +4,9 @@
 //   - apps/web (/api/alerts/scan)
 // Keeps thresholds + categorisation in one place so backtests stay coherent.
 
-import type { FundflowSnapshot } from "./types";
-import { getFullSnapshot } from "./snapshot";
-import { getFundingRates } from "./funding";
+import type { FundflowSnapshot } from "./types.js";
+import { getFullSnapshot } from "./snapshot.js";
+import { getFundingRates } from "./funding.js";
 
 export type AnomalySeverity = "low" | "med" | "high";
 export type AnomalyCategory =

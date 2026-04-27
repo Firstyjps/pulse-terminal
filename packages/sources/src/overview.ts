@@ -1,5 +1,5 @@
-import type { MarketOverview } from "./types";
-import { fetchJson } from "./_helpers";
+import type { MarketOverview } from "./types.js";
+import { fetchJson } from "./_helpers.js";
 
 type CGGlobal = {
   data: {

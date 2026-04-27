@@ -1,5 +1,5 @@
-import type { DexVolumeResponse } from "./types";
-import { fetchJson } from "./_helpers";
+import type { DexVolumeResponse } from "./types.js";
+import { fetchJson } from "./_helpers.js";
 
 type LlamaTotal = {
   totalDataChart: [number, number][];

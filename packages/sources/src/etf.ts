@@ -1,5 +1,5 @@
-import type { ETFFlow, ETFFlowResponse, ETFSource } from "./types";
-import { fetchFarsideEtf } from "./farside";
+import type { ETFFlow, ETFFlowResponse, ETFSource } from "./types.js";
+import { fetchFarsideEtf } from "./farside.js";
 
 type CoinglassETFFlow = {
   date: number | string;

@@ -1,5 +1,5 @@
-import type { StablecoinFlow, StablecoinPoint } from "./types";
-import { fetchJson } from "./_helpers";
+import type { StablecoinFlow, StablecoinPoint } from "./types.js";
+import { fetchJson } from "./_helpers.js";
 
 type LlamaStablecoin = {
   id: string;

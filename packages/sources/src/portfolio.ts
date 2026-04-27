@@ -3,7 +3,7 @@
 //
 // node:crypto is loaded lazily so the barrel stays browser-safe — only
 // `getPortfolio()` (server-only) ever pulls it in.
-import { fetchJson } from "./_helpers";
+import { fetchJson } from "./_helpers.js";
 
 export interface PortfolioBalance {
   asset: string;

@@ -9,7 +9,6 @@ const TABS = [
   { id: "markets", label: "MARKETS", href: "/markets" },
   { id: "fundflow", label: "FUNDFLOW", href: "/fundflow" },
   { id: "derivatives", label: "DERIVATIVES", href: "/derivatives" },
-  { id: "analyst", label: "AI ANALYST", href: "/analyst" },
   { id: "backtest", label: "BACKTEST", href: "/backtest" },
 ] as const;
 

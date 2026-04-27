@@ -3,7 +3,7 @@
 // webpack's static analyser can't see them. This keeps the `@pulse/sources`
 // barrel safe to import from client components that only need format helpers
 // or types — server-rendered API routes still get the full Node API.
-import type { ETFFlow } from "./types";
+import type { ETFFlow } from "./types.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dynImport = new Function("m", "return import(m)") as (m: string) => Promise<any>;

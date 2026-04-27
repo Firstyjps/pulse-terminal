@@ -1,5 +1,5 @@
-import type { FuturesData, FuturesResponse } from "./types";
-import { fetchJson } from "./_helpers";
+import type { FuturesData, FuturesResponse } from "./types.js";
+import { fetchJson } from "./_helpers.js";
 
 type BinanceTicker = { symbol: string; lastPrice: string; priceChangePercent: string };
 type BinanceFunding = { symbol: string; lastFundingRate: string; markPrice: string };

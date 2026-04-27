@@ -1,5 +1,5 @@
-import type { Exchange, FundingRate, OpenInterest } from "./types";
-import { fetchJson } from "./_helpers";
+import type { Exchange, FundingRate, OpenInterest } from "./types.js";
+import { fetchJson } from "./_helpers.js";
 
 // ── Binance ─────────────────────────────────────────────────────────────────
 type BinancePremium = {
