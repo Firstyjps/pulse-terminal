@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@pulse/ui": ["./packages/ui/src"],
+      "@pulse/ui/*": ["./packages/ui/src/*"],
+      "@pulse/sources": ["./packages/sources/src"],
+      "@pulse/sources/*": ["./packages/sources/src/*"],
+      "@pulse/charts": ["./packages/charts/src"],
+      "@pulse/charts/*": ["./packages/charts/src/*"],
+      "@pulse/i18n": ["./packages/i18n/src"],
+      "@pulse/i18n/*": ["./packages/i18n/src/*"]
+    }
+  }
+}
