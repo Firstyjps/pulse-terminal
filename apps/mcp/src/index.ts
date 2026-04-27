@@ -75,15 +75,35 @@ const text = (s: string) => ({
 
 const HUB_BASE = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
 const HUB_TIMEOUT_MS = 800;
+const WARN_DEDUP_MS = 30_000;
+let lastHubWarn = 0;
+
+/**
+ * Warn once per WARN_DEDUP_MS to stderr (stdout is reserved for the MCP
+ * JSON-RPC stream — never write there). Used when degrading from hub to direct
+ * upstream so the user sees something is up without a flood of repeats.
+ */
+function warnHubDegrade(path: string, reason: string) {
+  const now = Date.now();
+  if (now - lastHubWarn < WARN_DEDUP_MS) return;
+  lastHubWarn = now;
+  process.stderr.write(
+    `[pulse-mcp] hub ${path} unavailable (${reason.slice(0, 60)}), falling back to upstream\n`,
+  );
+}
 
 async function hubFetch<T>(path: string): Promise<T | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), HUB_TIMEOUT_MS);
   try {
     const res = await fetch(`${HUB_BASE}${path}`, { signal: ctrl.signal });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      warnHubDegrade(path, `HTTP ${res.status}`);
+      return null;
+    }
     return (await res.json()) as T;
-  } catch {
+  } catch (err) {
+    warnHubDegrade(path, (err as Error).message);
     return null;
   } finally {
     clearTimeout(t);

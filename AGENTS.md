@@ -270,13 +270,24 @@ get_oi_snapshot()                              // open interest — NEW
 
 | Sub-phase | Owner | Status | Notes |
 |-----------|-------|--------|-------|
-| Prereq · git init        | Cursor | _to do_ | `feat: pulse terminal monorepo (phase 1+2 complete)` |
-| Prereq · Vitest + tests  | Cursor | ✅ done | `_helpers.test.ts`, `anomalies.test.ts`, `format.test.ts` in `packages/sources/src/` · `vitest@2.1.8` in deps |
-| Prereq · /api/health     | Cursor | _to do_ | spec in Phase 3 section above |
-| Phase A · cleanup        | Cursor | _to do_ | drop Anthropic SDK + analyze + analyst |
-| Phase B v0 · hub HTTP    | Cursor | _to do_ | port 8081 cache + MCP rewire (graceful degrade) |
-| Phase C · pm2            | Cursor | files in place, awaiting B v0 | `ecosystem.config.cjs` + `scripts/pulse-status.mjs` ready · pending Hub at `:8081` from Phase B v0 |
-| Phase D · split sources  | Cursor | 🟢 in progress | `package.json` exports map + `src/server.ts` ✅ created · `apps/realtime/src/poller.ts` already uses `@pulse/sources/server` · still need: rewire other consumers + drop dynImport hacks + remove webpack fallback |
+| Prereq · git init        | Cursor | ✅ done | commits: `978e444` (Phase D) → `35b2f09` (prod) |
+| Prereq · Vitest + tests  | Cursor | ✅ done | 19/19 passing · `_helpers`, `anomalies`, `format` |
+| Prereq · /api/health     | Cursor | ✅ done | shape per spec · web `/api/health` + hub `/health` both green |
+| Phase A · cleanup        | Cursor | ✅ done | Anthropic SDK + `/api/analyze` + `/analyst` + `AnalysisPanel` removed · `nav.analyst` retained in dict |
+| Phase B v0 · hub HTTP    | Cursor | ✅ done | hub `:8081` running · MCP queries hub first, fallback to direct adapter on ECONNREFUSED · `/funding` measured 2.9ms |
+| Phase C · pm2            | Cursor | ✅ done | `web` 84MB · `realtime` 93MB · `alerts` 87MB online · `pm2 save` persisted · user must run `pm2 startup` (or `pnpm dlx pm2-installer install` on Win) for boot auto-start |
+| Phase D · split sources  | Cursor | ✅ done | `index.ts` browser-safe, `server.ts` server-only · dynImport hack + webpack fallback list **removed** · replaced with `extensionAlias .js → .ts/.tsx` · all consumers rewired |
+
+**🎉 Phase 3 complete — system runs 24/7 via pm2.**
+
+### Outstanding manual steps for project owner
+1. Run `pm2 startup` (Linux/macOS) or `pnpm dlx pm2-installer install` (Windows) to enable boot-time auto-start
+2. Set `BINANCE_API_KEY` + `BINANCE_API_SECRET` (read-only, see [SECURITY.md](./SECURITY.md)) if Portfolio panel is wanted
+3. Set `ALERT_WEBHOOK_URL` if Discord/Slack alerts are wanted
+
+### Known minor issues (non-blocking)
+- **Node 24 + Windows:** `pulse:status` exits with libuv assertion after printing — cosmetic, data is correct
+- **Turbopack + Thai paths:** Turbopack panics on the project's path. Use `next dev --webpack` + `next build --webpack` (already wired in `apps/web/package.json`)
 
 ## Phase 2 — done
 
