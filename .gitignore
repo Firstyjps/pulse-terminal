@@ -18,3 +18,7 @@ _legacy/
 
 # Alert worker run-time data
 apps/alerts/data/
+
+# pm2 logs + state
+logs/
+.pm2/
