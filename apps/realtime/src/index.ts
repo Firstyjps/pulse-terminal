@@ -3,17 +3,23 @@ import { startPollers } from "./poller.js";
 import { startBinanceStream } from "./binance-stream.js";
 import { startBybitStream } from "./bybit-stream.js";
 import { startOkxStream } from "./okx-stream.js";
+import { startSnapshotPoller } from "./snapshot-poller.js";
+import { startHttpServer } from "./http-server.js";
+import { cache } from "./cache.js";
 
-const PORT = Number(process.env.WS_PORT ?? 8080);
+const WS_PORT = Number(process.env.WS_PORT ?? 8080);
+const HTTP_PORT = Number(process.env.HUB_HTTP_PORT ?? 8081);
 const NATIVE_STREAMS = (process.env.PULSE_NATIVE_STREAMS ?? "binance,bybit,okx")
   .split(",")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-const server = new PulseServer(PORT);
-const stopPollers = startPollers(server);
+const server = new PulseServer(WS_PORT);
+const stoppers: Array<() => void> = [];
 
-const stoppers: Array<() => void> = [stopPollers];
+stoppers.push(startPollers(server));
+stoppers.push(startSnapshotPoller(cache));
+stoppers.push(startHttpServer(HTTP_PORT, { cache }));
 
 if (NATIVE_STREAMS.includes("binance")) stoppers.push(startBinanceStream(server));
 if (NATIVE_STREAMS.includes("bybit")) stoppers.push(startBybitStream(server));

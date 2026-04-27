@@ -38,6 +38,8 @@ import {
   getOpenInterest,
   scanAnomalies,
   type Exchange,
+  type FundflowSnapshot,
+  type FundingRate,
   type OpenInterest,
 } from "@pulse/sources";
 
@@ -66,6 +68,29 @@ const text = (s: string) => ({
 });
 
 // ─────────────────────────────────────────────────────────────────
+// Hub cache layer — query the local realtime daemon (started by `apps/realtime`)
+// for sub-50ms responses. Each tool falls back to direct upstream fetch if the
+// hub is unreachable or returns 404/503.
+// ─────────────────────────────────────────────────────────────────
+
+const HUB_BASE = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
+const HUB_TIMEOUT_MS = 800;
+
+async function hubFetch<T>(path: string): Promise<T | null> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), HUB_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${HUB_BASE}${path}`, { signal: ctrl.signal });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Existing 7 tools — ported from Crypto-Fundflow-Analyzer
 // ─────────────────────────────────────────────────────────────────
 
@@ -75,7 +100,12 @@ server.tool(
     "DeFi TVL, active cryptocurrencies, and Fear & Greed Index. " +
     "Sources: CoinGecko /global, alternative.me, DefiLlama.",
   {},
-  async () => json(await getOverview()),
+  async () => {
+    // Try the local hub first — its snapshot includes the same overview, ~5-20ms
+    const cached = await hubFetch<FundflowSnapshot>("/snapshot");
+    if (cached?.overview) return json(cached.overview);
+    return json(await getOverview());
+  },
 );
 
 server.tool(
@@ -85,7 +115,11 @@ server.tool(
     "trajectory. Stablecoin supply is the canonical indicator of dry powder " +
     "waiting in crypto. Source: DefiLlama stablecoins.",
   {},
-  async () => json(await getStablecoins()),
+  async () => {
+    const cached = await hubFetch<FundflowSnapshot>("/snapshot");
+    if (cached?.stablecoins) return json(cached.stablecoins);
+    return json(await getStablecoins());
+  },
 );
 
 server.tool(
@@ -101,7 +135,8 @@ server.tool(
       .describe("Filter to btc/eth/both. Default: both."),
   },
   async ({ symbol = "both" }) => {
-    const data = await getETFFlows();
+    const cached = await hubFetch<FundflowSnapshot>("/snapshot");
+    const data = cached?.etf ?? (await getETFFlows());
     if (symbol === "both") return json(data);
     const isBtc = symbol === "btc";
     return json({
@@ -142,7 +177,11 @@ server.tool(
       .describe("Filter to one symbol or both. Default: both."),
   },
   async ({ symbol = "both" }) => {
-    if (symbol === "both") return json(await getFutures());
+    const cached = await hubFetch<FundflowSnapshot>("/snapshot");
+    if (symbol === "both") {
+      if (cached?.futures) return json(cached.futures);
+      return json(await getFutures());
+    }
     return json(await getFuturesSymbol(symbol));
   },
 );
@@ -162,7 +201,11 @@ server.tool(
       .default(7)
       .describe("Lookback in days for the summary slice. Default 7."),
   },
-  async () => json(await getDexVolume()),
+  async () => {
+    const cached = await hubFetch<FundflowSnapshot>("/snapshot");
+    if (cached?.dex) return json(cached.dex);
+    return json(await getDexVolume());
+  },
 );
 
 server.tool(
@@ -177,7 +220,8 @@ server.tool(
       .describe("Optional chain filter (case-insensitive substring). Returns only that chain when set."),
   },
   async ({ chain }) => {
-    const data = await getTVL();
+    const cached = await hubFetch<FundflowSnapshot>("/snapshot");
+    const data = cached?.tvl ?? (await getTVL());
     if (!chain) return json(data);
     const needle = chain.toLowerCase();
     return json({
@@ -200,7 +244,7 @@ server.tool(
       .describe("markdown = brief (default). json = full raw snapshot."),
   },
   async ({ format = "markdown" }) => {
-    const snapshot = await getFullSnapshot();
+    const snapshot = (await hubFetch<FundflowSnapshot>("/snapshot")) ?? (await getFullSnapshot());
     return format === "json" ? json(snapshot) : text(summarizeSnapshot(snapshot, "overview"));
   },
 );
@@ -226,7 +270,13 @@ server.tool(
       .describe("Symbol (e.g. BTCUSDT, ETHUSDT). Default BTCUSDT."),
   },
   async ({ exchange, symbol = "BTCUSDT" }) => {
-    const rates = await getFundingRates({ exchange: exchange as Exchange | undefined, symbol });
+    // Try hub: it has freshest funding from native WS streams
+    const hub = await hubFetch<{ rates: FundingRate[] }>(
+      `/funding?${new URLSearchParams({ ...(exchange ? { exchange } : {}), symbol })}`,
+    );
+    const rates = hub?.rates?.length
+      ? hub.rates
+      : await getFundingRates({ exchange: exchange as Exchange | undefined, symbol });
     if (!rates.length) return text(`No funding rates returned for ${symbol}.`);
 
     const matched = rates.filter((r) =>
@@ -269,7 +319,12 @@ server.tool(
       .describe("Symbol (e.g. BTCUSDT, ETHUSDT). Default BTCUSDT."),
   },
   async ({ exchange, symbol = "BTCUSDT" }) => {
-    const ois = await getOpenInterest({ exchange: exchange as Exchange | undefined, symbol });
+    const hub = await hubFetch<{ ois: OpenInterest[] }>(
+      `/oi?${new URLSearchParams({ ...(exchange ? { exchange } : {}), symbol })}`,
+    );
+    const ois = hub?.ois?.length
+      ? hub.ois
+      : await getOpenInterest({ exchange: exchange as Exchange | undefined, symbol });
     if (!ois.length) return text(`No OI returned for ${symbol}.`);
 
     const totalUsd = ois.reduce((s, x) => s + x.oiUsd, 0);

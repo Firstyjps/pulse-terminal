@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { ClientMessage, ServerMessage } from "./contracts.js";
 import { channelFor, channelMatches } from "./channels.js";
+import { cache } from "./cache.js";
 
 const HEARTBEAT_MS = 30_000;
 const MAX_BUFFER = 64; // per-client backpressure cap (oldest dropped first)
@@ -115,6 +116,26 @@ export class PulseServer {
    * dropped first.
    */
   broadcast(msg: ServerMessage) {
+    // Mirror funding/OI into the HTTP cache so MCP can read them at <50ms
+    if (msg.type === "funding") {
+      cache.setFunding({
+        exchange: msg.exchange as never,
+        symbol: msg.symbol,
+        rate: msg.rate,
+        ratePercent: msg.ratePercent,
+        nextFundingTime: 0,
+        ts: msg.ts,
+      });
+    } else if (msg.type === "oi") {
+      cache.setOi({
+        exchange: msg.exchange as never,
+        symbol: msg.symbol,
+        oi: msg.oi,
+        oiUsd: msg.oiUsd,
+        ts: msg.ts,
+      });
+    }
+
     const channel = channelFor(msg);
     const payload = JSON.stringify(msg);
 
