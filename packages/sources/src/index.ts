@@ -1,10 +1,17 @@
-// @pulse/sources — public exports
-// All external data adapters live here. Apps must import from this package
-// rather than calling APIs directly.
+// @pulse/sources — BROWSER-SAFE entry point.
 //
-// `.js` extensions are required because the package is `"type": "module"`
-// and downstream apps use NodeNext module resolution. TS sees the .ts source
-// at compile time, Node sees emitted .js at runtime — same specifier works for both.
+// This barrel only re-exports things that have **no Node-only imports**:
+//   - shared types (erased at runtime)
+//   - pure formatters
+//   - fetch-based helpers (work on both client and server)
+//
+// Server-only data adapters (`getOverview`, `getETFFlows`, `getPortfolio`, etc.)
+// live in `./server.ts`. Client components must NOT import from `@pulse/sources/server`
+// — that path drags in farside (`node:child_process`) and portfolio (`node:crypto`)
+// which webpack cannot bundle for the browser.
+//
+// `.js` extensions are required because the package is `"type": "module"` and
+// downstream apps use NodeNext module resolution.
 
 export * from "./types.js";
 
@@ -13,22 +20,14 @@ export type { FetchOpts } from "./_helpers.js";
 
 export { formatUSD, formatNumber, formatPercent } from "./format.js";
 
-export { getOverview } from "./overview.js";
-export { getStablecoins } from "./stablecoins.js";
-export { getETFFlows } from "./etf.js";
-export { getTVL } from "./tvl.js";
-export { getDexVolume } from "./dex.js";
-export { getFutures, getFuturesSymbol } from "./futures.js";
-export { getFundingRates, getOpenInterest } from "./funding.js";
-export { getFullSnapshot, summarizeSnapshot } from "./snapshot.js";
-export { scanAnomalies, deriveAnomalies } from "./anomalies.js";
+// Type-only re-exports — TypeScript erases these, so the runtime modules
+// (`anomalies.ts`, `macro.ts`, `portfolio.ts`) are NOT loaded by client
+// bundles even though they sit in this package.
 export type {
   AnomalyFinding,
   AnomalyScan,
   AnomalyCategory,
   AnomalySeverity,
 } from "./anomalies.js";
-export { getMacro } from "./macro.js";
 export type { MacroPoint, MacroSeries, MacroResponse } from "./macro.js";
-export { getPortfolio } from "./portfolio.js";
 export type { PortfolioBalance, PortfolioSnapshot } from "./portfolio.js";

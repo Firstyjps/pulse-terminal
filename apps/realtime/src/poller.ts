@@ -1,4 +1,4 @@
-import { getFundingRates, getOpenInterest } from "@pulse/sources";
+import { getFundingRates, getOpenInterest } from "@pulse/sources/server";
 import type { PulseServer } from "./server.js";
 
 const FUNDING_INTERVAL_MS = 60_000; // 1 min

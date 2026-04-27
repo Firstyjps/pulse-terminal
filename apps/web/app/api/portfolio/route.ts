@@ -1,4 +1,4 @@
-import { getPortfolio } from "@pulse/sources";
+import { getPortfolio } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

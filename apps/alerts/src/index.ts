@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { scanAnomalies } from "@pulse/sources";
+import { scanAnomalies } from "@pulse/sources/server";
 import { AlertStore, type ScanRecord } from "./storage.js";
 import { Notifier } from "./notifier.js";
 

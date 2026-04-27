@@ -1,4 +1,4 @@
-import { getFutures } from "@pulse/sources";
+import { getFutures } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const revalidate = 60;

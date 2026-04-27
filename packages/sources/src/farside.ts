@@ -1,12 +1,11 @@
 // Cloudflare blocks Node fetch on farside.co.uk — shell out to system curl.
-// Node-only imports are loaded via a Function-constructed dynamic import so
-// webpack's static analyser can't see them. This keeps the `@pulse/sources`
-// barrel safe to import from client components that only need format helpers
-// or types — server-rendered API routes still get the full Node API.
+// This file is **server-only** — it is only re-exported through
+// `@pulse/sources/server`, never the browser-safe `@pulse/sources` barrel.
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { ETFFlow } from "./types.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const dynImport = new Function("m", "return import(m)") as (m: string) => Promise<any>;
+const execFileP = promisify(execFile);
 
 const URLS = {
   btc: "https://farside.co.uk/btc/",
@@ -15,10 +14,6 @@ const URLS = {
 
 async function curlGet(url: string): Promise<string | null> {
   try {
-    if (typeof window !== "undefined") return null;
-    const cp = await dynImport("node:child_process");
-    const util = await dynImport("node:util");
-    const execFileP = util.promisify(cp.execFile);
     const { stdout } = await execFileP(
       "curl",
       [

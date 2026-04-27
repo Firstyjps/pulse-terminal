@@ -1,4 +1,4 @@
-import { getStablecoins } from "@pulse/sources";
+import { getStablecoins } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const revalidate = 600;

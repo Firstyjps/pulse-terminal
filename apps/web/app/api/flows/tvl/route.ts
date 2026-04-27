@@ -1,4 +1,4 @@
-import { getTVL } from "@pulse/sources";
+import { getTVL } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const revalidate = 600;

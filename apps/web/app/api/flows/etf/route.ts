@@ -1,4 +1,4 @@
-import { getETFFlows } from "@pulse/sources";
+import { getETFFlows } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const revalidate = 1800;

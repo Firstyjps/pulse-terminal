@@ -1,4 +1,4 @@
-import { getOverview } from "@pulse/sources";
+import { getOverview } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const revalidate = 120;

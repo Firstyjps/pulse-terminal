@@ -1,4 +1,4 @@
-import { getFullSnapshot } from "@pulse/sources";
+import { getFullSnapshot } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const revalidate = 120;

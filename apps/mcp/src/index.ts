@@ -41,7 +41,7 @@ import {
   type FundflowSnapshot,
   type FundingRate,
   type OpenInterest,
-} from "@pulse/sources";
+} from "@pulse/sources/server";
 
 const server = new McpServer(
   {

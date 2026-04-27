@@ -1,4 +1,4 @@
-import { scanAnomalies } from "@pulse/sources";
+import { scanAnomalies } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 // Anomaly scan is "live" — disable static caching but cap inbound work via revalidate.

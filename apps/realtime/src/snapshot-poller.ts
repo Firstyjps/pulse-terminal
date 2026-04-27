@@ -1,4 +1,4 @@
-import { getFullSnapshot } from "@pulse/sources";
+import { getFullSnapshot } from "@pulse/sources/server";
 import type { HubCache } from "./cache.js";
 
 const SNAPSHOT_INTERVAL_MS = Number(process.env.SNAPSHOT_INTERVAL_MS ?? 90_000);

@@ -253,6 +253,8 @@ get_oi_snapshot()                              // open interest — NEW
 
 > Update as work happens. Owner can be a session ID, a date, or your name.
 
+### Phase 1 + 2 (done)
+
 | Role | Owner    | Status        | Notes |
 |------|----------|---------------|-------|
 | 1 — Foundation | Claude | Phase 1 done | root configs · pnpm workspace · turbo wired |
@@ -263,6 +265,18 @@ get_oi_snapshot()                              // open interest — NEW
 | 6 — Web        | Claude | Phase 1 done | configs · 5 routes + `/design` showcase · 6 flow API routes + `/api/snapshot` + `/api/analyze` (streaming Anthropic) · `/api/markets` · MetricStrip · Dashboard · AnalysisPanel · MarketsTable · live derivatives · LocaleProvider + LocaleToggle wired |
 | 7 — Realtime   | Claude | Phase 1+2 done | contracts (subscribe/unsubscribe/ack) · server with heartbeat + backpressure + per-client subscription filtering + channel matching · REST poller + native Binance/Bybit/OKX WS streams (reconnect/backoff, ping per venue, env-toggle via `PULSE_NATIVE_STREAMS`) |
 | 8 — MCP        | Claude | Phase 1+2 done | 10 tools (7 ported + 3 new: get_funding_summary, get_oi_snapshot, detect_anomalies) · `detect_anomalies` now backed by shared `scanAnomalies()` in `@pulse/sources` so MCP/alerts/web stay in sync · manifest.json · pack-dxt.mjs |
+
+### Phase 3 (active — MCP-first refactor)
+
+| Sub-phase | Owner | Status | Notes |
+|-----------|-------|--------|-------|
+| Prereq · git init        | Cursor | _to do_ | `feat: pulse terminal monorepo (phase 1+2 complete)` |
+| Prereq · Vitest + tests  | Cursor | ✅ done | `_helpers.test.ts`, `anomalies.test.ts`, `format.test.ts` in `packages/sources/src/` · `vitest@2.1.8` in deps |
+| Prereq · /api/health     | Cursor | _to do_ | spec in Phase 3 section above |
+| Phase A · cleanup        | Cursor | _to do_ | drop Anthropic SDK + analyze + analyst |
+| Phase B v0 · hub HTTP    | Cursor | _to do_ | port 8081 cache + MCP rewire (graceful degrade) |
+| Phase C · pm2            | Cursor | files in place, awaiting B v0 | `ecosystem.config.cjs` + `scripts/pulse-status.mjs` ready · pending Hub at `:8081` from Phase B v0 |
+| Phase D · split sources  | Cursor | 🟢 in progress | `package.json` exports map + `src/server.ts` ✅ created · `apps/realtime/src/poller.ts` already uses `@pulse/sources/server` · still need: rewire other consumers + drop dynImport hacks + remove webpack fallback |
 
 ## Phase 2 — done
 
@@ -278,10 +292,171 @@ get_oi_snapshot()                              // open interest — NEW
 
 ---
 
-## Phase 3 — possible next steps (not started)
+## Phase 3 — MCP-first refactor (active)
 
-1. **Mobile push** — replace webhook with Claude Code mobile push for high-severity alerts
-2. **More exchanges** — Deribit options OI, Coinbase spot
-3. **On-chain layer** — token transfer monitoring (Etherscan / Glassnode)
+**Context:** user uses Claude Pro/Max subscription via MCP — no Anthropic API budget. Optimize for personal use, 24/7 on user's own machine, MCP latency < 50ms per tool call.
+
+Sequence: **Prereq → A → B v0 → test → C** · D is optional cleanup, not blocking.
+
+### Prerequisites (~45 min, before destructive refactor)
+- [ ] `git init` + first commit (`feat: pulse terminal monorepo (phase 1+2 complete)`)
+- [ ] Vitest config + 4 smoke tests:
+  - `scanAnomalies()` from `packages/sources/src/anomalies.ts`
+  - `formatUSD()`, `formatPercent()` from `packages/sources/src/format.ts`
+  - `withFallback()` from `packages/sources/src/_helpers.ts` (covers loader-throws, returns-null, returns-undefined, fallback-value-used)
+- [ ] `apps/web/app/api/health/route.ts` per spec below
+
+#### `/api/health` contract
+```ts
+GET /api/health
+→ 200 (always — pm2 uses TCP probe, body is for humans)
+{
+  status: "healthy" | "degraded" | "unhealthy",
+  checks: {
+    coingecko: { ok: boolean, latencyMs: number, error?: string },
+    defillama: { ok: boolean, latencyMs: number, error?: string },
+    binance:   { ok: boolean, latencyMs: number, error?: string },
+    yahoo:     { ok: boolean, latencyMs: number, error?: string },
+    hub?:      { ok: boolean, latencyMs: number, error?: string }   // localhost:8081 once Phase B ships
+  },
+  ts: number
+}
+```
+- Each check: GET `/ping`-equivalent endpoint, 2s timeout, `Promise.race`
+- Status: all-pass = `healthy` · 1-2 fail = `degraded` · 3+ fail = `unhealthy`
+- Endpoints: CoinGecko `/api/v3/ping`, DefiLlama `https://api.llama.fi/protocols?limit=1`, Binance `/api/v3/ping`, Yahoo `/v8/finance/chart/^GSPC?range=1d`
+
+### Phase A — MCP-first cleanup (~10 min)
+Remove Anthropic SDK + AI panel from web (user uses MCP via Claude Desktop instead).
+- [ ] `rm apps/web/app/api/analyze/route.ts`
+- [ ] `rm -rf apps/web/app/analyst/`
+- [ ] `rm apps/web/components/AnalysisPanel.tsx`
+- [ ] `apps/web/package.json` — drop `@anthropic-ai/sdk` dependency
+- [ ] `apps/web/components/AppShell.tsx` — drop `{ id: "analyst", … }` from `TABS`
+- [ ] Keep `nav.analyst` in `packages/i18n/src/dict.ts` (zero cost, useful if reverted)
+
+**Risk:** low. Anthropic dep is web-only, no other consumer.
+**Doesn't kill:** dynImport hack in `farside.ts`/`portfolio.ts` (those are still consumed by `/api/flows/etf` + `/api/portfolio`). That's Phase D's job.
+
+### Phase B — Hub HTTP cache, **v0 only** (~30 min)
+Single bottleneck: each MCP tool call hits external APIs. Solution: hot in-memory cache served by `apps/realtime` over localhost HTTP. **Do NOT merge with `apps/alerts`** — keep failure isolation.
+
+#### Cache contract
+```ts
+// apps/realtime/src/cache.ts (new)
+interface HubCache {
+  snapshot: FundflowSnapshot | null;     // refreshed every 90s
+  snapshotTs: number;
+  funding: Map<string, FundingRate>;      // key: `${exchange}:${symbol}`, updated by WS streams
+  oi:      Map<string, OpenInterest>;
+  health:  { lastError?: string; lastErrorTs?: number };
+}
+```
+
+#### HTTP server (env `HUB_HTTP_PORT`, default 8081, alongside WS `WS_PORT` 8080, localhost-bind only)
+```
+GET /snapshot                          → FundflowSnapshot + X-Cache-Age: <seconds>
+GET /funding                           → FundingRate[]
+GET /funding/:exchange/:symbol         → FundingRate | 404
+GET /oi/:exchange/:symbol              → OpenInterest | 404
+GET /health                            → see shape below
+```
+- No auth — bind to `127.0.0.1` only (NOT `0.0.0.0`)
+- All responses JSON, no streaming
+- Snapshot served stale if poller errors; client checks `X-Cache-Age`
+
+#### Hub `/health` shape (consumed by `scripts/pulse-status.mjs`)
+```ts
+{
+  status: "healthy" | "degraded" | "unhealthy",
+  snapshotAgeSec: number,        // seconds since cache last refreshed
+  fundingChannelsFresh: number,  // count of funding entries < 5min old
+  oiChannels: number,            // count of OI entries cached
+  checks?: { [name]: { ok, ms, err? } },
+  ts: number,
+}
+```
+
+#### Web env wiring
+- `apps/web` reads `PULSE_HUB_URL` (default `http://127.0.0.1:8081`)
+- `/api/health` route does its own check + adds `hub:` block by probing `${PULSE_HUB_URL}/health`
+
+#### MCP rewire
+- Each `apps/mcp` tool: query `http://localhost:8081/...` first
+- **Graceful degradation:** if hub unreachable (ECONNREFUSED), fallback to direct `@pulse/sources` call + log `[mcp] hub down, falling back to direct fetch`
+- Hub-down is non-fatal — Claude Desktop still works, just slower
+
+**Skip v1/v2** — alerts already lives separate, no merge needed.
+
+### Phase C — pm2 production setup (~30 min)
+Auto-start hub + alerts + web on user's machine.
+
+#### `ecosystem.config.cjs` (root) — see actual file at repo root
+3 services: `pulse-web` (Next start, `:3000`), `pulse-realtime` (`WS_PORT=8080`, `HUB_HTTP_PORT=8081`, `PULSE_NATIVE_STREAMS=binance,bybit,okx`), `pulse-alerts` (cron). Each: `autorestart`, `max_memory_restart`, logs in `./logs/<app>.{out,err}.log`. **MCP server NOT in pm2** — Claude Desktop spawns it via stdio.
+
+#### `scripts/pulse-status.mjs`
+- `pm2 jlist` → parse JSON → table (name · status · uptime · mem · restarts)
+- `curl localhost:3000/api/health` → pretty-print (color-coded by status)
+- `curl localhost:8081/health` → same
+- Tail last alert from `apps/alerts/data/alerts.jsonl`
+
+#### Setup steps (README'd)
+```bash
+npm install -g pm2
+pnpm pulse:build
+pnpm pulse:start
+pm2 save                       # persist current list
+pm2 startup                    # generate auto-start command (run as printed)
+```
+
+### Phase D — Split `@pulse/sources` (~30 min, optional, kills dynImport debt)
+Eliminates: `dynImport` hack in `farside.ts` + `portfolio.ts`, webpack `resolve.fallback` list in `next.config.js`, the `next dev --webpack` workaround. After this, turbopack works.
+
+#### Target shape
+```
+packages/sources/
+├── package.json           ← exports map below
+└── src/
+    ├── index.ts           ← BROWSER-SAFE only: re-export types, format, _helpers, anomalies types
+    ├── server.ts          ← SERVER-ONLY: re-export everything (overview, stablecoins, etf, farside, futures, dex, tvl, funding, macro, portfolio, snapshot)
+    ├── types.ts
+    ├── format.ts
+    ├── _helpers.ts
+    ├── anomalies.ts       (split: types in ./anomalies-types.ts, scanner in ./anomalies.ts that imports server-side adapters)
+    └── (rest unchanged)
+```
+
+#### `package.json` exports map
+```json
+{
+  "name": "@pulse/sources",
+  "exports": {
+    ".":        { "types": "./src/index.ts",  "default": "./src/index.ts"  },
+    "./server": { "types": "./src/server.ts", "default": "./src/server.ts" }
+  }
+}
+```
+
+#### Consumer changes
+- `apps/web/components/**` — `import { formatUSD, ... } from "@pulse/sources"` (already correct, browser-safe path)
+- `apps/web/app/api/**/route.ts` — change to `import { ... } from "@pulse/sources/server"`
+- `apps/realtime/**`, `apps/alerts/**`, `apps/mcp/**` — change to `from "@pulse/sources/server"`
+- After all consumers updated:
+  - `rm` `dynImport` constructor + `await dynImport("node:...")` from `farside.ts` and `portfolio.ts` → use static `import { execFile } from "node:child_process"` etc.
+  - `rm` the `webpack(config, { isServer })` block from `apps/web/next.config.js`
+  - `apps/web/package.json` script: `"dev": "next dev -p 3000"` (drop `--webpack` flag)
+- Verify: `pnpm typecheck` green + `pnpm dev` boots on turbopack.
+
+**Risk:** medium. Touches every consumer. Do AFTER A/B/C land + after a `git commit` so revert is one-line.
+
+---
+
+## Phase 4 — future ideas (not committed)
+
+1. **Mobile push** — Claude Code mobile push for high-severity alerts (replace webhook)
+2. **More exchanges** — Deribit options OI/IV term structure, Coinbase spot
+3. **On-chain layer** — Etherscan/Glassnode token transfers, exchange wallet outflows
 4. **Multi-portfolio** — Bybit + OKX read-only sync alongside Binance
-5. **LLM-graded backtest** — feed signals + outcomes to Claude for pattern strength critique
+5. **LLM-graded backtest** — feed signals + outcomes back through Claude for pattern strength critique
+6. **MCP `grade_signal` tool** — given a finding, ask Claude for confidence + reasoning
+7. **Tool chaining** in MCP instructions — high-severity → auto-fetch funding details next

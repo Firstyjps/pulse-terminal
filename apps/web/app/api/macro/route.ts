@@ -1,4 +1,4 @@
-import { getMacro } from "@pulse/sources";
+import { getMacro } from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const revalidate = 600;

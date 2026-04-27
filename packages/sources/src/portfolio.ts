@@ -1,8 +1,9 @@
 // Read-only portfolio sync — Binance signed account endpoint.
 // Requires BINANCE_API_KEY + BINANCE_API_SECRET. SAFE if keys are read-only (no trade permission).
 //
-// node:crypto is loaded lazily so the barrel stays browser-safe — only
-// `getPortfolio()` (server-only) ever pulls it in.
+// This file is server-only — re-exported through `@pulse/sources/server`,
+// never the browser-safe `@pulse/sources` barrel.
+import { createHmac } from "node:crypto";
 import { fetchJson } from "./_helpers.js";
 
 export interface PortfolioBalance {
@@ -31,11 +32,7 @@ interface BinancePrice {
   price: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const dynImport = new Function("m", "return import(m)") as (m: string) => Promise<any>;
-
-async function sign(secret: string, query: string): Promise<string> {
-  const { createHmac } = await dynImport("node:crypto");
+function sign(secret: string, query: string): string {
   return createHmac("sha256", secret).update(query).digest("hex");
 }
 
@@ -50,7 +47,7 @@ export async function getPortfolio(): Promise<PortfolioSnapshot | null> {
 
   const ts = Date.now();
   const query = `timestamp=${ts}&recvWindow=10000`;
-  const signature = await sign(apiSecret, query);
+  const signature = sign(apiSecret, query);
   const url = `https://api.binance.com/api/v3/account?${query}&signature=${signature}`;
 
   const res = await fetch(url, {
