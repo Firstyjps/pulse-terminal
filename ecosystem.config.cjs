@@ -1,13 +1,23 @@
 // pm2 ecosystem — production process supervisor for the 3 long-running services.
 //
 // Usage:
-//   pnpm pulse:build           # tsc compile realtime + alerts to dist/, next build for web
-//   pm2 start ecosystem.config.cjs
+//   pnpm pulse:build           # next build for web (only thing that needs compiling)
+//   pnpm pulse:start           # launches all 3 via pm2
 //   pm2 save && pm2 startup    # auto-start on boot (Linux/mac); Windows: pm2-installer
 //
 // Logs:  ./logs/<app>.{out,err}.log
-// Health probes hit /health on the relevant port; pm2 itself watches the process,
-// not the body — combine with `pulse:status` script for body-level checks.
+//
+// Why tsx for realtime/alerts:
+//   `@pulse/sources` ships TypeScript source-only (no emit). Running the apps
+//   via `node --import tsx` lets us skip a per-package compile step while still
+//   getting native Node speed (tsx's strip-types loader is ~equivalent to .js).
+
+const path = require("node:path");
+
+/** Build a `--import file://...tsx/dist/loader.mjs` flag relative to each app's cwd. */
+const tsxLoader = (appCwd) =>
+  "file://" +
+  path.resolve(__dirname, appCwd, "node_modules/tsx/dist/loader.mjs").replace(/\\/g, "/");
 
 module.exports = {
   apps: [
@@ -31,7 +41,9 @@ module.exports = {
     {
       name: "pulse-realtime",
       cwd: "./apps/realtime",
-      script: "dist/index.js",
+      script: "src/index.ts",
+      interpreter: "node",
+      interpreter_args: `--import ${tsxLoader("apps/realtime")}`,
       env: {
         NODE_ENV: "production",
         WS_PORT: "8080",
@@ -48,7 +60,9 @@ module.exports = {
     {
       name: "pulse-alerts",
       cwd: "./apps/alerts",
-      script: "dist/index.js",
+      script: "src/index.ts",
+      interpreter: "node",
+      interpreter_args: `--import ${tsxLoader("apps/alerts")}`,
       env: {
         NODE_ENV: "production",
         ALERT_INTERVAL_MS: "900000",

@@ -11,7 +11,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "clean": "turbo run clean",
-    "pulse:build": "pnpm --filter @pulse/realtime build && pnpm --filter @pulse/alerts build && pnpm --filter @pulse/web build",
+    "pulse:build": "pnpm --filter @pulse/web build",
     "pulse:start": "pm2 start ecosystem.config.cjs",
     "pulse:stop": "pm2 stop ecosystem.config.cjs",
     "pulse:restart": "pm2 restart ecosystem.config.cjs",

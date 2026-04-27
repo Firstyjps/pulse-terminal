@@ -22,11 +22,13 @@ const ENDPOINTS = [
 ];
 
 async function getPm2List() {
+  // On Windows, npm-installed CLIs are `.cmd` shims that node can't spawn directly.
+  // Wrap via cmd.exe so the shim is interpreted.
+  const isWin = process.platform === "win32";
   try {
-    // Use the cmd shell explicitly on Windows, plain spawn elsewhere
-    const isWin = process.platform === "win32";
-    const cmd = isWin ? "pm2.cmd" : "pm2";
-    const { stdout } = await execFileP(cmd, ["jlist"]);
+    const { stdout } = isWin
+      ? await execFileP("cmd.exe", ["/d", "/s", "/c", "pm2 jlist"])
+      : await execFileP("pm2", ["jlist"]);
     return JSON.parse(stdout);
   } catch (err) {
     return { _error: err.message };
