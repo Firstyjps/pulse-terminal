@@ -6,7 +6,7 @@ import { Notifier } from "./notifier.js";
 import { startDualAssetsTick } from "./dual-assets-tick.js";
 import { startDualAssetsRollup } from "./dual-assets-rollup.js";
 
-const INTERVAL_MS = Number(process.env.ALERT_INTERVAL_MS ?? 900_000);
+const INTERVAL_MS = Number(process.env.ALERT_INTERVAL_MS ?? 240_000);
 const LOG_PATH = resolve(process.env.ALERT_LOG_PATH ?? "./data/alerts.jsonl");
 const WEBHOOK_URL = process.env.ALERT_WEBHOOK_URL;
 const MIN_SEVERITY = (process.env.ALERT_MIN_SEVERITY ?? "med") as "low" | "med" | "high";
