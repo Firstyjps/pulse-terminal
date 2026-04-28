@@ -283,14 +283,16 @@ server.tool(
 // 3 new derivatives tools (Pulse Terminal additions)
 // ─────────────────────────────────────────────────────────────────
 
-const ExchangeSchema = z.enum(["binance", "bybit", "okx"]);
+const ExchangeSchema = z.enum(["binance", "bybit", "okx", "deribit"]);
 
 server.tool(
   "get_funding_summary",
-  "Aggregated funding rates for a symbol across Binance, Bybit, and OKX (or a " +
-    "specific exchange). Returns each venue's rate plus the cross-venue mean / " +
-    "max-min spread — a wide spread between exchanges is itself a signal. " +
-    "Sources: fapi.binance.com, api.bybit.com, www.okx.com.",
+  "Aggregated funding rates for a symbol across Binance, Bybit, OKX, and " +
+    "Deribit (or a specific exchange). Returns each venue's rate plus the " +
+    "cross-venue mean / max-min spread — a wide spread between exchanges is " +
+    "itself a signal. Deribit perpetuals are inverse contracts; their " +
+    "funding_8h is the directly comparable rate. Sources: fapi.binance.com, " +
+    "api.bybit.com, www.okx.com, www.deribit.com.",
   {
     exchange: ExchangeSchema.optional().describe("Filter to one venue. Omit for all three."),
     symbol: z
@@ -337,9 +339,11 @@ server.tool(
 
 server.tool(
   "get_oi_snapshot",
-  "Open-interest snapshot for a symbol across Binance/Bybit/OKX in USD notional. " +
-    "Returns each venue's OI plus the cross-venue total — useful for measuring " +
-    "leverage build-up. Source: each exchange's public OI endpoint.",
+  "Open-interest snapshot for a symbol across Binance/Bybit/OKX/Deribit in USD " +
+    "notional. Returns each venue's OI plus the cross-venue total — useful for " +
+    "measuring leverage build-up. Deribit's `oi` is derived from its " +
+    "USD-quoted open_interest divided by mark_price (inverse perp). Source: " +
+    "each exchange's public OI endpoint.",
   {
     exchange: ExchangeSchema.optional().describe("Filter to one venue. Omit for all three."),
     symbol: z
