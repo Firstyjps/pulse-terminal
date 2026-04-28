@@ -97,6 +97,10 @@
     {
       "name": "get_dual_assets_daily_summary",
       "description": "Daily aggregated APR summaries (avg/max/min + best/worst hour) per date × pair × target"
+    },
+    {
+      "name": "grade_signal",
+      "description": "Grade an anomaly finding from detect_anomalies — returns rubric + required output schema for confidence/reasoning/risk_flags"
     }
   ],
   "user_config": {
