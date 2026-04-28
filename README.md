@@ -56,7 +56,7 @@ apps/
 ├── web/        Next.js 16 dashboard (App Router, 6 tabs, 11+ API routes)
 ├── realtime/   WS server (Binance/Bybit/OKX native streams) + HTTP cache (Phase B v0)
 ├── alerts/     Cron worker — runs scanAnomalies every 15min, JSONL log + webhook
-└── mcp/        MCP server for Claude Desktop (10 tools, stdio transport, .dxt bundle)
+└── mcp/        MCP server for Claude Desktop (17 tools, stdio transport, .dxt bundle)
 
 packages/
 ├── ui/         Design tokens + 9 React components (purple/cyan glassmorphism)
@@ -75,7 +75,15 @@ pnpm --filter @pulse/mcp pack-dxt
 # Drop apps/mcp/dist/*.dxt into Claude Desktop → Settings → MCP servers
 ```
 
-Available tools: `get_market_overview`, `get_stablecoin_flows`, `get_etf_flows`, `get_futures`, `get_dex_leaderboard`, `get_tvl_breakdown`, `get_funding_summary`, `get_oi_snapshot`, `detect_anomalies`, `get_fundflow_snapshot`. Once Phase B v0 ships, tools query the local hub at `:8081` for sub-50ms latency.
+Available tools (17):
+
+- **Data** — `get_market_overview`, `get_stablecoin_flows`, `get_etf_flows`, `get_futures`, `get_dex_leaderboard`, `get_tvl_breakdown`, `get_fundflow_snapshot`
+- **Derivatives** — `get_funding_summary`, `get_oi_snapshot` (cross-venue: Binance / Bybit / OKX / Deribit)
+- **Options (Phase 5A)** — `get_options_chain`, `get_iv_smile`, `get_options_arbitrage`
+- **Bybit Dual Assets (Phase 5A)** — `get_dual_assets_apr`, `get_best_dual_assets_hour`, `get_dual_assets_daily_summary`
+- **Analysis** — `detect_anomalies`, `grade_signal` (Phase 4 — rubric-returner for grading findings)
+
+Tools query the local hub at `:8081` for sub-50ms latency, with graceful fallback to direct upstream fetch when the hub is unreachable.
 
 ## How to contribute
 
