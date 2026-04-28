@@ -4,6 +4,8 @@ import { Card } from "@pulse/ui";
 import { Sparkline } from "@pulse/charts";
 import { formatUSD, formatPercent } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
+import { useWatchlist } from "../lib/use-watchlist";
+import { SkeletonRows } from "./Skeleton";
 
 export interface MarketsTableProps {
   /** Currently selected symbol (e.g. "BTC"). When set, that row is highlighted. */
@@ -36,16 +38,23 @@ const ChangeCell = ({ value }: { value?: number }) => {
 
 export function MarketsTable({ selectedSymbol, onSelect }: MarketsTableProps = {}) {
   const { data, loading, error } = useFlow<CoinRow[]>("/api/markets");
+  const { has, toggle } = useWatchlist();
+
+  // Sort watched coins to the top, preserve original order otherwise
+  const sorted = data
+    ? [...data].sort((a, b) => Number(has(b.symbol)) - Number(has(a.symbol)))
+    : null;
 
   return (
     <Card>
-      {loading && <p style={{ color: "#9ca3af" }}>Loading top 20 coins…</p>}
+      {loading && !data && <div style={{ padding: 12 }}><SkeletonRows rows={8} /></div>}
       {error && <p style={{ color: "#f87171" }}>Error: {error}</p>}
-      {data && (
+      {sorted && (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#9ca3af", borderBottom: "1px solid rgba(255,255,255,0.08)", fontFamily: "JetBrains Mono, monospace" }}>
+                <th style={{ padding: "10px 12px", fontWeight: 600, width: 28 }}></th>
                 <th style={{ padding: "10px 12px", fontWeight: 600 }}>#</th>
                 <th style={{ padding: "10px 12px", fontWeight: 600 }}>Asset</th>
                 <th style={{ padding: "10px 12px", fontWeight: 600, textAlign: "right" }}>Price</th>
@@ -58,20 +67,39 @@ export function MarketsTable({ selectedSymbol, onSelect }: MarketsTableProps = {
               </tr>
             </thead>
             <tbody>
-              {data.map((c, i) => {
+              {sorted.map((c, i) => {
                 const sym = c.symbol.toUpperCase();
                 const active = selectedSymbol === sym;
+                const watched = has(sym);
                 return (
                 <tr
                   key={c.id}
                   onClick={() => onSelect?.(sym)}
                   style={{
                     borderBottom: "1px solid rgba(255,255,255,0.04)",
-                    background: active ? "rgba(124,92,255,0.08)" : undefined,
+                    background: active ? "rgba(124,92,255,0.08)" : watched ? "rgba(251,191,36,0.04)" : undefined,
                     cursor: onSelect ? "pointer" : undefined,
                     transition: "background .15s",
                   }}
                 >
+                  <td style={{ padding: "12px 4px 12px 12px" }}>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggle(sym); }}
+                      title={watched ? "Remove from watchlist" : "Add to watchlist"}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: 14,
+                        color: watched ? "#fbbf24" : "#404656",
+                        padding: 0,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {watched ? "★" : "☆"}
+                    </button>
+                  </td>
                   <td style={{ padding: "12px", color: "#6b7280" }}>{i + 1}</td>
                   <td style={{ padding: "12px" }}>
                     <span style={{ fontWeight: 600 }}>{sym}</span>

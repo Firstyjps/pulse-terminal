@@ -1,103 +1,186 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Pill } from "@pulse/ui";
+import { SignalPill, colors, fonts } from "@pulse/ui";
+import type { SignalTone } from "@pulse/ui";
 import type { AnomalyScan, AnomalyFinding } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
 
-const SEV_TONE: Record<AnomalyFinding["severity"], "down" | "gold" | "flat"> = {
-  high: "down",
-  med: "gold",
-  low: "flat",
+/**
+ * Map our internal AnomalyCategory → handoff display tag.
+ * Handoff tags: WHALE / LIQ / FLOW / OI / PUMP / NEWS
+ *
+ * Since our data layer uses different categories (etf/futures/funding/stablecoin/tvl/dex/options/bybit),
+ * we re-map for display:
+ *   etf       → FLOW   (cyan, exchange/issuer netflow)
+ *   futures   → OI     (magenta, futures open interest)
+ *   funding   → OI     (magenta, perp leverage signal)
+ *   stablecoin→ FLOW   (cyan, stablecoin supply movement)
+ *   tvl       → PUMP   (green, defi capital movement)
+ *   dex       → FLOW   (cyan, exchange flow)
+ *   options   → OI     (magenta, options structure)
+ *   bybit     → WHALE  (amber, exchange-specific large move)
+ */
+const CAT_DISPLAY: Record<AnomalyFinding["category"], "WHALE" | "LIQ" | "FLOW" | "OI" | "PUMP" | "NEWS"> = {
+  etf: "FLOW",
+  futures: "OI",
+  funding: "OI",
+  stablecoin: "FLOW",
+  tvl: "PUMP",
+  dex: "FLOW",
+  options: "OI",
+  bybit: "WHALE",
 };
 
-const CATEGORY_TONE: Record<AnomalyFinding["category"], "purple" | "btc" | "eth" | "cyan" | "up" | "down"> = {
-  etf: "purple",
-  futures: "btc",
-  funding: "eth",
-  stablecoin: "cyan",
-  tvl: "up",
-  dex: "down",
+const SEV_TONE: Record<AnomalyFinding["severity"], SignalTone> = {
+  high: "down",
+  med: "amber",
+  low: "muted",
 };
 
 export interface AlertsFeedProps {
   symbol?: string;
+  /** Slim variant when embedded in a small panel — drops sub-header. */
+  embed?: "panel" | "strip";
 }
 
-export function AlertsFeed({ symbol = "BTCUSDT" }: AlertsFeedProps) {
+function fmtTime(ts: string | Date) {
+  const d = typeof ts === "string" ? new Date(ts) : ts;
+  return d.toISOString().slice(11, 19);
+}
+
+export function AlertsFeed({ symbol = "BTCUSDT", embed = "panel" }: AlertsFeedProps) {
   const [refresh, setRefresh] = useState(0);
   const { data, loading, error } = useFlow<AnomalyScan>(`/api/alerts/scan?symbol=${symbol}`, refresh);
+  const slim = embed === "strip";
 
   return (
-    <section style={{ marginTop: 32 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 14, letterSpacing: "0.12em", color: "#9ca3af", textTransform: "uppercase" }}>
-            Live Anomaly Feed
-          </h3>
-          <span style={{ fontSize: 11, color: "#6b7280" }}>{symbol} · cross-source</span>
-        </div>
-        <button
-          onClick={() => setRefresh((r) => r + 1)}
-          disabled={loading}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {!slim && (
+        <div
           style={{
-            background: "transparent",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 8,
-            color: "#f2f4f8",
-            padding: "4px 10px",
-            fontSize: 11,
-            cursor: loading ? "wait" : "pointer",
-            fontFamily: "JetBrains Mono, monospace",
-            opacity: loading ? 0.5 : 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "4px 8px",
+            borderBottom: `1px solid ${colors.line}`,
+            fontFamily: fonts.mono,
+            fontSize: 9,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: colors.txt3,
+            flexShrink: 0,
           }}
         >
-          {loading ? "SCANNING…" : "RESCAN"}
-        </button>
-      </div>
+          <span style={{ color: colors.txt2 }}>{symbol}</span>
+          <span>· cross-source</span>
+          {data && <span style={{ color: colors.txt4 }}>· {data.findings.length} EVTS</span>}
+          <button
+            type="button"
+            onClick={() => setRefresh((r) => r + 1)}
+            disabled={loading}
+            style={{
+              marginLeft: "auto",
+              background: "transparent",
+              border: `1px solid ${colors.line2}`,
+              color: colors.txt2,
+              fontFamily: "inherit",
+              fontSize: 9,
+              padding: "2px 6px",
+              cursor: loading ? "wait" : "pointer",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              opacity: loading ? 0.5 : 1,
+            }}
+          >
+            {loading ? "Scanning…" : "Rescan"}
+          </button>
+        </div>
+      )}
 
-      <Card>
-        {loading && !data && <p style={{ color: "#9ca3af", fontSize: 12 }}>Scanning sources…</p>}
-        {error && <p style={{ color: "#f87171", fontSize: 12 }}>Error: {error}</p>}
-        {data && data.findings.length === 0 && (
-          <p style={{ color: "#9ca3af", fontSize: 13 }}>
-            No anomalies — markets quiet across the tracked dimensions.
-          </p>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
+        {loading && !data && (
+          <div
+            style={{
+              padding: 16,
+              textAlign: "center",
+              fontFamily: fonts.mono,
+              fontSize: 10,
+              color: colors.txt3,
+            }}
+          >
+            <span className="blink">▒ MONITORING ▒</span>
+          </div>
         )}
-        {data && data.findings.length > 0 && (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-            {data.findings.map((f, i) => (
-              <li
+        {error && (
+          <div style={{ padding: 12, fontFamily: fonts.mono, fontSize: 10, color: colors.red }}>
+            ERR · {error}
+          </div>
+        )}
+        {data && data.findings.length === 0 && (
+          <div
+            style={{
+              padding: 16,
+              textAlign: "center",
+              fontFamily: fonts.mono,
+              fontSize: 10,
+              color: colors.txt3,
+            }}
+          >
+            <span className="blink">▒ MARKETS QUIET — NO ANOMALIES ▒</span>
+            <div style={{ marginTop: 4, fontSize: 9, color: colors.txt4 }}>
+              last scan {data.generatedAt ? fmtTime(data.generatedAt) : "—"} UTC
+            </div>
+          </div>
+        )}
+        {data &&
+          data.findings.map((f, i) => {
+            const tag = CAT_DISPLAY[f.category];
+            const sev = f.severity;
+            return (
+              <div
                 key={`${f.category}:${i}`}
+                className="feed-row"
                 style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  padding: "10px 0",
-                  borderBottom: i < data.findings.length - 1 ? "1px dashed rgba(255,255,255,0.06)" : "none",
+                  display: "grid",
+                  gridTemplateColumns: "60px 60px 1fr auto",
+                  gap: 8,
+                  padding: "5px 8px",
+                  borderBottom: `1px solid ${colors.line}`,
+                  fontSize: 10,
+                  fontFamily: fonts.mono,
+                  alignItems: "baseline",
                 }}
               >
-                <Pill tone={SEV_TONE[f.severity]} size="sm">{f.severity.toUpperCase()}</Pill>
-                <Pill tone={CATEGORY_TONE[f.category]} size="sm">{f.category.toUpperCase()}</Pill>
-                <div style={{ flex: 1, fontSize: 13, color: "#f2f4f8", lineHeight: 1.5 }}>
+                <span
+                  style={{
+                    color: colors.txt4,
+                    fontSize: 9,
+                  }}
+                >
+                  {fmtTime(data.generatedAt)}
+                </span>
+                <SignalPill tone={tag}>{tag}</SignalPill>
+                <span style={{ color: colors.txt2 }}>
                   {f.signal}
-                  <span style={{ display: "block", marginTop: 2, fontSize: 11, color: "#6b7280", fontFamily: "JetBrains Mono, monospace" }}>
-                    {Object.entries(f.evidence)
-                      .map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed(3) : String(v)}`)
-                      .join(" · ")}
+                  <span style={{ marginLeft: 8, color: colors.txt4, fontSize: 9 }}>
+                    [{evidenceShort(f.evidence)}]
                   </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {data && (
-        <p style={{ marginTop: 8, fontSize: 11, color: "#6b7280" }}>
-          generated {new Date(data.generatedAt).toLocaleTimeString()} · BTC ${data.marker.btcPrice?.toFixed(2) ?? "—"}
-        </p>
-      )}
-    </section>
+                </span>
+                <SignalPill tone={SEV_TONE[sev]} size="xs">
+                  {sev}
+                </SignalPill>
+              </div>
+            );
+          })}
+      </div>
+    </div>
   );
+}
+
+function evidenceShort(ev: Record<string, unknown>): string {
+  return Object.entries(ev)
+    .slice(0, 3)
+    .map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed(2) : String(v)}`)
+    .join(" · ");
 }

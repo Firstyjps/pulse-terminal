@@ -16,7 +16,9 @@
     "pulse:stop": "pm2 stop ecosystem.config.cjs",
     "pulse:restart": "pm2 restart ecosystem.config.cjs",
     "pulse:status": "node scripts/pulse-status.mjs",
-    "pulse:logs": "pm2 logs --lines 50"
+    "pulse:logs": "pm2 logs --lines 50",
+    "ask": "node scripts/ask.mjs",
+    "ask:p": "node scripts/ask.mjs -p"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

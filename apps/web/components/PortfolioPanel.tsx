@@ -1,9 +1,11 @@
 "use client";
 
-import { Card, Pill } from "@pulse/ui";
+import { MonoNum, SignalPill, colors, fonts } from "@pulse/ui";
 import { formatUSD } from "@pulse/sources";
 import type { PortfolioBalance } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
+import { EmptyState } from "./EmptyState";
+import { SkeletonRows } from "./Skeleton";
 
 interface ApiResp {
   configured: boolean;
@@ -13,69 +15,241 @@ interface ApiResp {
   ts?: number;
 }
 
+const ASSET_COLOR: Record<string, string> = {
+  BTC: colors.btc,
+  ETH: colors.eth,
+  USDT: colors.green,
+  USDC: colors.accent2,
+  BNB: colors.gold,
+  SOL: "#9b6dff",
+  XRP: "#9aa3b3",
+  DOGE: "#cba135",
+};
+
+function colorFor(asset: string): string {
+  if (ASSET_COLOR[asset]) return ASSET_COLOR[asset];
+  // hash to a palette
+  let h = 0;
+  for (let i = 0; i < asset.length; i++) h = (h * 31 + asset.charCodeAt(i)) | 0;
+  const palette = [colors.accent, colors.accent2, colors.gold, colors.eth, colors.btc, "#9b6dff"];
+  return palette[Math.abs(h) % palette.length];
+}
+
+/**
+ * PortfolioBlock — compact overview of Binance spot holdings.
+ *
+ * - Big total at top with phosphor flash on tick
+ * - Top-N holdings as horizontal bars (length = USD share, label = ticker, value = USD)
+ * - Hover row reveals free/locked detail
+ */
 export function PortfolioPanel() {
   const { data, loading } = useFlow<ApiResp>("/api/portfolio");
 
+  if (loading && !data) {
+    return <SkeletonRows rows={5} />;
+  }
+
+  if (data && !data.configured) {
+    return (
+      <EmptyState
+        icon="🔐"
+        title="Portfolio not configured"
+        body={
+          <>
+            Set <code style={{ color: colors.accent }}>BINANCE_API_KEY</code> +{" "}
+            <code style={{ color: colors.accent }}>BINANCE_API_SECRET</code> in <code>.env.local</code>, then{" "}
+            <code>pnpm pulse:restart</code>.
+            <br />
+            <br />
+            <strong style={{ color: colors.gold }}>Important:</strong> use a <strong>read-only</strong> key (disable
+            Trading + Withdrawal in the Binance API console). See{" "}
+            <a href="/SECURITY.md" style={{ color: colors.accent2 }}>
+              SECURITY.md
+            </a>
+            .
+          </>
+        }
+        action={<SignalPill tone="muted">OPT-IN FEATURE</SignalPill>}
+      />
+    );
+  }
+
+  if (!data?.configured || !data.balances) return null;
+
+  const total = data.totalUsd ?? 0;
+  const sortedAll = [...data.balances].filter((b) => (b.usdValue ?? 0) > 0).sort((a, b) => (b.usdValue ?? 0) - (a.usdValue ?? 0));
+  const top = sortedAll.slice(0, 8);
+  const other = sortedAll.slice(8);
+  const otherUsd = other.reduce((s, b) => s + (b.usdValue ?? 0), 0);
+
   return (
-    <section style={{ marginTop: 32 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 14, letterSpacing: "0.12em", color: "#9ca3af", textTransform: "uppercase" }}>
-          Portfolio · Binance Spot
-        </h3>
-        {data?.configured && data.totalUsd !== undefined && (
-          <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 14 }}>
-            {formatUSD(data.totalUsd)}
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, height: "100%" }}>
+      {/* Total */}
+      <div
+        style={{
+          padding: "14px 16px",
+          background: colors.bg3,
+          border: `1px solid ${colors.line2}`,
+          borderRadius: 3,
+          boxShadow: "0 1px 0 rgba(255,255,255,0.05) inset",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(135deg, rgba(65,255,139,0.06) 0%, transparent 60%)",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "relative",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: 6,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: fonts.mono,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.10em",
+              color: colors.txt2,
+              textTransform: "uppercase",
+            }}
+          >
+            TOTAL EQUITY
           </span>
+          <span style={{ fontFamily: fonts.mono, fontSize: 10, color: colors.txt3, letterSpacing: "0.06em" }}>
+            BINANCE · SPOT
+          </span>
+        </div>
+        <MonoNum
+          value={total}
+          size={34}
+          weight={800}
+          style={{ color: colors.txt1, letterSpacing: "-0.025em", lineHeight: 1.05 }}
+        >
+          {formatUSD(total, { compact: false, decimals: 2 })}
+        </MonoNum>
+        <div style={{ marginTop: 8, fontFamily: fonts.mono, fontSize: 11, color: colors.txt3, letterSpacing: "0.06em", fontWeight: 600 }}>
+          {sortedAll.length} ASSETS
+        </div>
+      </div>
+
+      {/* Holdings bars */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0, overflow: "auto" }}>
+        {top.map((b) => {
+          const usd = b.usdValue ?? 0;
+          const pct = total > 0 ? (usd / total) * 100 : 0;
+          return <HoldingBar key={b.asset} asset={b.asset} usd={usd} pct={pct} qty={b.total} locked={b.locked} />;
+        })}
+        {otherUsd > 0 && (
+          <HoldingBar asset="OTHER" usd={otherUsd} pct={(otherUsd / total) * 100} qty={null} locked={null} muted />
         )}
       </div>
-      <Card>
-        {loading && <p style={{ color: "#6b7280", fontSize: 12 }}>Loading…</p>}
-        {data && !data.configured && (
-          <div>
-            <Pill tone="flat">NOT CONFIGURED</Pill>
-            <p style={{ color: "#9ca3af", fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
-              {data.message}<br />
-              <strong>Use a read-only key</strong> — disable trading/withdrawal permissions in Binance API
-              settings before pasting credentials.
-            </p>
-          </div>
-        )}
-        {data?.configured && data.balances && (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "JetBrains Mono, monospace" }}>
-              <thead>
-                <tr style={{ textAlign: "left", color: "#9ca3af", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  <th style={{ padding: "8px 12px" }}>Asset</th>
-                  <th style={{ padding: "8px 12px", textAlign: "right" }}>Free</th>
-                  <th style={{ padding: "8px 12px", textAlign: "right" }}>Locked</th>
-                  <th style={{ padding: "8px 12px", textAlign: "right" }}>Total</th>
-                  <th style={{ padding: "8px 12px", textAlign: "right" }}>USD</th>
-                  <th style={{ padding: "8px 12px", textAlign: "right" }}>Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.balances.slice(0, 25).map((b) => {
-                  const share = data.totalUsd && b.usdValue ? (b.usdValue / data.totalUsd) * 100 : 0;
-                  return (
-                    <tr key={b.asset} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                      <td style={{ padding: "8px 12px", fontWeight: 600 }}>{b.asset}</td>
-                      <td style={{ padding: "8px 12px", textAlign: "right", color: "#9ca3af" }}>{b.free.toFixed(6)}</td>
-                      <td style={{ padding: "8px 12px", textAlign: "right", color: "#6b7280" }}>{b.locked.toFixed(6)}</td>
-                      <td style={{ padding: "8px 12px", textAlign: "right" }}>{b.total.toFixed(6)}</td>
-                      <td style={{ padding: "8px 12px", textAlign: "right", color: "#9ca3af" }}>
-                        {b.usdValue ? formatUSD(b.usdValue) : "—"}
-                      </td>
-                      <td style={{ padding: "8px 12px", textAlign: "right", color: "#9ca3af" }}>
-                        {share.toFixed(1)}%
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </section>
+    </div>
+  );
+}
+
+function HoldingBar({
+  asset,
+  usd,
+  pct,
+  qty,
+  locked,
+  muted,
+}: {
+  asset: string;
+  usd: number;
+  pct: number;
+  qty: number | null;
+  locked: number | null;
+  muted?: boolean;
+}) {
+  const color = muted ? colors.txt4 : colorFor(asset);
+  return (
+    <div
+      style={{
+        position: "relative",
+        background: colors.bg2,
+        border: `1px solid ${colors.line}`,
+        borderRadius: 2,
+        padding: "10px 12px",
+        overflow: "hidden",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: `${pct}%`,
+          background: muted
+            ? "rgba(255,255,255,0.03)"
+            : `linear-gradient(90deg, ${color}30 0%, ${color}12 100%)`,
+          borderRight: `1px solid ${color}44`,
+          transition: "width .35s ease",
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
+          display: "grid",
+          gridTemplateColumns: "auto 1fr auto auto",
+          gap: 12,
+          alignItems: "center",
+          fontFamily: fonts.mono,
+          fontSize: 12.5,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 1,
+            background: color,
+            boxShadow: muted ? undefined : `0 0 8px ${color}88`,
+          }}
+        />
+        <span style={{ fontWeight: 800, color: muted ? colors.txt3 : colors.txt1, letterSpacing: "0.02em" }}>
+          {asset}
+          {qty !== null && (
+            <span style={{ marginLeft: 10, fontWeight: 500, color: colors.txt3, fontSize: 11 }}>
+              {qty < 1 ? qty.toFixed(6) : qty.toFixed(qty < 100 ? 4 : 2)}
+              {locked && locked > 0 && (
+                <span style={{ marginLeft: 6, color: colors.gold }}>
+                  · {locked.toFixed(qty < 100 ? 4 : 2)} locked
+                </span>
+              )}
+            </span>
+          )}
+        </span>
+        <span style={{ color: colors.txt1, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+          {formatUSD(usd, { compact: usd >= 100_000, decimals: usd >= 10_000 ? 0 : 2 })}
+        </span>
+        <span
+          style={{
+            color: colors.txt2,
+            fontVariantNumeric: "tabular-nums",
+            minWidth: 50,
+            textAlign: "right",
+            fontSize: 11.5,
+            fontWeight: 600,
+          }}
+        >
+          {pct.toFixed(1)}%
+        </span>
+      </div>
+    </div>
   );
 }

@@ -20,3 +20,9 @@ export { getFullSnapshot, summarizeSnapshot } from "./snapshot.js";
 export { scanAnomalies, deriveAnomalies } from "./anomalies.js";
 export { getMacro } from "./macro.js";
 export { getPortfolio } from "./portfolio.js";
+
+// Multi-exchange options (Deribit/Binance/Bybit/OKX) — Phase 5A
+export * from "./options/index.js";
+
+// Bybit Dual Assets APR tracker + SQLite store — Phase 5A
+export * from "./dual-assets/index.js";

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { colors, fonts, gradients, glows, radii } from "./tokens";
+import { colors, fonts } from "./tokens";
 
 export interface NavTab {
   id: string;
@@ -34,7 +34,6 @@ const DefaultBrandIcon = (
   </svg>
 );
 
-const liveDotKeyframes = `@keyframes pulseUiLiveDot { 50% { opacity: 0.4; } }`;
 
 export function NavBar({
   brand = "PULSE",
@@ -53,50 +52,40 @@ export function NavBar({
         position: "sticky",
         top: 0,
         zIndex: 100,
-        backdropFilter: "blur(22px)",
-        WebkitBackdropFilter: "blur(22px)",
-        background: "rgba(4,5,10,0.7)",
+        background: colors.bg1,
         borderBottom: `1px solid ${colors.line}`,
+        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
         ...style,
       }}
     >
-      <style>{liveDotKeyframes}</style>
       <div
         style={{
-          maxWidth: 1640,
-          margin: "0 auto",
-          padding: "14px 28px",
+          maxWidth: "100%",
+          margin: 0,
+          padding: "10px 16px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 24,
+          gap: 16,
         }}
       >
         {/* Brand */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: radii.md,
-              background: gradients.purple,
+              width: 36,
+              height: 36,
+              borderRadius: 3,
+              background: colors.bg3,
+              border: `1px solid ${colors.line2}`,
               display: "grid",
               placeItems: "center",
-              boxShadow: glows.purple,
+              boxShadow: "0 0 0 1px rgba(65,255,139,0.15), 0 0 14px -2px rgba(65,255,139,0.25)",
               position: "relative",
               overflow: "hidden",
-              color: "#fff",
+              color: colors.accent,
             }}
           >
-            <span
-              aria-hidden
-              style={{
-                position: "absolute",
-                inset: 0,
-                background:
-                  "radial-gradient(circle at 30% 20%,rgba(255,255,255,0.4),transparent 50%)",
-              }}
-            />
             <span style={{ position: "relative", zIndex: 1, display: "inline-flex" }}>
               {brandIcon ?? DefaultBrandIcon}
             </span>
@@ -104,24 +93,29 @@ export function NavBar({
           <div>
             <div
               style={{
-                fontSize: 18,
-                fontWeight: 800,
-                letterSpacing: "-0.01em",
+                fontFamily: fonts.mono,
+                fontSize: 15,
+                fontWeight: 700,
+                letterSpacing: "0.04em",
                 color: colors.txt1,
+                lineHeight: 1.05,
               }}
             >
               {brand}
               {brandAccent && (
-                <span style={{ fontWeight: 300, opacity: 0.65 }}> {brandAccent}</span>
+                <span style={{ fontWeight: 400, opacity: 0.55, marginLeft: 4 }}>·{brandAccent}</span>
               )}
             </div>
             <div
+              className="bsub"
               style={{
-                fontSize: 10,
+                fontFamily: fonts.mono,
+                fontSize: 9,
                 color: colors.txt3,
-                letterSpacing: "0.18em",
+                letterSpacing: "0.20em",
                 textTransform: "uppercase",
                 fontWeight: 600,
+                marginTop: 2,
               }}
             >
               {subtitle}
@@ -131,8 +125,17 @@ export function NavBar({
 
         {/* Tabs */}
         {tabs.length > 0 && (
-          <div style={{ display: "flex", gap: 4 }}>
-            {tabs.map((tab) => {
+          <div
+            style={{
+              display: "flex",
+              gap: 0,
+              border: `1px solid ${colors.line}`,
+              borderRadius: 3,
+              overflow: "hidden",
+              background: colors.bg2,
+            }}
+          >
+            {tabs.map((tab, i) => {
               const active = tab.id === activeTab;
               return (
                 <button
@@ -140,20 +143,34 @@ export function NavBar({
                   type="button"
                   onClick={() => onTabChange?.(tab.id)}
                   style={{
-                    background: active ? colors.bg4 : "none",
+                    background: active ? colors.bg4 : "transparent",
                     border: "none",
-                    padding: "8px 14px",
-                    borderRadius: 10,
-                    fontFamily: "inherit",
+                    borderLeft: i > 0 ? `1px solid ${colors.line}` : "none",
+                    padding: "10px 18px",
+                    fontFamily: fonts.mono,
                     fontSize: 12,
-                    color: active ? colors.txt1 : colors.txt2,
-                    fontWeight: 500,
+                    color: active ? colors.accent : colors.txt2,
+                    fontWeight: 700,
                     cursor: "pointer",
-                    transition: "all .2s ease",
-                    letterSpacing: "0.04em",
-                    boxShadow: active ? `inset 0 0 0 1px ${colors.line2}` : undefined,
+                    transition: "all .14s ease",
+                    letterSpacing: "0.10em",
+                    position: "relative",
                   }}
                 >
+                  {active && (
+                    <span
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: -1,
+                        height: 1,
+                        background: colors.accent,
+                        boxShadow: `0 0 8px ${colors.accent}`,
+                      }}
+                    />
+                  )}
                   {tab.label}
                 </button>
               );
@@ -167,26 +184,21 @@ export function NavBar({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "8px 14px",
-              borderRadius: radii.pill,
-              background: colors.bg3,
+              gap: 10,
+              padding: "7px 14px",
+              borderRadius: 3,
+              background: colors.bg2,
               border: `1px solid ${colors.line2}`,
-              fontSize: 11,
+              fontSize: 12,
               fontFamily: fonts.mono,
               color: colors.txt2,
+              letterSpacing: "0.12em",
+              fontWeight: 700,
             }}
           >
             <span
               aria-hidden
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: colors.green,
-                boxShadow: "0 0 0 4px rgba(52,211,153,0.18)",
-                animation: "pulseUiLiveDot 2s ease-in-out infinite",
-              }}
+              className="live-dot"
             />
             {liveLabel}
           </div>

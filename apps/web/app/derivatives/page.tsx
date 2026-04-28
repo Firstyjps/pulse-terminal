@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, Pill } from "@pulse/ui";
 import { PulseClient, type ServerMessage } from "../../lib/ws-client";
+import { FundingHeatmap } from "../../components/FundingHeatmap";
+import { MCPQuickAsk } from "../../components/MCPQuickAsk";
 
 interface FundingRow {
   exchange: string;
@@ -46,13 +48,21 @@ export default function DerivativesPage() {
 
   return (
     <section style={{ paddingTop: 40 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 12, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: 28, margin: 0 }}>Derivatives · Live</h2>
-        <Pill tone={status === "open" ? "up" : status === "error" ? "down" : "flat"}>
-          {status.toUpperCase()}
-        </Pill>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <MCPQuickAsk endpoint="/api/funding" label="Ask Claude" />
+          <Pill tone={status === "open" ? "up" : status === "error" ? "down" : "flat"}>
+            {status.toUpperCase()}
+          </Pill>
+        </div>
       </div>
 
+      <FundingHeatmap />
+
+      <h3 style={{ fontSize: 14, letterSpacing: "0.12em", color: "#9ca3af", textTransform: "uppercase", margin: "32px 0 12px" }}>
+        Live WS Stream
+      </h3>
       <Card>
         {rows.length === 0 ? (
           <p style={{ color: "#9ca3af" }}>

@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { Card, Pill } from "@pulse/ui";
 import { useFlow } from "../../lib/use-flow";
+import { EmptyState } from "../../components/EmptyState";
+import { Skeleton } from "../../components/Skeleton";
+import { MCPQuickAsk } from "../../components/MCPQuickAsk";
 
 interface PatternStats {
   pattern: string;
@@ -33,8 +36,10 @@ export default function BacktestPage() {
 
   return (
     <section style={{ paddingTop: 40 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24, gap: 16, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 28, letterSpacing: "-0.01em" }}>Backtest · Signal Hit-rate</h2>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <MCPQuickAsk endpoint={`/api/backtest?hours=${hours}`} label="Ask Claude to grade" />
         <div style={{ display: "flex", gap: 6 }}>
           {LOOKAHEADS.map((h) => (
             <button
@@ -55,6 +60,7 @@ export default function BacktestPage() {
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       {data?.summary && (
@@ -66,17 +72,39 @@ export default function BacktestPage() {
       )}
 
       <Card>
-        {loading && <p style={{ color: "#9ca3af" }}>Loading…</p>}
-        {data && !data.configured && (
-          <div>
-            <Pill tone="flat">NO DATA</Pill>
-            <p style={{ marginTop: 12, color: "#9ca3af", fontSize: 13, lineHeight: 1.6 }}>{data.message}</p>
+        {loading && !data && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} style={{ display: "flex", gap: 12 }}>
+                <Skeleton width="50%" height={20} />
+                <Skeleton width={60} height={20} />
+                <Skeleton width={70} height={20} />
+                <Skeleton width={120} height={20} />
+              </div>
+            ))}
           </div>
         )}
+        {data && !data.configured && (
+          <EmptyState
+            icon="📊"
+            title="No alert log yet"
+            body={
+              <>
+                Backtest reads <code>apps/alerts/data/alerts.jsonl</code>. Run the alerts worker for a few hours to start collecting findings:
+                <br /><br />
+                <code style={{ color: "#22d3ee" }}>pnpm pulse:start</code> &nbsp;then come back later.
+              </>
+            }
+          />
+        )}
         {data?.configured && data.stats.length === 0 && (
-          <p style={{ color: "#9ca3af" }}>
-            Not enough scored scans yet — wait until alerts have aged at least {hours}h.
-          </p>
+          <EmptyState
+            icon="⏳"
+            title={`Not enough scored scans yet`}
+            body={`Findings need to age at least ${hours}h before scoring. Older lookahead = more samples.`}
+            action={<Pill tone="cyan">try a shorter lookahead above</Pill>}
+            compact
+          />
         )}
         {data?.configured && data.stats.length > 0 && (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>

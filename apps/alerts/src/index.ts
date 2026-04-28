@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { scanAnomalies } from "@pulse/sources/server";
 import { AlertStore, type ScanRecord } from "./storage.js";
 import { Notifier } from "./notifier.js";
+import { startDualAssetsTick } from "./dual-assets-tick.js";
+import { startDualAssetsRollup } from "./dual-assets-rollup.js";
 
 const INTERVAL_MS = Number(process.env.ALERT_INTERVAL_MS ?? 900_000);
 const LOG_PATH = resolve(process.env.ALERT_LOG_PATH ?? "./data/alerts.jsonl");
@@ -38,9 +40,15 @@ console.log(`[alerts] starting — interval ${INTERVAL_MS}ms, log ${LOG_PATH}, w
 void tick();
 const timer = setInterval(tick, INTERVAL_MS);
 
+// Phase 5A — Dual Assets cron (separate cadence; auto-disables if no Bybit keys)
+const stopDualAssets = startDualAssetsTick();
+const stopRollup = startDualAssetsRollup();
+
 const shutdown = (sig: string) => {
   console.log(`[alerts] ${sig} — shutting down`);
   clearInterval(timer);
+  stopDualAssets();
+  stopRollup();
   process.exit(0);
 };
 process.on("SIGINT", () => shutdown("SIGINT"));

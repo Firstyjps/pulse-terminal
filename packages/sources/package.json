@@ -19,7 +19,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

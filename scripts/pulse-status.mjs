@@ -116,10 +116,29 @@ async function main() {
   }
 
   console.log();
-  process.exit(allHealthy ? 0 : 1);
+  // Set exit code instead of calling process.exit() so libuv has time to
+  // close child-process + undici handles cleanly. Node 24 + Windows trips
+  // an `Assertion failed: !uv__is_active(handle)` if we exit while pm2's
+  // cmd.exe child or fetch keep-alive sockets are still referenced.
+  // Closing the global undici dispatcher releases keep-alive sockets;
+  // unref'ing stdio lets the event loop drain to zero by itself.
+  await closeFetchSockets();
+  process.exitCode = allHealthy ? 0 : 1;
+}
+
+/** Close the global undici dispatcher (Node ≥ 18) so keep-alive sockets exit. */
+async function closeFetchSockets() {
+  try {
+    const dispatcher = globalThis[Symbol.for("undici.globalDispatcher.1")];
+    if (dispatcher && typeof dispatcher.close === "function") {
+      await dispatcher.close();
+    }
+  } catch {
+    // best-effort — never fail the script over cleanup
+  }
 }
 
 main().catch((err) => {
   console.error("status failed:", err);
-  process.exit(2);
+  process.exitCode = 2;
 });

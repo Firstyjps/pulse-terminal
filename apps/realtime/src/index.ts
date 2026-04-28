@@ -6,6 +6,7 @@ import { startOkxStream } from "./okx-stream.js";
 import { startSnapshotPoller } from "./snapshot-poller.js";
 import { startHttpServer } from "./http-server.js";
 import { cache } from "./cache.js";
+import { createAprReader, preloadAprDriver } from "./apr-reader.js";
 
 const WS_PORT = Number(process.env.WS_PORT ?? 8080);
 const HTTP_PORT = Number(process.env.HUB_HTTP_PORT ?? 8081);
@@ -19,7 +20,10 @@ const stoppers: Array<() => void> = [];
 
 stoppers.push(startPollers(server));
 stoppers.push(startSnapshotPoller(cache));
-stoppers.push(startHttpServer(HTTP_PORT, { cache }));
+
+// Preload SQLite driver for APR /health block (graceful if unavailable).
+void preloadAprDriver();
+stoppers.push(startHttpServer(HTTP_PORT, { cache, apr: createAprReader() }));
 
 if (NATIVE_STREAMS.includes("binance")) stoppers.push(startBinanceStream(server));
 if (NATIVE_STREAMS.includes("bybit")) stoppers.push(startBybitStream(server));

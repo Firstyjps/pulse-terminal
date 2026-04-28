@@ -3,49 +3,126 @@
   "name": "pulse-terminal",
   "display_name": "Pulse Terminal",
   "version": "0.1.0",
-  "description": "Live crypto macro + derivatives intelligence — overview, stablecoins, ETFs, perp futures, DEX volume, TVL, funding rates, open interest, and cross-source anomaly detection.",
+  "description": "Live crypto macro + derivatives intelligence \u00e2\u20ac\u201d overview, stablecoins, ETFs, perp futures, DEX volume, TVL, funding rates, open interest, and cross-source anomaly detection.",
   "long_description": "Exposes 10 read-only MCP tools that pull real-time crypto market and derivatives data so Claude can analyse fund flows + leverage without an API key on the model side. Sources: CoinGecko (overview), DefiLlama (stablecoins / DEX / TVL), Binance/Bybit/OKX public endpoints (funding, OI, futures), alternative.me (Fear & Greed), Farside (real spot ETF flows). Optional COINGLASS_API_KEY swaps Farside for Coinglass since-inception cumulatives.",
   "author": {
     "name": "Firsty"
   },
-  "keywords": ["crypto", "macro", "derivatives", "fund-flow", "etf", "funding-rate", "open-interest", "anomaly-detection"],
+  "keywords": [
+    "crypto",
+    "macro",
+    "derivatives",
+    "fund-flow",
+    "etf",
+    "funding-rate",
+    "open-interest",
+    "anomaly-detection"
+  ],
   "license": "MIT",
   "server": {
     "type": "node",
-    "entry_point": "dist/index.js",
+    "entry_point": "dist/index.mjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/dist/index.js"],
+      "args": [
+        "${__dirname}/dist/index.mjs"
+      ],
       "env": {
-        "COINGLASS_API_KEY": "${user_config.coinglass_api_key}"
+        "COINGLASS_API_KEY": "${user_config.coinglass_api_key}",
+        "PULSE_HUB_URL": "${user_config.pulse_hub_url}"
       }
     }
   },
   "tools": [
-    { "name": "get_market_overview", "description": "Total mcap, BTC/ETH dominance, F&G, DeFi TVL" },
-    { "name": "get_stablecoin_flows", "description": "Stablecoin supply, dominance, 30d trajectory" },
-    { "name": "get_etf_flows", "description": "BTC/ETH spot ETF daily flows + cumulative" },
-    { "name": "get_futures", "description": "Binance perp OI, funding, L/S, price (BTC/ETH)" },
-    { "name": "get_dex_leaderboard", "description": "DEX 24h/7d volume, top venues" },
-    { "name": "get_tvl_breakdown", "description": "DeFi TVL total + by chain" },
-    { "name": "get_fundflow_snapshot", "description": "All-in-one markdown brief (best starting point)" },
-    { "name": "get_funding_summary", "description": "Funding rates aggregated across Binance/Bybit/OKX" },
-    { "name": "get_oi_snapshot", "description": "Open-interest snapshot across Binance/Bybit/OKX" },
-    { "name": "detect_anomalies", "description": "Cross-source signal scan (ETF + funding + flows)" }
+    {
+      "name": "get_market_overview",
+      "description": "Total mcap, BTC/ETH dominance, F&G, DeFi TVL"
+    },
+    {
+      "name": "get_stablecoin_flows",
+      "description": "Stablecoin supply, dominance, 30d trajectory"
+    },
+    {
+      "name": "get_etf_flows",
+      "description": "BTC/ETH spot ETF daily flows + cumulative"
+    },
+    {
+      "name": "get_futures",
+      "description": "Binance perp OI, funding, L/S, price (BTC/ETH)"
+    },
+    {
+      "name": "get_dex_leaderboard",
+      "description": "DEX 24h/7d volume, top venues"
+    },
+    {
+      "name": "get_tvl_breakdown",
+      "description": "DeFi TVL total + by chain"
+    },
+    {
+      "name": "get_fundflow_snapshot",
+      "description": "All-in-one markdown brief (best starting point)"
+    },
+    {
+      "name": "get_funding_summary",
+      "description": "Funding rates aggregated across Binance/Bybit/OKX"
+    },
+    {
+      "name": "get_oi_snapshot",
+      "description": "Open-interest snapshot across Binance/Bybit/OKX"
+    },
+    {
+      "name": "detect_anomalies",
+      "description": "Cross-source signal scan (ETF + funding + flows)"
+    },
+    {
+      "name": "get_options_chain",
+      "description": "Multi-exchange options chain (Deribit/Binance/Bybit/OKX) — strike/IV/Greeks/OI"
+    },
+    {
+      "name": "get_iv_smile",
+      "description": "IV smile per expiry across all venues — spot skew abnormalities"
+    },
+    {
+      "name": "get_options_arbitrage",
+      "description": "Cross-venue options mispricings (bid > ask between exchanges)"
+    },
+    {
+      "name": "get_dual_assets_apr",
+      "description": "Bybit Dual Assets APR snapshots (SQLite, 5min cadence)"
+    },
+    {
+      "name": "get_best_dual_assets_hour",
+      "description": "Hourly APR analysis — when of day to enter Bybit Dual Assets"
+    },
+    {
+      "name": "get_dual_assets_daily_summary",
+      "description": "Daily aggregated APR summaries (avg/max/min + best/worst hour) per date × pair × target"
+    }
   ],
   "user_config": {
     "coinglass_api_key": {
       "type": "string",
       "title": "Coinglass API key (optional)",
-      "description": "Optional. Replaces Farside ETF data with Coinglass since-inception cumulative. Leave blank — Farside (free) is fine.",
+      "description": "Optional. Replaces Farside ETF data with Coinglass since-inception cumulative. Leave blank \u00e2\u20ac\u201d Farside (free) is fine.",
       "required": false,
       "sensitive": true,
       "default": ""
+    },
+    "pulse_hub_url": {
+      "type": "string",
+      "title": "Pulse Hub URL",
+      "description": "Where the local hub HTTP cache lives. Default: http://127.0.0.1:8081 (local). For remote deploy via Tailscale: http://<tailscale-ip>:8081 (e.g. http://100.90.142.81:8081).",
+      "required": false,
+      "default": "http://127.0.0.1:8081"
     }
   },
   "compatibility": {
     "claude_desktop": ">=0.10.0",
-    "platforms": ["win32", "darwin", "linux"],
+    "platforms": [
+      "win32",
+      "darwin",
+      "linux"
+    ],
     "runtimes": {
       "node": ">=18.0.0"
     }

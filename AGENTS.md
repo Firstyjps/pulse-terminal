@@ -220,32 +220,35 @@ get_oi_snapshot()                              // open interest — NEW
 
 ---
 
-## Migration source map
+## Migration source map (all complete · originals under `_legacy/`)
 
-| New location                              | Copy from                                                        |
-|-------------------------------------------|------------------------------------------------------------------|
-| `packages/ui/src/tokens.ts`               | `Pulse Command/pulsecommand.html` `:root` block                  |
-| `packages/ui/src/ThreeBackground.tsx`     | `Pulse Command/pulsecommand.html` Three.js init                  |
-| `packages/ui/src/NavBar.tsx`              | `Pulse Command/pulsecommand.html` `.nav` block                   |
-| `packages/sources/src/overview.ts`        | `Crypto-Fundflow-Analyzer/lib/sources/overview.ts`               |
-| `packages/sources/src/stablecoins.ts`     | `Crypto-Fundflow-Analyzer/lib/sources/stablecoins.ts`            |
-| `packages/sources/src/etf.ts`             | `Crypto-Fundflow-Analyzer/lib/sources/etf.ts`                    |
-| `packages/sources/src/tvl.ts`             | `Crypto-Fundflow-Analyzer/lib/sources/tvl.ts`                    |
-| `packages/sources/src/dex.ts`             | `Crypto-Fundflow-Analyzer/lib/sources/dex.ts`                    |
-| `packages/sources/src/futures.ts`         | `Crypto-Fundflow-Analyzer/lib/sources/futures.ts`                |
-| `packages/sources/src/funding.ts`         | `Funding_Oi/server/src/exchanges/*` (NEW — combine all)          |
-| `packages/charts/src/Candlestick.tsx`     | `CryptoTerminal/js/chart.js`                                     |
-| `packages/charts/src/Sparkline.tsx`       | `CryptoTerminal/js/app.js` `buildSparkline()`                    |
-| `packages/charts/src/FlowChart.tsx`       | `Crypto-Fundflow-Analyzer/components/{Stablecoin,ETF,TVL,Dex}Chart.tsx` |
-| `packages/i18n/src/dict.ts`               | scanned from all four projects                                   |
-| `apps/web/app/page.tsx`                   | `Crypto-Fundflow-Analyzer/app/page.tsx` + Pulse Command hero     |
-| `apps/web/components/Dashboard.tsx`       | `Crypto-Fundflow-Analyzer/components/Dashboard.tsx`              |
-| `apps/web/components/AnalysisPanel.tsx`   | `Crypto-Fundflow-Analyzer/components/AnalysisPanel.tsx`          |
-| `apps/realtime/src/index.ts`              | `Funding_Oi/server/src/index.js`                                 |
-| `apps/realtime/src/ws.ts`                 | `Funding_Oi/server/src/ws.js`                                    |
-| `apps/mcp/src/index.ts`                   | `Crypto-Fundflow-Analyzer/mcp-server/src/index.ts`               |
+| ✓ | New location                              | Source (`_legacy/...`)                                            |
+|---|-------------------------------------------|-------------------------------------------------------------------|
+| ✅ | `packages/ui/src/tokens.ts`               | `Pulse Command/pulsecommand.html` `:root` block                   |
+| ✅ | `packages/ui/src/ThreeBackground.tsx`     | `Pulse Command/pulsecommand.html` Three.js init                   |
+| ✅ | `packages/ui/src/NavBar.tsx`              | `Pulse Command/pulsecommand.html` `.nav` block                    |
+| ✅ | `packages/sources/src/overview.ts`        | `Crypto-Fundflow-Analyzer/lib/sources/overview.ts`                |
+| ✅ | `packages/sources/src/stablecoins.ts`     | `Crypto-Fundflow-Analyzer/lib/sources/stablecoins.ts`             |
+| ✅ | `packages/sources/src/etf.ts`             | `Crypto-Fundflow-Analyzer/lib/sources/etf.ts` + farside scrape    |
+| ✅ | `packages/sources/src/tvl.ts`             | `Crypto-Fundflow-Analyzer/lib/sources/tvl.ts`                     |
+| ✅ | `packages/sources/src/dex.ts`             | `Crypto-Fundflow-Analyzer/lib/sources/dex.ts`                     |
+| ✅ | `packages/sources/src/futures.ts`         | `Crypto-Fundflow-Analyzer/lib/sources/futures.ts`                 |
+| ✅ | `packages/sources/src/funding.ts`         | `Funding_Oi/server/src/exchanges/*` — all combined Binance/Bybit/OKX |
+| ✅ | `packages/sources/src/macro.ts`           | NEW — Yahoo Finance v8 chart API                                  |
+| ✅ | `packages/sources/src/portfolio.ts`       | NEW — Binance signed account                                      |
+| ✅ | `packages/sources/src/anomalies.ts`       | NEW — shared `scanAnomalies()` (used by MCP, alerts, web)         |
+| ✅ | `packages/charts/src/Candlestick.tsx`     | `CryptoTerminal/js/chart.js`                                      |
+| ✅ | `packages/charts/src/Sparkline.tsx`       | `CryptoTerminal/js/app.js` `buildSparkline()`                     |
+| ✅ | `packages/charts/src/{FlowChart,FlowAreaChart,FlowBarChart,DepthChart}.tsx` | `Crypto-Fundflow-Analyzer/components/{Stablecoin,ETF,TVL,Dex}Chart.tsx` |
+| ✅ | `packages/i18n/src/dict.ts`               | scanned from Pulse Command + CryptoTerminal                        |
+| ✅ | `apps/web/app/page.tsx`                   | `Crypto-Fundflow-Analyzer/app/page.tsx` + Pulse Command hero      |
+| ✅ | `apps/web/components/Dashboard.tsx`       | `Crypto-Fundflow-Analyzer/components/Dashboard.tsx`               |
+| ⛔ | ~~`apps/web/components/AnalysisPanel.tsx`~~ | removed in Phase A — superseded by MCP via Claude Desktop       |
+| ✅ | `apps/realtime/src/{server,poller,index}.ts` + `binance/bybit/okx-stream.ts` | `Funding_Oi/server/src/*` |
+| ✅ | `apps/mcp/src/index.ts`                   | `Crypto-Fundflow-Analyzer/mcp-server/src/index.ts` + 3 new tools  |
+| ✅ | `apps/alerts/`                            | NEW — cron worker + JSONL + webhook                               |
 
-**Once a file is fully ported and tested:** delete the source, then check the box in this table.
+`_legacy/` is retained for cross-check until project owner confirms no further salvage needed (see [README.md](./README.md#reference-projects)).
 
 ---
 
@@ -286,8 +289,10 @@ get_oi_snapshot()                              // open interest — NEW
 3. Set `ALERT_WEBHOOK_URL` if Discord/Slack alerts are wanted
 
 ### Known minor issues (non-blocking)
-- **Node 24 + Windows:** `pulse:status` exits with libuv assertion after printing — cosmetic, data is correct
 - **Turbopack + Thai paths:** Turbopack panics on the project's path. Use `next dev --webpack` + `next build --webpack` (already wired in `apps/web/package.json`)
+
+### Recently fixed
+- ✅ **Node 24 + Windows libuv assertion in `pulse:status`** — switched to `process.exitCode` + global undici dispatcher close so libuv handles drain cleanly (verified on Node 24.14.1 Win11)
 
 ## Phase 2 — done
 

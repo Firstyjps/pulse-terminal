@@ -76,16 +76,21 @@ export async function getPortfolio(): Promise<PortfolioSnapshot | null> {
   );
   const priceMap = new Map(prices.map((p) => [p.symbol, parseFloat(p.price)]));
 
+  // Binance Earn / Flexible Savings appear as "LD<ASSET>" — value is 1:1 with underlying
+  const underlyingOf = (a: string) => a.startsWith("LD") ? a.slice(2) : a;
+  const STABLES = new Set(["USDT", "USDC", "BUSD", "FDUSD", "DAI", "TUSD"]);
+
   let totalUsd = 0;
   const balances: PortfolioBalance[] = nonZero.map((b) => {
     let usd: number | undefined;
-    if (b.asset === "USDT" || b.asset === "USDC" || b.asset === "BUSD" || b.asset === "FDUSD") {
+    const u = underlyingOf(b.asset);
+    if (STABLES.has(u)) {
       usd = b.total;
     } else {
       const price =
-        priceMap.get(`${b.asset}USDT`) ??
-        priceMap.get(`${b.asset}BUSD`) ??
-        priceMap.get(`${b.asset}USDC`);
+        priceMap.get(`${u}USDT`) ??
+        priceMap.get(`${u}BUSD`) ??
+        priceMap.get(`${u}USDC`);
       if (price) usd = b.total * price;
     }
     if (usd) totalUsd += usd;

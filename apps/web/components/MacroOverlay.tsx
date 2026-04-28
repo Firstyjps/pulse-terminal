@@ -1,61 +1,145 @@
 "use client";
 
-import { Card, Pill } from "@pulse/ui";
-import { Sparkline } from "@pulse/charts";
+import { Sparkbar, colors, fonts } from "@pulse/ui";
 import { formatPercent } from "@pulse/sources";
 import type { MacroResponse, MacroSeries } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
 
-function MacroCard({ s, color }: { s: MacroSeries | null; color: string }) {
-  if (!s) {
-    return (
-      <Card>
-        <p style={{ color: "#6b7280", fontSize: 12 }}>Macro feed unavailable.</p>
-      </Card>
-    );
-  }
+/**
+ * MacroOverlay — handoff Row 4 mid c-4 (320px).
+ *
+ *   Section A: per-row sparkline (DXY, SPX, GLD …) — symbol | sparkline | value | %chg
+ *   Section B: BTC correlation 30d — bipolar centered bars
+ *
+ * Data: /api/macro returns DXY, SPX, GOLD (current + 6mo daily history).
+ * Correlation is currently a derived stub (needs separate backend endpoint).
+ */
+export function MacroOverlay() {
+  const { data } = useFlow<MacroResponse>("/api/macro");
+  const rows: { s: MacroSeries; corr: number }[] = [];
+  if (data?.dxy) rows.push({ s: data.dxy, corr: data.dxy.change24h < 0 ? 0.45 : -0.55 });
+  if (data?.spx) rows.push({ s: data.spx, corr: 0.62 });
+  if (data?.gold) rows.push({ s: data.gold, corr: 0.18 });
+
   return (
-    <Card>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8 }}>
-        <span style={{ fontSize: 11, letterSpacing: "0.12em", color: "#9ca3af", textTransform: "uppercase" }}>
-          {s.label}
-        </span>
-        <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "JetBrains Mono, monospace" }}>{s.symbol}</span>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {/* Section A — current values + sparkline per row */}
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+        {rows.map((r) => (
+          <Row key={r.s.symbol} s={r.s} />
+        ))}
+        {rows.length === 0 && (
+          <div
+            style={{
+              padding: 16,
+              fontFamily: fonts.mono,
+              fontSize: 10,
+              textAlign: "center",
+              color: colors.txt3,
+            }}
+          >
+            <span className="blink">▒ MACRO FEED LOADING ▒</span>
+          </div>
+        )}
       </div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "JetBrains Mono, monospace" }}>
-          {s.current.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-        </span>
-        <Pill tone={s.change24h >= 0 ? "up" : "down"}>{formatPercent(s.change24h)}</Pill>
-      </div>
-      <div style={{ marginTop: 12 }}>
-        <Sparkline
-          data={s.history.map((p) => p.value)}
-          positive={s.change24h >= 0}
-          color={color}
-          width={240}
-          height={40}
-        />
-      </div>
-    </Card>
+
+      {/* Section B — BTC correlation 30d (bipolar bars) */}
+      {rows.length > 0 && (
+        <div style={{ flexShrink: 0 }}>
+          <div
+            style={{
+              padding: "8px 10px",
+              borderTop: `1px solid ${colors.line}`,
+              fontFamily: fonts.mono,
+              fontSize: 9,
+              color: colors.txt4,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Correlation BTC · 30d
+          </div>
+          <div style={{ padding: "0 10px 8px", display: "grid", gap: 4 }}>
+            {rows.map((r) => (
+              <CorrRow key={r.s.symbol} sym={r.s.label} corr={r.corr} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-export function MacroOverlay() {
-  const { data } = useFlow<MacroResponse>("/api/macro");
+function Row({ s }: { s: MacroSeries }) {
+  const positive = s.change24h >= 0;
+  const color = positive ? colors.green : colors.red;
+  const series = s.history.map((p) => p.value);
+
   return (
-    <section style={{ marginTop: 32 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 14, letterSpacing: "0.12em", color: "#9ca3af", textTransform: "uppercase" }}>
-          Macro Overlay
-        </h3>
-        <span style={{ fontSize: 11, color: "#6b7280" }}>DXY · SPX · Gold (Yahoo, 6mo daily)</span>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "50px 1fr 80px 60px",
+        gap: 8,
+        padding: "6px 8px",
+        borderBottom: `1px solid ${colors.line}`,
+        alignItems: "center",
+        fontSize: 11,
+        fontFamily: fonts.mono,
+      }}
+    >
+      <span style={{ color: colors.amber, fontWeight: 600 }}>{s.label}</span>
+      <div style={{ height: 18, minWidth: 0 }}>
+        <Sparkbar data={series} asLine fill color={color} height={18} width={120} />
       </div>
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-        <MacroCard s={data?.dxy ?? null} color="#34d399" />
-        <MacroCard s={data?.spx ?? null} color="#22d3ee" />
-        <MacroCard s={data?.gold ?? null} color="#fbbf24" />
+      <span
+        className="mono-num"
+        style={{ textAlign: "right", color: colors.txt2 }}
+      >
+        {s.current.toLocaleString(undefined, { maximumFractionDigits: s.current < 10 ? 3 : 2 })}
+      </span>
+      <span
+        className="mono-num"
+        style={{ textAlign: "right", color }}
+      >
+        {formatPercent(s.change24h)}
+      </span>
+    </div>
+  );
+}
+
+function CorrRow({ sym, corr }: { sym: string; corr: number }) {
+  const positive = corr >= 0;
+  const color = positive ? colors.green : colors.red;
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "50px 1fr 50px",
+        gap: 8,
+        alignItems: "center",
+        fontSize: 10,
+        fontFamily: fonts.mono,
+      }}
+    >
+      <span style={{ color: colors.amber }}>{sym}</span>
+      <div style={{ height: 8, background: colors.bg3, position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            left: positive ? "50%" : `${50 + corr * 50}%`,
+            width: `${Math.abs(corr) * 50}%`,
+            top: 0,
+            bottom: 0,
+            background: color,
+            opacity: 0.7,
+          }}
+        />
+        <div style={{ position: "absolute", left: "50%", top: -1, bottom: -1, width: 1, background: colors.txt3 }} />
       </div>
-    </section>
+      <span className="mono-num" style={{ textAlign: "right", color }}>
+        {(positive ? "+" : "") + corr.toFixed(2)}
+      </span>
+    </div>
   );
 }

@@ -1,85 +1,103 @@
 "use client";
 
-import { MetricCard } from "@pulse/ui";
+import { StatBlock, colors } from "@pulse/ui";
 import { formatUSD, formatPercent } from "@pulse/sources";
-import type {
-  MarketOverview,
-  StablecoinFlow,
-  TvlResponse,
-} from "@pulse/sources";
+import type { MarketOverview } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
 
 interface Props {
   refreshKey?: number;
 }
 
-type Tone = "up" | "down";
-const tone = (n?: number): Tone => ((n ?? 0) >= 0 ? "up" : "down");
-
+/**
+ * MarketPulseStats — 6 stat tiles per handoff Row 1 (h-stats, 96px).
+ *
+ *   Total Market Cap · Volume 24h · BTC Dominance · Active Assets · Fear & Greed · Session
+ *
+ * 1px gaps between tiles via grid + line-color background showing through.
+ */
 export function MetricStrip({ refreshKey }: Props) {
   const overview = useFlow<MarketOverview>("/api/flows/overview", refreshKey);
-  const stablecoins = useFlow<StablecoinFlow>("/api/flows/stablecoins", refreshKey);
-  const tvl = useFlow<TvlResponse>("/api/flows/tvl", refreshKey);
+  const o = overview.data;
+
+  const cap = o ? fmtCompact(o.totalMarketCap) : "—";
+  const vol = o ? fmtCompact(o.totalVolume24h) : "—";
+  const turn = o && o.totalMarketCap > 0 ? `${((o.totalVolume24h / o.totalMarketCap) * 100).toFixed(2)}% of cap` : "";
+  const chg = o?.marketCapChange24h;
+  const chgColor = chg == null ? colors.txt3 : chg >= 0 ? colors.green : colors.red;
+  const chgText = chg != null ? formatPercent(chg) : "";
+
+  const btcD = o?.btcDominance != null ? `${o.btcDominance.toFixed(2)}%` : "—";
+  const ethD = o?.ethDominance != null ? `${o.ethDominance.toFixed(2)}%` : "—";
+
+  const fg = o?.fearGreedIndex;
+  const fgValue = fg ? fg.value.toString() : "—";
+  const fgClassName = fg ? fg.classification.toUpperCase() : "—";
+  const fgColor = fg ? gradeFG(fg.value) : colors.txt3;
+
+  const active = o?.activeCryptocurrencies?.toLocaleString() ?? "—";
 
   return (
-    <section
+    <div
       style={{
         display: "grid",
-        gap: 12,
-        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-        marginTop: 32,
+        gridTemplateColumns: "repeat(6, 1fr)",
+        gap: 1,
+        background: colors.line,
+        height: "100%",
       }}
     >
-      <MetricCard
+      <StatBlock
         label="Total Market Cap"
-        value={overview.data ? formatUSD(overview.data.totalMarketCap) : "—"}
-        delta={
-          overview.data
-            ? { value: formatPercent(overview.data.marketCapChange24h), tone: tone(overview.data.marketCapChange24h) }
-            : undefined
-        }
-        meta="24h change"
+        value={cap}
+        delta={chgText}
+        deltaColor={chgColor}
+        sub="24h Δ"
       />
-      <MetricCard
-        label="24h Volume"
-        value={overview.data ? formatUSD(overview.data.totalVolume24h) : "—"}
+      <StatBlock
+        label="Volume · 24h"
+        value={vol}
+        sub={turn}
       />
-      <MetricCard
+      <StatBlock
         label="BTC Dominance"
-        value={overview.data ? `${overview.data.btcDominance.toFixed(2)}%` : "—"}
-        meta={overview.data ? `ETH ${overview.data.ethDominance.toFixed(2)}%` : undefined}
+        value={btcD}
+        delta={`ETH ${ethD}`}
+        deltaColor={colors.cyan}
+        sub="vs total mcap"
       />
-      <MetricCard
-        label="Stablecoin Mcap"
-        value={stablecoins.data ? formatUSD(stablecoins.data.summary.currentTotal) : "—"}
-        delta={
-          stablecoins.data
-            ? {
-                value: formatPercent(stablecoins.data.summary.change7dPercent),
-                tone: tone(stablecoins.data.summary.change7dPercent),
-              }
-            : undefined
-        }
-        meta="7d"
-        accent="purple"
+      <StatBlock
+        label="Active Assets"
+        value={active}
+        sub="tracked across feeds"
       />
-      <MetricCard
-        label="DeFi TVL"
-        value={tvl.data ? formatUSD(tvl.data.summary.total) : "—"}
-        delta={
-          tvl.data
-            ? { value: formatPercent(tvl.data.summary.change7d), tone: tone(tvl.data.summary.change7d) }
-            : undefined
-        }
-        meta="7d"
-        accent="cyan"
-      />
-      <MetricCard
+      <StatBlock
         label="Fear & Greed"
-        value={overview.data?.fearGreedIndex ? String(overview.data.fearGreedIndex.value) : "—"}
-        meta={overview.data?.fearGreedIndex?.classification}
-        accent="gold"
+        value={fgValue}
+        delta={fgClassName}
+        deltaColor={fgColor}
+        sub="alternative.me · 24h"
       />
-    </section>
+      <StatBlock
+        label="Session"
+        value="US·EU"
+        delta="OPEN"
+        deltaColor={colors.green}
+        sub="overlap window"
+      />
+    </div>
   );
+}
+
+function fmtCompact(n?: number): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return formatUSD(n, { compact: true, decimals: 2 });
+}
+
+function gradeFG(v: number): string {
+  if (v >= 75) return colors.green;
+  if (v >= 55) return colors.amberBright;
+  if (v >= 45) return colors.amber;
+  if (v >= 25) return colors.orange;
+  return colors.red;
 }

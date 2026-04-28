@@ -7,7 +7,17 @@ export interface MarketOverview {
   totalVolume24h: number;
   btcDominance: number;
   ethDominance: number;
+  altDominance: number;          // 100 - btc - eth
   marketCapChange24h: number;
+  /**
+   * 24h volume change %. CoinGecko `/global` doesn't expose this directly,
+   * so we maintain a server-side rolling buffer of recent samples and
+   * compute the delta against the closest sample to (now − 24h). May be
+   * undefined for the first ~24h after server start.
+   */
+  volumeChange24h?: number;
+  /** volume24h / totalMarketCap × 100 — turnover ratio (always available). */
+  volumeTurnoverPct: number;
   activeCryptocurrencies: number;
   defiMarketCap: number;
   defiTvl: number;

@@ -2,44 +2,229 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
+/* ═════════════════════════════════════════════════════════════════════════
+   PULSE TERMINAL · CryptoPulse Bloomberg
+   Source of truth: /design_handoff_cryptopulse/CryptoPulse Terminal.html
+   Identity: Bloomberg-style amber-on-black trading terminal.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-0: #04050a;
-  --bg-1: #080b14;
-  --bg-2: #0d111d;
-  --bg-3: #141927;
-  --accent: #7c5cff;
-  --accent-2: #22d3ee;
+  /* substrate + elevation */
+  --bg-0: #07090b;
+  --bg-1: #0b0e12;
+  --bg-2: #10141a;
+  --bg-3: #161b22;
+  --bg-4: #10141a;          /* legacy alias for hot tier — same as bg-2 in Bloomberg */
+  /* handoff aliases */
+  --bg:   #07090b;          /* same as --bg-0, kept for handoff CSS compatibility */
+
+  /* borders — solid hex per handoff */
+  --line:   #1d242d;
+  --line-2: #2a323c;
+  --line-3: #2a323c;
+
+  /* foreground */
+  --fg:    #c8d1dc;          /* primary text */
+  --fg-1:  #e6edf5;          /* emphasized / large numbers */
+  --mid:   #7d8a99;          /* secondary labels */
+  --dim:   #4b5563;          /* tertiary / hints */
+
+  /* legacy aliases for old token names */
+  --txt-1: #e6edf5;
+  --txt-2: #c8d1dc;
+  --txt-3: #7d8a99;
+  --txt-4: #4b5563;
+
+  /* brand & signal */
+  --amber:        #ffb000;
+  --amber-bright: #ffd400;
+  --amber-dim:    #8a5f00;
+  --green:        #19d27a;
+  --green-dim:    #0a6b3d;
+  --red:          #ff4d5e;
+  --red-dim:      #7a1f29;
+  --cyan:         #44c8ff;
+  --magenta:      #ff5cf3;
+  --btc:          #ffb000;
+  --eth:          #627eea;
+
+  /* legacy aliases */
+  --accent:   var(--amber);
+  --accent-2: var(--cyan);
+  --phosphor: var(--amber);  /* old keyframes still reference this */
+  --danger:   var(--red);
+  --info:     var(--cyan);
+
+  /* type system — toggleable via body.sans */
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --type: var(--mono);
 }
 
 * { box-sizing: border-box; }
 
 html, body {
-  background: var(--bg-0);
-  color: #f2f4f8;
-  font-family: 'Inter', 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--type);
+  font-size: 11px;
+  line-height: 1.4;
+  font-feature-settings: "tnum" 1, "ss01" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
 }
 
-body { overflow-x: hidden; }
+body { overflow: hidden; height: 100vh; }
 
-body::before {
+/* Sans variant — softens chrome, numerics stay mono */
+body.sans { --type: var(--sans); font-size: 12px; }
+body.sans .num, body.sans .mono, body.sans .mono-num { font-family: var(--mono); }
+
+/* Tabular numerics globally on numeric containers */
+.num, .mono-num, table, [class*="num"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "zero";
+}
+
+::selection { background: var(--amber); color: #000; }
+
+/* CRT scanline overlay — applied via .crt class on body or a wrapper */
+.crt::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(900px circle at 8% 5%, rgba(124,92,255,0.18), transparent 50%),
-    radial-gradient(900px circle at 92% 8%, rgba(34,211,238,0.13), transparent 50%),
-    radial-gradient(1200px circle at 50% 100%, rgba(251,191,36,0.10), transparent 55%);
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+  z-index: 9999;
+  mix-blend-mode: overlay;
 }
+
+/* Grain — kept for Phosphor legacy; toned down to invisible under Bloomberg */
+.grain { display: none; }
 
 .thai { font-family: 'IBM Plex Sans Thai', 'Inter', sans-serif; }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
+/* Mono digit class — used by MonoNum and any tabular cell */
+.mono-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "zero", "ss01";
+  letter-spacing: -0.01em;
+}
+
+/* Amber / signal helper classes (handoff convention) */
+.amber { color: var(--amber); }
+.up    { color: var(--green); }
+.down  { color: var(--red); }
+.dim   { color: var(--mid); }
+.vdim  { color: var(--dim); }
+
+/* ── Number tick flash — was phosphor green, now amber (positive) / red (negative) ── */
+@keyframes phosphor-up {
+  0%   { color: var(--amber); }
+  50%  { color: var(--amber-bright); background: rgba(255,176,0,0.12); }
+  100% { color: inherit; background: transparent; }
+}
+@keyframes phosphor-down {
+  0%   { color: var(--red); }
+  50%  { background: rgba(255,77,94,0.18); }
+  100% { color: inherit; background: transparent; }
+}
+[data-phosphor="up"]   { animation: phosphor-up 600ms ease-out; }
+[data-phosphor="down"] { animation: phosphor-down 600ms ease-out; }
+
+/* ── Pulse dot for live status indicators (status bar, ticker live) ── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+.live-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse-dot 1.4s infinite;
+}
+.live-dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.live-dot.red   { background: var(--red);   box-shadow: 0 0 6px var(--red);   }
+
+/* Generic blink (matches handoff's .blink) */
+@keyframes blink { 50% { opacity: 0; } }
+.blink { animation: blink 1s steps(2) infinite; }
+
+/* ── Ticker tape scroll — handoff exact ── */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+.ticker-track {
+  display: flex;
+  gap: 32px;
+  white-space: nowrap;
+  animation: ticker 90s linear infinite;
+  padding-left: 100%;
+}
+.ticker-track:hover { animation-play-state: paused; }
+
+/* ── Anomaly feed insertion flash ── */
+@keyframes feedIn {
+  from { background: rgba(255,176,0,0.18); transform: translateY(-4px); opacity: 0; }
+  to   { background: transparent; transform: translateY(0); opacity: 1; }
+}
+.feed-row { animation: feedIn 0.4s ease-out; }
+
+/* ── Loading skeleton shimmer ── */
+@keyframes shim { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.skel {
+  background: linear-gradient(90deg, var(--bg-2) 0%, var(--bg-3) 50%, var(--bg-2) 100%);
+  background-size: 200% 100%;
+  animation: shim 1.4s linear infinite;
+  height: 12px;
+  margin: 4px 0;
+}
+
+/* ── Scanline (legacy class — kept so old refs don't break) ── */
+.scanline { position: relative; overflow: hidden; }
+.scanline::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 30%; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,176,0,0.7) 50%, transparent 100%);
+  animation: scanline-move 3.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes scanline-move {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+/* ── Scrollbars — thin terminal style ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-1); }
-::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar-thumb { background: var(--line-2); }
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Mobile (< 720px) — Bloomberg layout collapses gracefully ── */
+@media (max-width: 720px) {
+  body { font-size: 10px; }
+  .ticker-track { animation-duration: 60s; }
+  table { font-size: 10px !important; }
+  th, td { padding: 4px 6px !important; }
+}

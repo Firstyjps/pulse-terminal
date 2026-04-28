@@ -37,10 +37,20 @@ import {
   getFundingRates,
   getOpenInterest,
   scanAnomalies,
+  // Phase 5A — multi-exchange options
+  getOptionsAggregate,
+  findOptionsArbitrage,
+  buildIVSmile,
+  // Phase 5A — Bybit Dual Assets
+  generateHourlyReport,
+  getRecentSnapshots,
+  getDailySummaries,
+  getAprIvCorrelation,
   type Exchange,
   type FundflowSnapshot,
   type FundingRate,
   type OpenInterest,
+  type OptionAsset,
 } from "@pulse/sources/server";
 
 const server = new McpServer(
@@ -393,6 +403,143 @@ server.tool(
 
 // Keep OpenInterest type referenced (used implicitly via getOpenInterest return)
 type _UnusedOpenInterest = OpenInterest;
+
+// ─────────────────────────────────────────────────────────────────
+// Phase 5A — Multi-exchange options (Deribit/Binance/Bybit/OKX)
+// ─────────────────────────────────────────────────────────────────
+
+const OptionAssetSchema = z.enum(["SOL", "BTC", "ETH"]);
+
+server.tool(
+  "get_options_chain",
+  "Aggregated options chain across Deribit, Binance, Bybit, and OKX (BTC/ETH only on OKX, SOL only on the first three). " +
+    "Returns mark/bid/ask/IV/Greeks/OI per (strike, side, expiry, exchange). Cached 25s. " +
+    "Use this to scan IV skew, find best price at a strike, or feed downstream Greek calculations.",
+  {
+    asset: OptionAssetSchema.optional().default("SOL"),
+    expiry: z.string().optional().describe("YYYYMMDD — filter to one expiry. Omit for all."),
+    side: z.enum(["call", "put", "both"]).optional().default("both"),
+    limit: z.number().int().min(1).max(500).optional().default(150),
+  },
+  async ({ asset = "SOL", expiry, side = "both", limit = 150 }) => {
+    const agg = await getOptionsAggregate(asset as OptionAsset);
+    let opts = agg.options;
+    if (expiry) opts = opts.filter((o) => o.expiry === expiry);
+    if (side !== "both") opts = opts.filter((o) => o.side === side);
+    return json({
+      asset,
+      underlyingPrice: agg.underlyingPrice,
+      strikes: agg.strikes,
+      expiries: agg.expiries,
+      errors: agg.errors,
+      count: opts.length,
+      options: opts.slice(0, limit),
+    });
+  },
+);
+
+server.tool(
+  "get_iv_smile",
+  "IV smile (strike → IV) for one expiry, separated by call/put across all venues. Use to spot skew abnormalities.",
+  {
+    asset: OptionAssetSchema.optional().default("SOL"),
+    expiry: z.string().optional().describe("YYYYMMDD; defaults to nearest expiry"),
+  },
+  async ({ asset = "SOL", expiry }) => {
+    const agg = await getOptionsAggregate(asset as OptionAsset);
+    const targetExpiry = expiry ?? agg.expiries[0];
+    if (!targetExpiry) return text("No expiries available.");
+    const smile = buildIVSmile(agg.options, asset as OptionAsset, targetExpiry);
+    return json({
+      ...smile,
+      underlyingPrice: agg.underlyingPrice,
+      available_expiries: agg.expiries,
+    });
+  },
+);
+
+server.tool(
+  "get_options_arbitrage",
+  "Cross-venue options arbitrage scanner: same (asset, expiry, strike, side) where one venue's bid > another's ask. " +
+    "Returns top 50 sorted by spread %. Filters out spreads < 5% as noise. " +
+    "Most opportunities are illiquid — verify size_bid/size_ask via get_options_chain before assuming you can hit them.",
+  {
+    asset: OptionAssetSchema.optional().default("SOL"),
+    minSpreadPercent: z.number().min(0.5).max(50).optional().default(5),
+  },
+  async ({ asset = "SOL", minSpreadPercent = 5 }) => {
+    const agg = await getOptionsAggregate(asset as OptionAsset);
+    const arb = findOptionsArbitrage(agg.options, minSpreadPercent);
+    return json({
+      asset,
+      count: arb.length,
+      arbitrage: arb,
+      _note: "Verify liquidity via get_options_chain before trading.",
+    });
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────
+// Phase 5A — Bybit Dual Assets APR (SQLite-backed time-series)
+// ─────────────────────────────────────────────────────────────────
+
+server.tool(
+  "get_dual_assets_apr",
+  "Recent Bybit Dual Assets APR snapshots from local SQLite (populated by alerts cron every 5 min). " +
+    "Returns raw rows for analysis or visualization. Use get_best_dual_assets_hour for the analyzed report.",
+  {
+    limit: z.number().int().min(1).max(1000).optional().default(96).describe("rows; 96 = ~8h at 5-min cadence"),
+  },
+  async ({ limit = 96 }) => {
+    try {
+      const records = getRecentSnapshots(limit);
+      return json({ count: records.length, records });
+    } catch (err) {
+      return text(`SQLite not initialized yet — alerts cron must run at least once. Error: ${(err as Error).message}`);
+    }
+  },
+);
+
+server.tool(
+  "get_best_dual_assets_hour",
+  "Hourly APR analysis for Bybit Dual Assets — answers: 'when in the day is APR highest?' " +
+    "Returns hourly_data (24 buckets in ICT/UTC+7), best_hours top-3, hot/cold lists, and a Thai-language recommendation. " +
+    "Optionally include APR-vs-IV correlation (needs ≥10 samples with IV data).",
+  {
+    coin_pair: z.string().optional().default("SOL-USDT"),
+    target_price: z.number().optional().default(78),
+    days: z.number().int().min(1).max(90).optional().default(7),
+    include_correlation: z.boolean().optional().default(false),
+  },
+  async ({ coin_pair = "SOL-USDT", target_price = 78, days = 7, include_correlation = false }) => {
+    const report = generateHourlyReport({ coinPair: coin_pair, targetPrice: target_price, days });
+    if ("error" in report) return text(report.error);
+    if (include_correlation) {
+      return json({ ...report, correlation: getAprIvCorrelation(days) });
+    }
+    return json(report);
+  },
+);
+
+server.tool(
+  "get_dual_assets_daily_summary",
+  "Daily aggregated APR summaries for Bybit Dual Assets — one row per (date, coin_pair, target_price) " +
+    "with avg/max/min APR and best/worst hour-of-day. Rolled up by alerts cron at 00:05 ICT. " +
+    "Use this for trend tracking across days; use get_best_dual_assets_hour for intraday hourly analysis.",
+  {
+    coin_pair: z.string().optional().default("SOL-USDT"),
+    target_price: z.number().optional().describe("Optional — filter to a single target price"),
+    days: z.number().int().min(1).max(365).optional().default(30),
+  },
+  async ({ coin_pair = "SOL-USDT", target_price, days = 30 }) => {
+    try {
+      const summaries = getDailySummaries({ coinPair: coin_pair, targetPrice: target_price, days });
+      return json({ count: summaries.length, summaries });
+    } catch (err) {
+      return text(`SQLite not initialized yet — alerts cron must run at least once. Error: ${(err as Error).message}`);
+    }
+  },
+);
 
 // ─────────────────────────────────────────────────────────────────
 // Boot

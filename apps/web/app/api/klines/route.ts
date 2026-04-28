@@ -42,21 +42,67 @@ export async function GET(request: Request) {
     return Response.json({ error: "invalid interval" }, { status: 400 });
   }
 
+  // Binance hosts (try in order); fall back to Bybit if all return 418/banned.
+  const BINANCE_HOSTS = [
+    "https://data-api.binance.vision",
+    "https://api.binance.com",
+    "https://api1.binance.com",
+    "https://api3.binance.com",
+  ];
+
+  let lastErr: Error | null = null;
+  for (const host of BINANCE_HOSTS) {
+    try {
+      const raw = await fetchJson<BinanceKline[]>(
+        `${host}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+        { revalidate: 60, retries: 0 },
+      );
+      const rows: KlineRow[] = raw.map((k) => ({
+        time: Math.floor(k[0] / 1000),
+        open: parseFloat(k[1]),
+        high: parseFloat(k[2]),
+        low: parseFloat(k[3]),
+        close: parseFloat(k[4]),
+        volume: parseFloat(k[5]),
+      }));
+      return Response.json(rows);
+    } catch (err) {
+      lastErr = err as Error;
+      continue;
+    }
+  }
+
+  // Fallback: Bybit V5 spot klines (different IP rate-limit pool than Binance).
+  const BYBIT_INTERVAL: Record<string, string> = {
+    "1m": "1", "5m": "5", "15m": "15", "1h": "60", "4h": "240", "1d": "D", "1w": "W",
+  };
   try {
-    const raw = await fetchJson<BinanceKline[]>(
-      `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-      { revalidate: 30, retries: 1 },
+    const bbInterval = BYBIT_INTERVAL[interval] ?? "60";
+    const bbRaw = await fetchJson<{
+      result: { list: [string, string, string, string, string, string, string][] };
+    }>(
+      `https://api.bybit.com/v5/market/kline?category=spot&symbol=${symbol}&interval=${bbInterval}&limit=${limit}`,
+      { revalidate: 60, retries: 0 },
     );
-    const rows: KlineRow[] = raw.map((k) => ({
-      time: Math.floor(k[0] / 1000),
-      open: parseFloat(k[1]),
-      high: parseFloat(k[2]),
-      low: parseFloat(k[3]),
-      close: parseFloat(k[4]),
-      volume: parseFloat(k[5]),
-    }));
+    // Bybit returns newest-first — reverse to oldest-first like Binance.
+    const rows: KlineRow[] = bbRaw.result.list
+      .slice()
+      .reverse()
+      .map((k) => ({
+        time: Math.floor(parseInt(k[0], 10) / 1000),
+        open: parseFloat(k[1]),
+        high: parseFloat(k[2]),
+        low: parseFloat(k[3]),
+        close: parseFloat(k[4]),
+        volume: parseFloat(k[5]),
+      }));
     return Response.json(rows);
-  } catch (err) {
-    return Response.json({ error: (err as Error).message }, { status: 500 });
+  } catch (bbErr) {
+    return Response.json(
+      {
+        error: `all kline hosts failed. Binance: ${lastErr?.message ?? "unknown"}. Bybit fallback: ${(bbErr as Error).message}`,
+      },
+      { status: 502 },
+    );
   }
 }

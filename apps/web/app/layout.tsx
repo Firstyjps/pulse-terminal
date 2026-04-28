@@ -15,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <div className="grain" aria-hidden />
         <AppShell>{children}</AppShell>
       </body>
     </html>

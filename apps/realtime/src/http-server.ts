@@ -3,9 +3,18 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { HubCache } from "./cache.js";
+import {
+  buildHealthV2,
+  type AprReader,
+  type OptionsReader,
+} from "./hub-health.js";
 
 interface Routes {
   cache: HubCache;
+  /** Optional APR store reader. Omit to suppress the `apr` block. */
+  apr?: AprReader;
+  /** Optional options-cache reader. Omit to suppress the `options` block. */
+  options?: OptionsReader;
 }
 
 const JSON_HEADERS = {
@@ -22,11 +31,11 @@ function sendCached(res: ServerResponse, body: unknown, ageMs: number) {
   send(res, 200, body, { "x-cache-age": String(Math.round(ageMs / 1000)) });
 }
 
-export function startHttpServer(port: number, { cache }: Routes): () => void {
+export function startHttpServer(port: number, routes: Routes): () => void {
   const server = createServer(async (req, res) => {
     const started = Date.now();
     try {
-      handle(req, res, cache);
+      handle(req, res, routes);
     } catch (err) {
       send(res, 500, { error: (err as Error).message });
     }
@@ -42,23 +51,19 @@ export function startHttpServer(port: number, { cache }: Routes): () => void {
   return () => server.close();
 }
 
-function handle(req: IncomingMessage, res: ServerResponse, cache: HubCache) {
+function handle(req: IncomingMessage, res: ServerResponse, routes: Routes) {
   if (!req.url) return send(res, 400, { error: "no url" });
   const url = new URL(req.url, "http://localhost");
+  const { cache } = routes;
 
-  // GET /health
+  // GET /health — v2 per docs/HUB-HEALTH-V2.md
   if (url.pathname === "/health") {
-    const fundingFresh = [...cache.funding.values()].filter(
-      (f) => Date.now() - f.ts < 5 * 60_000,
-    ).length;
-    const snapAge = cache.snapshotAgeMs();
-    return send(res, 200, {
-      status: cache.snapshot ? "healthy" : "warming",
-      snapshotAgeSec: snapAge === Infinity ? null : Math.round(snapAge / 1000),
-      fundingChannelsFresh: fundingFresh,
-      oiChannels: cache.oi.size,
-      ts: new Date().toISOString(),
+    const body = buildHealthV2({
+      cache,
+      apr: routes.apr,
+      options: routes.options,
     });
+    return send(res, 200, body);
   }
 
   // GET /snapshot

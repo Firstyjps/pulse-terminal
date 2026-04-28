@@ -1,5 +1,5 @@
-// Packs the Pulse Terminal MCP into a single .dxt (zip) — manifest.json + dist/index.js.
-// Run after `pnpm build` so dist/index.js exists.
+// Packs the Pulse Terminal MCP into a single .dxt (zip) — manifest.json + dist/index.mjs.
+// Run after `pnpm build` so dist/index.mjs exists.
 
 import AdmZip from "adm-zip";
 import { existsSync, statSync, readFileSync, rmSync } from "node:fs";
@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = join(ROOT, "pulse-terminal.dxt");
 
-if (!existsSync(join(ROOT, "dist/index.js"))) {
-  console.error("dist/index.js missing — run `pnpm build` first.");
+if (!existsSync(join(ROOT, "dist/index.mjs"))) {
+  console.error("dist/index.mjs missing — run `pnpm build` first.");
   process.exit(1);
 }
 if (!existsSync(join(ROOT, "manifest.json"))) {
@@ -22,7 +22,7 @@ if (existsSync(OUT)) rmSync(OUT);
 
 const zip = new AdmZip();
 zip.addLocalFile(join(ROOT, "manifest.json"));
-zip.addLocalFile(join(ROOT, "dist/index.js"), "dist");
+zip.addLocalFile(join(ROOT, "dist/index.mjs"), "dist");
 zip.writeZip(OUT);
 
 const size = statSync(OUT).size;

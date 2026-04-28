@@ -15,6 +15,15 @@ coverage/
 
 # Reference projects — kept locally for cross-check, not part of the monorepo build
 _legacy/
+Bybit Api/
+Option Scan/
+option-dashboard/
+
+# Claude Code worktrees (ephemeral)
+.claude/worktrees/
+
+# Bundled MCP archive (rebuild via `pnpm --filter @pulse/mcp pack-dxt`)
+apps/mcp/pulse-terminal.dxt
 
 # Alert worker run-time data
 apps/alerts/data/
@@ -22,3 +31,6 @@ apps/alerts/data/
 # pm2 logs + state
 logs/
 .pm2/
+
+# Prompt drafts (compose in editor, pipe to claude — local only)
+_prompts/
