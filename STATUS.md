@@ -140,7 +140,13 @@
 - **[blocked]** Need Code to deploy: `pulse-realtime` restart on Hetzner so prod `/health` emits `_version: 2`. Sanity: `curl http://127.0.0.1:8081/health` should show `_version:2 + apr` block (driver loads transitively via `@pulse/sources`'s `better-sqlite3`; if the dynamic import fails on the prod box, `apr.error: "better-sqlite3 not installed"` appears — that's a signal to add it as a direct dep of `apps/realtime`)
 - **[doing]** Smoke tests for Code's adapters (optional 🥈) — deferred unless asked
 
-### 2026-04-28 · Code session (latest — 20:50)
+### 2026-04-28 · Code session (latest — 21:30)
+- **[done 21:30]** Two user-reported fixes:
+  - **Scroll bug fix** [apps/web/components/AppShell.tsx:52](apps/web/components/AppShell.tsx#L52) — `<main>` had `overflow:hidden` contradicting its own "scrollable" comment. Flipped to `overflow:auto`. **Cross-lane note:** AppShell is Desktop's, but this is a typo-class bug fix matching their stated intent — not a design pivot. Desktop please ack via STATUS log.
+  - **OKX funding expansion** [packages/sources/src/funding.ts:118](packages/sources/src/funding.ts#L118) — adapter only fetched BTC+ETH (2 rates). Now lists USDT-settled SWAPs from `/api/v5/public/instruments` and parallel-fetches funding-rate per-id (capped to 80). OKX coverage: **2 → 80 rates** verified live.
+  - GitHub: `f484b1a`, deployed via `git pull` workflow ✓
+- **[done 21:00]** GitHub repo: https://github.com/Firstyjps/pulse-terminal (private) — 126 files committed, deploy key on Hetzner, server now uses `git pull` workflow (no more scp). Both `.env.local` + `apps/alerts/data/` preserved during git takeover.
+- **[done 20:50]** Full deploy of Desktop + Cursor work to prod:
 - **[done 20:50]** Full deploy of Desktop + Cursor work to prod:
   - **Cleanup**: deleted [apps/web/components/bloomberg/](apps/web/components/bloomberg/) + [apps/web/app/bloomberg-preview/](apps/web/app/bloomberg-preview/) on local + prod
   - **Synced Desktop's UI**: all new components (`Terminal*`, `MoversTable`, `AssetInspector`, `FearGreedGauge`, `FundingHeatmapMini`, `OverviewPriceChart`, refactored `AlertsFeed`/`MacroOverlay`/`AppShell`) + new primitives (`Panel`, `StatBlock`, `WsRow`) + `tokens.ts` rewrite + `globals.css` + `page.tsx` 4-row layout
