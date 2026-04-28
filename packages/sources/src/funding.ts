@@ -115,13 +115,31 @@ function okxSymbolToInstId(s: string): string {
   return `${base}-USDT-SWAP`;
 }
 
+type OkxInstrument = { instId: string; instType: string; settleCcy: string; state: string };
+
 async function getOkxFunding(symbol?: string): Promise<FundingRate[]> {
   if (!symbol) {
-    // OKX requires per-instrument; default to BTC + ETH
-    return Promise.all([
-      getOkxFunding("BTC-USDT-SWAP"),
-      getOkxFunding("ETH-USDT-SWAP"),
-    ]).then((r) => r.flat());
+    // OKX has no batch funding endpoint — fetch the top USDT-settled SWAP instruments,
+    // then call funding-rate per-instrument in parallel. Result is cached upstream for 60s.
+    let instruments: string[] = [];
+    try {
+      const list = await fetchJson<OkxResp<OkxInstrument>>(
+        "https://www.okx.com/api/v5/public/instruments?instType=SWAP",
+        { revalidate: 3600 },
+      );
+      instruments = list.data
+        .filter((i) => i.settleCcy === "USDT" && i.state === "live" && i.instId.endsWith("-USDT-SWAP"))
+        .map((i) => i.instId)
+        .slice(0, 80); // cap to keep latency + rate-limit safe
+    } catch {
+      // fall back to a sane default set if the listing call fails
+      instruments = [
+        "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "BNB-USDT-SWAP", "XRP-USDT-SWAP",
+        "DOGE-USDT-SWAP", "ADA-USDT-SWAP", "AVAX-USDT-SWAP", "LINK-USDT-SWAP", "DOT-USDT-SWAP",
+      ];
+    }
+    const results = await Promise.allSettled(instruments.map((id) => getOkxFunding(id)));
+    return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   }
   const instId = okxSymbolToInstId(symbol);
   const json = await fetchJson<OkxResp<OkxFunding>>(

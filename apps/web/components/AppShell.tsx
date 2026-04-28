@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             }}
           >
             <TerminalNav />
-            <main style={{ overflow: "hidden", minHeight: 0, minWidth: 0 }}>{children}</main>
+            <main style={{ overflow: "auto", minHeight: 0, minWidth: 0 }}>{children}</main>
           </div>
           <TerminalBotBar />
         </div>
