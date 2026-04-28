@@ -55,6 +55,11 @@ const EXPECTED_DIRECTION: Record<AnomalyCategory, "up" | "down" | "neutral"> = {
   stablecoin: "up",   // dry powder building → expect up over time
   tvl: "down",
   dex: "down",
+  // Phase 5A categories — IV/options moves and Bybit-specific dual-asset APR
+  // anomalies don't carry a clean directional bias on spot price, so we keep
+  // expectedDirection neutral and let the model reason from evidence.
+  options: "neutral",
+  bybit: "neutral",
 };
 
 /**
@@ -92,6 +97,16 @@ const CATEGORY_CONSIDERATIONS: Record<AnomalyCategory, string[]> = {
     "DEX volume spikes are usually risk-on; sudden collapse paired with stablecoin contraction = capital-leaving signal.",
     "Look at top venue concentration — if 24h spike is one chain only, it's likely a meme/airdrop event not macro.",
     "Compare 7d vs 24h: 24h-only collapse with steady 7d means it's a single quiet day, not a regime change.",
+  ],
+  options: [
+    "IV skew direction matters — calls bid up vs puts bid up tells a different story (greed vs fear).",
+    "Term-structure context: front-month IV spike with long-dated steady is event-driven; parallel shift is macro.",
+    "Cross-venue arbitrage signals from get_options_arbitrage are usually illiquid — verify size before treating as actionable.",
+  ],
+  bybit: [
+    "Dual-asset APR spikes can be promotional (Bybit boosts) rather than market-driven — check coin_pair across venues.",
+    "Hour-of-day pattern in APR: persistent spikes at the same UTC+7 hour suggest a structural settlement quirk, not a tradeable signal.",
+    "APR-vs-IV correlation: high APR with low IV = stable yield; high APR with high IV = elevated assignment risk.",
   ],
 };
 

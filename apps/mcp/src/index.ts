@@ -562,7 +562,16 @@ server.tool(
 // ─────────────────────────────────────────────────────────────────
 
 const FindingSchema = z.object({
-  category: z.enum(["etf", "stablecoin", "funding", "futures", "tvl", "dex"]),
+  category: z.enum([
+    "etf",
+    "stablecoin",
+    "funding",
+    "futures",
+    "tvl",
+    "dex",
+    "options",  // Phase 5A — IV skew, max-OI shift
+    "bybit",    // Phase 5A — dual-asset APR regime change
+  ]),
   severity: z.enum(["low", "med", "high"]),
   signal: z.string(),
   evidence: z.record(z.unknown()).default({}),
