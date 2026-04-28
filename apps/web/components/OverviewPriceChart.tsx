@@ -1,39 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Candlestick, type Candle } from "@pulse/charts";
 import { colors, fonts } from "@pulse/ui";
 
 const TIMEFRAMES = [
-  { id: "1H", interval: "5m",  limit: 12 },
-  { id: "24H", interval: "1h",  limit: 24 },
-  { id: "7D",  interval: "4h",  limit: 42 },
-  { id: "30D", interval: "1d",  limit: 30 },
-  { id: "1Y",  interval: "1d", limit: 365 },
+  { id: "1H",  interval: "1m",  limit: 60  },
+  { id: "24H", interval: "15m", limit: 96  },
+  { id: "7D",  interval: "1h",  limit: 168 },
+  { id: "30D", interval: "4h",  limit: 180 },
+  { id: "1Y",  interval: "1d",  limit: 365 },
 ] as const;
 type Tf = (typeof TIMEFRAMES)[number]["id"];
 
 const COINS = [
-  { id: "BTCUSDT", label: "BTC" },
-  { id: "ETHUSDT", label: "ETH" },
-  { id: "SOLUSDT", label: "SOL" },
-  { id: "BNBUSDT", label: "BNB" },
-  { id: "XRPUSDT", label: "XRP" },
+  { id: "BTCUSDT",  label: "BTC" },
+  { id: "ETHUSDT",  label: "ETH" },
+  { id: "SOLUSDT",  label: "SOL" },
+  { id: "BNBUSDT",  label: "BNB" },
+  { id: "XRPUSDT",  label: "XRP" },
   { id: "DOGEUSDT", label: "DOGE" },
-  { id: "ADAUSDT", label: "ADA" },
+  { id: "ADAUSDT",  label: "ADA" },
   { id: "AVAXUSDT", label: "AVAX" },
   { id: "LINKUSDT", label: "LINK" },
 ];
 
 /**
- * OverviewPriceChart — handoff Row 2 left c-8 (360px).
- * Symbol picker + segmented timeframe control + Candlestick (Lightweight Charts).
+ * OverviewPriceChart — handoff Row 2 left c-8 (360px panel row).
+ *
+ *   Sub-header: symbol picker + interval label + tf segmented control (1H..1Y)
+ *   Body: Lightweight Charts Candlestick, height computed via ResizeObserver
+ *   so it fills the panel body exactly (Candlestick has a fixed `height` prop
+ *   that doesn't auto-flex on its own).
  */
 export function OverviewPriceChart() {
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [tf, setTf] = useState<Tf>("24H");
   const [data, setData] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [bodyHeight, setBodyHeight] = useState(300);
+
+  // Measure body height for the chart so it fills the panel without overflow.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const h = Math.floor(entries[0].contentRect.height);
+      if (h > 80) setBodyHeight(h);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +73,8 @@ export function OverviewPriceChart() {
     return () => { cancelled = true; };
   }, [symbol, tf]);
 
+  const config = TIMEFRAMES.find((t) => t.id === tf)!;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {/* sub-header (controls) */}
@@ -70,6 +91,7 @@ export function OverviewPriceChart() {
           letterSpacing: "0.08em",
           color: colors.txt3,
           flexShrink: 0,
+          height: 28,
         }}
       >
         <select
@@ -94,10 +116,10 @@ export function OverviewPriceChart() {
         </select>
 
         <span style={{ color: colors.txt4 }}>·</span>
-        <span>{TIMEFRAMES.find((t) => t.id === tf)?.interval} candles</span>
+        <span>{config.limit}× {config.interval} CANDLES</span>
 
         <span style={{ marginLeft: "auto", display: "inline-flex", border: `1px solid ${colors.line2}` }}>
-          {TIMEFRAMES.map((t) => {
+          {TIMEFRAMES.map((t, i) => {
             const active = tf === t.id;
             return (
               <button
@@ -107,8 +129,7 @@ export function OverviewPriceChart() {
                 style={{
                   background: active ? colors.amber : "transparent",
                   border: "none",
-                  borderRight: t.id !== TIMEFRAMES[TIMEFRAMES.length - 1].id
-                    ? `1px solid ${colors.line2}` : "none",
+                  borderRight: i < TIMEFRAMES.length - 1 ? `1px solid ${colors.line2}` : "none",
                   color: active ? "#000" : colors.txt3,
                   fontFamily: "inherit",
                   fontSize: 9,
@@ -126,8 +147,8 @@ export function OverviewPriceChart() {
         </span>
       </div>
 
-      {/* chart body */}
-      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+      {/* chart body — measured by ResizeObserver so Candlestick fills exactly */}
+      <div ref={bodyRef} style={{ flex: 1, minHeight: 0, position: "relative" }}>
         {loading && data.length === 0 ? (
           <div
             style={{
@@ -144,7 +165,7 @@ export function OverviewPriceChart() {
             <span className="blink">▒ AWAITING FEED ▒</span>
           </div>
         ) : (
-          <Candlestick data={data} />
+          <Candlestick data={data} height={bodyHeight} />
         )}
       </div>
     </div>
