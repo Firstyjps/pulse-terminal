@@ -1,5 +1,6 @@
 import { getFundingRates, getOpenInterest } from "@pulse/sources/server";
 import type { PulseServer } from "./server.js";
+import { normaliseSymbol } from "./cache.js";
 
 const FUNDING_INTERVAL_MS = 60_000; // 1 min
 const OI_INTERVAL_MS = 60_000;
@@ -7,14 +8,16 @@ const TRACKED_SYMBOLS = ["BTCUSDT", "ETHUSDT"];
 
 /**
  * Polls @pulse/sources adapters and broadcasts updates to connected clients.
- * TODO(role-7): replace with native WS subscriptions to each exchange (lower latency).
+ * Native WS streams (binance/bybit/okx-stream.ts) cover the lowest-latency path
+ * for those venues; this poller covers Deribit (no native stream yet) and
+ * provides REST fallback when streams are toggled off via PULSE_NATIVE_STREAMS.
  */
 export function startPollers(server: PulseServer): () => void {
   const fundingTimer = setInterval(async () => {
     try {
       const rates = await getFundingRates();
       for (const r of rates) {
-        if (!TRACKED_SYMBOLS.includes(r.symbol.replace(/-USDT-SWAP$/, "USDT"))) continue;
+        if (!TRACKED_SYMBOLS.includes(normaliseSymbol(r.symbol))) continue;
         server.broadcast({
           type: "funding",
           exchange: r.exchange,

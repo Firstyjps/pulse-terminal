@@ -13,9 +13,10 @@
  *   - get_dex_leaderboard      — DefiLlama DEX 24h/7d, top venues
  *   - get_tvl_breakdown        — DeFi TVL total + by chain
  *   - get_fundflow_snapshot    — all of the above formatted as one markdown brief
- *   - get_funding_summary      — NEW. Aggregated funding across Binance/Bybit/OKX
- *   - get_oi_snapshot          — NEW. Aggregated open interest snapshot
- *   - detect_anomalies         — NEW. Cross-source signal scan (ETF + funding + flows)
+ *   - get_funding_summary      — Aggregated funding across Binance/Bybit/OKX/Deribit
+ *   - get_oi_snapshot          — Aggregated open interest snapshot
+ *   - detect_anomalies         — Cross-source signal scan (ETF + funding + flows)
+ *   - grade_signal             — NEW (Phase 4). Returns rubric for grading a finding
  *
  * Transport: stdio (the standard for Claude Desktop).
  */
@@ -46,11 +47,14 @@ import {
   getRecentSnapshots,
   getDailySummaries,
   getAprIvCorrelation,
+  // Phase 4 — grade_signal rubric
+  buildGradeSignalRubric,
   type Exchange,
   type FundflowSnapshot,
   type FundingRate,
   type OpenInterest,
   type OptionAsset,
+  type AnomalyFinding,
 } from "@pulse/sources/server";
 
 const server = new McpServer(
@@ -283,14 +287,16 @@ server.tool(
 // 3 new derivatives tools (Pulse Terminal additions)
 // ─────────────────────────────────────────────────────────────────
 
-const ExchangeSchema = z.enum(["binance", "bybit", "okx"]);
+const ExchangeSchema = z.enum(["binance", "bybit", "okx", "deribit"]);
 
 server.tool(
   "get_funding_summary",
-  "Aggregated funding rates for a symbol across Binance, Bybit, and OKX (or a " +
-    "specific exchange). Returns each venue's rate plus the cross-venue mean / " +
-    "max-min spread — a wide spread between exchanges is itself a signal. " +
-    "Sources: fapi.binance.com, api.bybit.com, www.okx.com.",
+  "Aggregated funding rates for a symbol across Binance, Bybit, OKX, and " +
+    "Deribit (or a specific exchange). Returns each venue's rate plus the " +
+    "cross-venue mean / max-min spread — a wide spread between exchanges is " +
+    "itself a signal. Deribit perpetuals are inverse contracts; their " +
+    "funding_8h is the directly comparable rate. Sources: fapi.binance.com, " +
+    "api.bybit.com, www.okx.com, www.deribit.com.",
   {
     exchange: ExchangeSchema.optional().describe("Filter to one venue. Omit for all three."),
     symbol: z
@@ -337,9 +343,11 @@ server.tool(
 
 server.tool(
   "get_oi_snapshot",
-  "Open-interest snapshot for a symbol across Binance/Bybit/OKX in USD notional. " +
-    "Returns each venue's OI plus the cross-venue total — useful for measuring " +
-    "leverage build-up. Source: each exchange's public OI endpoint.",
+  "Open-interest snapshot for a symbol across Binance/Bybit/OKX/Deribit in USD " +
+    "notional. Returns each venue's OI plus the cross-venue total — useful for " +
+    "measuring leverage build-up. Deribit's `oi` is derived from its " +
+    "USD-quoted open_interest divided by mark_price (inverse perp). Source: " +
+    "each exchange's public OI endpoint.",
   {
     exchange: ExchangeSchema.optional().describe("Filter to one venue. Omit for all three."),
     symbol: z
@@ -538,6 +546,65 @@ server.tool(
     } catch (err) {
       return text(`SQLite not initialized yet — alerts cron must run at least once. Error: ${(err as Error).message}`);
     }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────
+// Phase 4 — grade_signal (rubric-returner pattern)
+//
+// We don't use MCP sampling/elicitation to round-trip back through Claude:
+// host support for sampling is uneven across Claude Desktop versions, and a
+// pure rubric-return is more debuggable. The tool hands Claude a structured
+// rubric + the required output schema; Claude does the grading in-place
+// and is told (in `instructions`) to return ONLY a JSON object matching the
+// schema. Hit-rate enrichment from the alerts JSONL is a v2 enhancement —
+// keeping v1 pure means latency stays sub-50ms.
+// ─────────────────────────────────────────────────────────────────
+
+const FindingSchema = z.object({
+  category: z.enum([
+    "etf",
+    "stablecoin",
+    "funding",
+    "futures",
+    "tvl",
+    "dex",
+    "options",  // Phase 5A — IV skew, max-OI shift
+    "bybit",    // Phase 5A — dual-asset APR regime change
+  ]),
+  severity: z.enum(["low", "med", "high"]),
+  signal: z.string(),
+  evidence: z.record(z.unknown()).default({}),
+});
+
+server.tool(
+  "grade_signal",
+  "Grade an anomaly finding from `detect_anomalies`. Returns a structured " +
+    "rubric (weights, formula, considerations specific to the finding's category) " +
+    "plus the required output schema. After receiving this rubric, reply with " +
+    "ONLY a JSON object matching outputSchema — do not echo the rubric back, do " +
+    "not wrap in code fences. Use the rubric's category-specific considerations " +
+    "and the severity confidence band as anchors. Typical chain: " +
+    "detect_anomalies → pick a finding → grade_signal {finding} → produce " +
+    "{confidence, reasoning, suggested_action, risk_flags}.",
+  {
+    finding: FindingSchema.describe(
+      "An AnomalyFinding object — typically copied verbatim from detect_anomalies output.",
+    ),
+    market_context: z
+      .record(z.unknown())
+      .optional()
+      .describe(
+        "Optional macro context (BTC price, regime label, recent moves). Improves grading; " +
+          "if omitted the rubric instructs the model to flag the absence in risk_flags.",
+      ),
+  },
+  async ({ finding, market_context }) => {
+    const rubric = buildGradeSignalRubric(
+      finding as AnomalyFinding,
+      market_context ?? null,
+    );
+    return json(rubric);
   },
 );
 

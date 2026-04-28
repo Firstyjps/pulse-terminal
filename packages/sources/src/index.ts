@@ -52,3 +52,11 @@ export type {
   DualAssetReport,
   AprIvCorrelation,
 } from "./dual-assets/types.js";
+
+// Phase 4 — pure rubric builder for the MCP `grade_signal` tool. No I/O, safe in any context.
+export { buildGradeSignalRubric } from "./grade-signal.js";
+export type {
+  GradeSignalRubric,
+  GradeSignalOutput,
+  SuggestedAction,
+} from "./grade-signal.js";

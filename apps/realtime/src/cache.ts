@@ -68,9 +68,22 @@ export class HubCache {
   }
 }
 
-/** OKX uses BTC-USDT-SWAP — collapse to BTCUSDT for cross-venue comparison. */
-function normaliseSymbol(s: string): string {
-  return s.toUpperCase().replace(/-USDT-SWAP$/, "USDT").replace(/-/g, "");
+/**
+ * Collapse venue-specific symbol formats to a single key for cross-venue
+ * comparison. We treat all "BTC perpetual swap" instruments as the same key
+ * regardless of contract type (linear vs inverse) or quote currency, since the
+ * funding-rate / OI signals are about the same underlying asset:
+ *   - OKX        BTC-USDT-SWAP   → BTCUSDT
+ *   - Deribit    BTC-PERPETUAL   → BTCUSDT  (inverse, USD-quoted)
+ *   - Binance    BTCUSDT         → BTCUSDT
+ *   - Bybit      BTCUSDT         → BTCUSDT
+ */
+export function normaliseSymbol(s: string): string {
+  return s
+    .toUpperCase()
+    .replace(/-USDT-SWAP$/, "USDT")
+    .replace(/-PERPETUAL$/, "USDT")
+    .replace(/-/g, "");
 }
 
 export const cache = new HubCache();
