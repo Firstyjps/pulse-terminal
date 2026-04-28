@@ -26,3 +26,17 @@ export * from "./options/index.js";
 
 // Bybit Dual Assets APR tracker + SQLite store — Phase 5A
 export * from "./dual-assets/index.js";
+
+// Phase 4 — graded backtest runner (server-only: reads JSONL, fetches klines, writes report)
+export {
+  runGradedBacktest,
+  writeGradedBacktestReport,
+  readScansFromJsonl,
+  fetchKlinesForScan,
+  buildSyntheticFixture,
+} from "./grade-replay-runner.js";
+export type {
+  ScanRecord,
+  GradedBacktestOpts,
+  GradedBacktestResult,
+} from "./grade-replay-runner.js";

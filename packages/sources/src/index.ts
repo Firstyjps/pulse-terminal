@@ -60,3 +60,25 @@ export type {
   GradeSignalOutput,
   SuggestedAction,
 } from "./grade-signal.js";
+
+// Phase 4 — graded backtest engine. Pure functions; OHLCV injected via callback so
+// callers (apps/web API route, CLI scripts) own the I/O.
+export {
+  applyRubric,
+  extractSignalStrength,
+  scoreOutcome,
+  replayFindings,
+  aggregateReport,
+  priorHitRateFromReport,
+} from "./grade-replay.js";
+export type {
+  OhlcvRow,
+  ApplyRubricContext,
+  ApplyRubricResult,
+  ScoreOutcomeResult,
+  ReplayInput,
+  ReplayResult,
+  BucketStats,
+  CalibrationBucket,
+  AggregateReport,
+} from "./grade-replay.js";

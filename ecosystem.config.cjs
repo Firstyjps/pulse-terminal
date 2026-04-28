@@ -65,7 +65,7 @@ module.exports = {
       interpreter_args: `--import ${tsxLoader("apps/alerts")}`,
       env: {
         NODE_ENV: "production",
-        ALERT_INTERVAL_MS: "900000",
+        ALERT_INTERVAL_MS: "240000",
         ALERT_LOG_PATH: "./data/alerts.jsonl",
         ALERT_MIN_SEVERITY: "med",
         ALERT_FUNDING_SYMBOL: "BTCUSDT",
