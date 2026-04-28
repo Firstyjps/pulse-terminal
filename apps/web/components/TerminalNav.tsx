@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { colors, fonts } from "@pulse/ui";
-import { formatUSD, formatPercent } from "@pulse/sources";
 
 interface NavItem {
   id: string;
@@ -42,49 +41,24 @@ const KEY_TO_HREF = NAV.flatMap((g) => g.items).reduce<Record<string, string>>(
   {},
 );
 
-interface TickerData {
-  btc: { price: number; change24h: number } | null;
-  eth: { price: number; change24h: number } | null;
-  fearGreed: { value: number; classification: string } | null;
-  marketCap: { total: number; change24h: number } | null;
-  ts: number;
-}
-
 /**
- * TerminalNav — 140px left rail with F-key shortcuts + live status blocks
- * under each section so the rail reads dense (handoff fidelity).
+ * TerminalNav — 140px left rail with F-key shortcuts + STATUS block.
  *
  *   ─ INTEL ─                ─ TRADING ─               ─ SYSTEM ─
  *   F1 Overview              F4 Derivatives            F6 Alerts
  *   F2 Markets               F5 Backtest               F7 Settings
- *   F3 Fundflow              ┌─ DERIV ─────┐           ┌─ STATUS ────┐
- *   ┌─ FEED ──────┐          │ FND  +0.01% │           │ ALERTS  12  │
- *   │ MCAP  $2.6T │          │ OI   $89B   │           │ STREAMS  3  │
- *   │ BTC   $76K  │          └─────────────┘           │ UPLINK 14ms │
- *   │ ETH   $2.2K │                                    └─────────────┘
- *   │ F&G    33   │
- *   └─────────────┘
+ *   F3 Fundflow                                        ┌─ STATUS ────┐
+ *                                                      │ ALERTS  12  │
+ *                                                      │ STREAMS  3  │
+ *                                                      │ UPLINK 14ms │
+ *                                                      └─────────────┘
+ *
+ * FEED + DERIV mini-blocks were removed per user request 2026-04-28
+ * (top-of-page TerminalTicker covers the same data).
  */
 export function TerminalNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [ticker, setTicker] = useState<TickerData | null>(null);
-
-  // Live status — same source as TerminalTicker, but only sampled for nav rail.
-  useEffect(() => {
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/ticker", { cache: "no-store" });
-        if (!res.ok) return;
-        const j = (await res.json()) as TickerData;
-        if (!cancelled) setTicker(j);
-      } catch { /* ignore */ }
-    };
-    void poll();
-    const id = setInterval(poll, 30_000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, []);
 
   // F1–F7 keyboard navigation (handoff feature)
   useEffect(() => {
@@ -182,9 +156,7 @@ export function TerminalNav() {
             );
           })}
 
-          {/* live status block per section — keeps the rail dense */}
-          {group.section === "INTEL" && <FeedBlock ticker={ticker} />}
-          {group.section === "TRADING" && <DerivBlock />}
+          {/* SYSTEM keeps its STATUS block; FEED + DERIV blocks removed per user request 2026-04-28. */}
           {group.section === "SYSTEM" && <StatusBlock />}
         </div>
       ))}
@@ -248,99 +220,6 @@ function MiniBlock({ title, rows }: { title: string; rows: { k: string; v: React
         </div>
       ))}
     </div>
-  );
-}
-
-function FeedBlock({ ticker }: { ticker: TickerData | null }) {
-  if (!ticker) {
-    return (
-      <MiniBlock
-        title="FEED"
-        rows={[
-          { k: "MCAP", v: "—" },
-          { k: "BTC",  v: "—" },
-          { k: "ETH",  v: "—" },
-          { k: "F&G",  v: "—" },
-        ]}
-      />
-    );
-  }
-  const fgColor =
-    ticker.fearGreed && ticker.fearGreed.value < 25 ? colors.red :
-    ticker.fearGreed && ticker.fearGreed.value < 45 ? colors.orange :
-    ticker.fearGreed && ticker.fearGreed.value < 55 ? colors.amber :
-    ticker.fearGreed && ticker.fearGreed.value < 75 ? colors.amberBright : colors.green;
-  return (
-    <MiniBlock
-      title="FEED"
-      rows={[
-        {
-          k: "MCAP",
-          v: ticker.marketCap ? formatUSD(ticker.marketCap.total, { compact: true, decimals: 1 }) : "—",
-        },
-        {
-          k: "BTC",
-          v: ticker.btc ? (
-            <span style={{ color: ticker.btc.change24h >= 0 ? colors.green : colors.red }}>
-              {formatUSD(ticker.btc.price, { compact: true, decimals: 1 })}
-            </span>
-          ) : "—",
-        },
-        {
-          k: "ETH",
-          v: ticker.eth ? (
-            <span style={{ color: ticker.eth.change24h >= 0 ? colors.green : colors.red }}>
-              {formatUSD(ticker.eth.price, { compact: true, decimals: 1 })}
-            </span>
-          ) : "—",
-        },
-        {
-          k: "F&G",
-          v: ticker.fearGreed ? (
-            <span style={{ color: fgColor }}>{ticker.fearGreed.value}</span>
-          ) : "—",
-        },
-      ]}
-    />
-  );
-}
-
-function DerivBlock() {
-  const [data, setData] = useState<{ avgFnd?: number; oiUsd?: number } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/funding", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j: { rates?: { ratePercent: number }[] }) => {
-        if (cancelled || !Array.isArray(j.rates)) return;
-        // BTCUSDT cross-venue avg
-        const btc = j.rates.filter((r: { symbol?: string; ratePercent: number }) =>
-          (r as { symbol?: string }).symbol?.toUpperCase()?.replace("-USDT-SWAP", "USDT") === "BTCUSDT");
-        const avgFnd = btc.length
-          ? btc.reduce((s, r) => s + r.ratePercent, 0) / btc.length
-          : undefined;
-        setData({ avgFnd });
-      })
-      .catch(() => { /* ignore */ });
-    return () => { cancelled = true; };
-  }, []);
-
-  return (
-    <MiniBlock
-      title="DERIV"
-      rows={[
-        {
-          k: "FND",
-          v: data?.avgFnd != null ? (
-            <span style={{ color: data.avgFnd >= 0 ? colors.green : colors.red }}>
-              {formatPercent(data.avgFnd, 3)}
-            </span>
-          ) : "—",
-        },
-        { k: "VENUES", v: <span>3</span> },
-      ]}
-    />
   );
 }
 
