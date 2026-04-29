@@ -19,13 +19,13 @@
 ## 🔒 Currently locked (do NOT touch)
 
 - _Code_: `packages/sources/src/{options,dual-assets}/**` (Phase 5A live in prod, do not refactor)
-- _Desktop_: `packages/ui/**`, `apps/web/app/globals.css`, all `apps/web/components/*` EXCEPT `apps/web/components/bloomberg/**` (Code's, awaiting cleanup), `apps/web/app/page.tsx` (Overview)
+- _Code (round 4 — in flight)_: `apps/realtime/src/binance-depth-stream.ts` (new), `apps/realtime/src/index.ts` (wire), `apps/realtime/src/http-server.ts` (add /depth route), `apps/web/app/api/{depth,whale-flow}/route.ts` (new), `packages/sources/src/{depth,whale-flow}.ts` (new), `apps/mcp/src/index.ts` + `manifest.json` (add 2 tools). Cross-lane note: realtime is normally Cursor's — additive only, no conflict with hub-health/apr-reader.
+- _Desktop_: `packages/ui/**`, `apps/web/app/globals.css`, all `apps/web/components/*` EXCEPT `apps/web/components/bloomberg/**` (Code's, awaiting cleanup), `apps/web/app/page.tsx` (Overview), **`apps/web/app/{markets,derivatives,backtest,fundflow,settings,options}/page.tsx`** (round-3: mobile + Bloomberg polish + new options page), **`apps/web/lib/use-media.ts`** (new mobile hook), **`packages/i18n/src/dict.ts`** (new keys for shell labels)
 - _Cursor_: `packages/sources/src/{format,anomalies,snapshot,_helpers}.ts`, `packages/charts/src/**`, `apps/realtime/src/{hub-health,apr-reader}.{ts,test.ts}` + `vitest.config.ts` (Phase 5A scaffolding + hub v2)
 
 ## ✅ Free for anyone
 
-- `apps/web/app/{markets,derivatives,backtest,fundflow,settings}/page.tsx` (Desktop will polish next per user's go-ahead)
-- `apps/web/lib/**`
+- `apps/web/lib/**` (except `use-media.ts` while Desktop is in flight)
 - `docs/**` (additive), `design-refs/**`
 - Top-level configs (coordinate via STATUS log first)
 
