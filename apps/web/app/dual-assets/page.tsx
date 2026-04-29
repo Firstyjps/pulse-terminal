@@ -54,28 +54,51 @@ interface DailySummary {
   sample_count: number;
 }
 
-const TARGETS = [78, 80] as const;
-type Target = (typeof TARGETS)[number];
-
 /**
  * Dual Assets — Bybit Earn APR analytics.
  *
  *   Row 1 (h-stats, 116px): KPIs (current APR / 7d avg / best hour / sample count)
  *   Row 2 (h-chart, 360px): HOURLY APR HEATMAP c-8 + RECOMMENDATION c-4
  *   Row 3 (h-table, 340px): RECENT SNAPSHOTS c-7 + DAILY SUMMARY c-5
+ *
+ * Target selector is dynamic — pulled from whatever strikes Bybit served in
+ * the recent snapshots (DUAL_ASSETS_TARGETS=all in tracker config). Filters
+ * down to the most recent ~50 rows for the picker so we always reflect the
+ * live product menu.
  */
 export default function DualAssetsPage() {
-  const [target, setTarget] = useState<Target>(78);
   const [days, setDays] = useState<7 | 14 | 30>(7);
 
-  const bestHour = useFlow<BestHourReport | { error: string }>(
-    `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=${target}&days=${days}`,
-  );
   const snapshots = useFlow<{ count: number; records: Snapshot[] }>(
-    `/api/dual-assets/snapshots?limit=50`,
+    `/api/dual-assets/snapshots?limit=200`,
+  );
+
+  // Dynamic target list — distinct strikes from recent snapshots, sorted desc
+  // so near-spot strikes (high APR products) sit near the top.
+  const availableTargets = useMemo(() => {
+    if (!snapshots.data) return [];
+    const set = new Set<number>();
+    for (const r of snapshots.data.records) set.add(r.target_price);
+    return [...set].sort((a, b) => b - a);
+  }, [snapshots.data]);
+
+  const [target, setTarget] = useState<number | null>(null);
+  // Default target = nearest-to-spot strike on first load.
+  useMemo(() => {
+    if (target === null && availableTargets.length > 0 && snapshots.data?.records[0]) {
+      const spot = snapshots.data.records[0].index_price ?? availableTargets[0];
+      const nearest = availableTargets.reduce((a, b) =>
+        Math.abs(b - spot) < Math.abs(a - spot) ? b : a,
+      );
+      setTarget(nearest);
+    }
+  }, [availableTargets, target, snapshots.data]);
+
+  const bestHour = useFlow<BestHourReport | { error: string }>(
+    `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=${target ?? 0}&days=${days}`,
   );
   const summary = useFlow<{ count: number; summaries: DailySummary[] }>(
-    `/api/dual-assets/summary?coin_pair=SOL-USDT&target=${target}&days=30`,
+    `/api/dual-assets/summary?coin_pair=SOL-USDT&target=${target ?? 0}&days=30`,
   );
 
   const report =
@@ -91,7 +114,7 @@ export default function DualAssetsPage() {
   }, [report]);
 
   const filteredSnapshots = useMemo(() => {
-    if (!snapshots.data) return [];
+    if (!snapshots.data || target == null) return [];
     return snapshots.data.records
       .filter((r) => r.target_price === target)
       .slice(0, 30);
@@ -102,27 +125,46 @@ export default function DualAssetsPage() {
     ? Math.max(...report.hourly_data.map((h) => h.avg_apr), 0.001)
     : 0.001;
 
+  const spot = snapshots.data?.records[0]?.index_price ?? null;
   const headerActions = (
-    <span style={{ display: "flex", gap: 1, background: colors.line }}>
-      {TARGETS.map((t) => (
-        <button
-          key={t}
-          onClick={() => setTarget(t)}
-          style={{
-            background: target === t ? colors.bg2 : colors.bg1,
-            border: "none",
-            color: target === t ? colors.amber : colors.txt3,
-            padding: "3px 12px",
-            fontFamily: fonts.mono,
-            fontSize: 9,
-            letterSpacing: "0.10em",
-            cursor: "pointer",
-            textTransform: "uppercase",
-          }}
-        >
-          ${t}
-        </button>
-      ))}
+    <span
+      style={{
+        display: "flex",
+        gap: 1,
+        background: colors.line,
+        maxWidth: 480,
+        overflowX: "auto",
+      }}
+    >
+      {availableTargets.length === 0 && (
+        <span style={{ padding: "3px 12px", color: colors.txt4, fontSize: 9, fontFamily: fonts.mono }}>
+          NO STRIKES YET
+        </span>
+      )}
+      {availableTargets.map((t) => {
+        const distancePct = spot ? ((t - spot) / spot) * 100 : 0;
+        const isNearSpot = Math.abs(distancePct) < 0.5;
+        return (
+          <button
+            key={t}
+            onClick={() => setTarget(t)}
+            title={spot ? `${distancePct >= 0 ? "+" : ""}${distancePct.toFixed(2)}% from spot $${spot.toFixed(2)}` : ""}
+            style={{
+              background: target === t ? colors.bg2 : colors.bg1,
+              border: "none",
+              color: target === t ? colors.amber : isNearSpot ? colors.amberBright : colors.txt3,
+              padding: "3px 10px",
+              fontFamily: fonts.mono,
+              fontSize: 9,
+              letterSpacing: "0.06em",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            ${t}
+          </button>
+        );
+      })}
     </span>
   );
 

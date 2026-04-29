@@ -17,9 +17,16 @@ const DERIBIT_BASE = "https://www.deribit.com/api/v2";
 
 // Defaults — overridable via env
 const DEFAULT_PAIRS = (process.env.DUAL_ASSETS_PAIRS ?? "SOL-USDT").split(",");
-const DEFAULT_DIRECTIONS = ((process.env.DUAL_ASSETS_DIRECTIONS ?? "BuyLow").split(",")) as DualAssetDirection[];
-const DEFAULT_TARGETS = (process.env.DUAL_ASSETS_TARGETS ?? "78,80")
-  .split(",").map((s) => parseFloat(s.trim())).filter((n) => Number.isFinite(n));
+const DEFAULT_DIRECTIONS = ((process.env.DUAL_ASSETS_DIRECTIONS ?? "BuyLow,SellHigh").split(",")) as DualAssetDirection[];
+// DUAL_ASSETS_TARGETS:
+//   - "all" (default) → no filter, save every strike Bybit serves (near-spot products
+//     have much higher APR than far-OTM ones; the 696%/347% rates on the web are
+//     8H near-spot products that filter-by-fixed-target would miss).
+//   - "78,80" or any comma list → only save those exact strikes (legacy behavior).
+const DEFAULT_TARGETS_RAW = (process.env.DUAL_ASSETS_TARGETS ?? "all").trim();
+const DEFAULT_TARGETS: number[] | null = DEFAULT_TARGETS_RAW.toLowerCase() === "all" || DEFAULT_TARGETS_RAW === ""
+  ? null
+  : DEFAULT_TARGETS_RAW.split(",").map((s) => parseFloat(s.trim())).filter((n) => Number.isFinite(n));
 const TIMEZONE = "Asia/Bangkok"; // ICT, UTC+7
 
 interface BybitResp<T> {
@@ -150,12 +157,13 @@ interface TickResult {
 export async function runDualAssetTick(opts: {
   pairs?: string[];
   directions?: DualAssetDirection[];
-  targets?: number[];
+  /** null/undefined = save all targets Bybit serves; array = whitelist only those. */
+  targets?: number[] | null;
   aprAlertThreshold?: number;
 } = {}): Promise<TickResult> {
   const pairs = opts.pairs ?? DEFAULT_PAIRS;
   const directions = opts.directions ?? DEFAULT_DIRECTIONS;
-  const targets = opts.targets ?? DEFAULT_TARGETS;
+  const targets: number[] | null = opts.targets !== undefined ? opts.targets : DEFAULT_TARGETS;
   const threshold = opts.aprAlertThreshold ?? Number(process.env.DUAL_ASSETS_APR_ALERT ?? 100);
 
   const nowUtc = new Date();
@@ -176,7 +184,7 @@ export async function runDualAssetTick(opts: {
     const [coin, quoteCoin] = pair.split("-");
     const products = await getDualAssetProducts(coin, quoteCoin);
     for (const p of products) {
-      if (!targets.includes(p.targetPrice)) continue;
+      if (targets !== null && !targets.includes(p.targetPrice)) continue;
       if (!directions.includes(p.direction)) continue;
 
       const snap: DualAssetSnapshot = {
