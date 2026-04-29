@@ -19,7 +19,7 @@
 ## 🔒 Currently locked (do NOT touch)
 
 - _Code_: `packages/sources/src/{options,dual-assets}/**` (Phase 5A live in prod, do not refactor)
-- _Code (round 4 — in flight)_: `apps/realtime/src/binance-depth-stream.ts` (new), `apps/realtime/src/index.ts` (wire), `apps/realtime/src/http-server.ts` (add /depth route), `apps/web/app/api/{depth,whale-flow}/route.ts` (new), `packages/sources/src/{depth,whale-flow}.ts` (new), `apps/mcp/src/index.ts` + `manifest.json` (add 2 tools). Cross-lane note: realtime is normally Cursor's — additive only, no conflict with hub-health/apr-reader.
+- _~~Code (round 4)~~_ — UNLOCKED. Round 4 deployed at commit `f25a387`. Files now in `master` and free for any session to extend.
 - _Desktop_: `packages/ui/**`, `apps/web/app/globals.css`, all `apps/web/components/*` EXCEPT `apps/web/components/bloomberg/**` (Code's, awaiting cleanup), `apps/web/app/page.tsx` (Overview), **`apps/web/app/{markets,derivatives,backtest,fundflow,settings,options}/page.tsx`** (round-3: mobile + Bloomberg polish + new options page), **`apps/web/lib/use-media.ts`** (new mobile hook), **`packages/i18n/src/dict.ts`** (new keys for shell labels)
 - _Cursor_: `packages/sources/src/{format,anomalies,snapshot,_helpers}.ts`, `packages/charts/src/**`, `apps/realtime/src/{hub-health,apr-reader}.{ts,test.ts}` + `vitest.config.ts` (Phase 5A scaffolding + hub v2)
 
@@ -39,6 +39,25 @@
 ---
 
 ## 📰 Activity log (newest at top)
+
+### 2026-04-29 · Code session (latest — 22:00)
+- **[done 22:00]** Round 4 — Order Book L2 + Whale Flow + cleanup. Commit `f25a387` deployed live.
+  - **WS depth stream** [apps/realtime/src/binance-depth-stream.ts](apps/realtime/src/binance-depth-stream.ts) — Binance partial book @100ms for BTCUSDT/ETHUSDT/SOLUSDT, in-process Map<DepthBook>, auto-reconnect 1s→30s exponential. Disable via `PULSE_DEPTH=0`.
+  - **Hub /depth route** [apps/realtime/src/http-server.ts](apps/realtime/src/http-server.ts) — sub-50ms cached, returns 404 with `available[]` if symbol not subscribed.
+  - **Adapter + API** [packages/sources/src/depth.ts](packages/sources/src/depth.ts) + [apps/web/app/api/depth/route.ts](apps/web/app/api/depth/route.ts) — hub-first with Binance REST fallback. **3 tests pass.**
+  - **Whale flow self-index** [packages/sources/src/whale-flow.ts](packages/sources/src/whale-flow.ts) — Etherscan USDT/USDC + Mempool.space BTC, 30-entry exchange address book, IN/OUT/INTERNAL classification. WHALE_FLOW_MIN_USD=10M default. **4 tests pass.**
+  - **Whale API** [apps/web/app/api/whale-flow/route.ts](apps/web/app/api/whale-flow/route.ts) — 60s revalidate.
+  - **MCP +2 tools** → 19 total ([apps/mcp/manifest.json](apps/mcp/manifest.json) + [src/index.ts](apps/mcp/src/index.ts)): `get_order_book`, `get_whale_flow`. **.dxt rebuilt 144.7 KB.**
+  - **Options endpoint** [apps/web/app/api/options/aggregate/route.ts](apps/web/app/api/options/aggregate/route.ts) — added `?expiry=YYYYMMDD` + `?side=call|put` filters for Desktop's Options Chain page.
+  - **Cleanup**: `apps/web/components/MarketHeatstrip.tsx` deleted. 3 reference projects (`Bybit Api/`, `Option Scan/`, `option-dashboard/`) — partial removal, OneDrive locked `node_modules` so they remain on disk (gitignored, harmless).
+  - **All 4 typechecks clean** (sources/web/realtime/mcp).
+- **[verified live]** All endpoints 200 on https://cryptopulse.buzz:
+  - `/api/depth?symbol=BTCUSDT` returns live order book (real bids/asks @ 77K)
+  - `/api/whale-flow` working
+  - `/api/options/aggregate?asset=SOL&expiry=20260626` filters correctly
+  - `/api/options/aggregate?asset=BTC&side=call` filters correctly
+- **[noted]** Desktop's mobile WIP (BottomTabNav/AppShell/use-media/MoversTable etc.) and i18n keys are uncommitted in worktree — Code did NOT commit those. Desktop will commit on their side.
+- **[blocked]** Optional ETHERSCAN_API_KEY env on prod — current rate limit 1 req/sec works but key bumps to 5. Add to `.env.local` if needed.
 
 ### 2026-04-29 · Cursor session (latest)
 - **[done 15:30]** Quality work — smoke test coverage on Code's adapters. **60 new tests across 5 files**, all passing locally. Sources test suite: **124 → 183 passing** (13 dual-assets failures remain — same SQLite native-binding issue on Windows + Node 24, unchanged from baseline).
