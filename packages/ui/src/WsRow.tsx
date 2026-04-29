@@ -9,7 +9,9 @@ export interface WsRowProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const HEIGHT_MAP: Record<Exclude<WsRowHeight, "auto">, React.CSSProperties> = {
-  stats: { minHeight: 96 },
+  // 116px gives each StatBlock its full 4-line layout (label + value + delta + sub)
+  // without a vertical scroll — was 96 which clipped the sub line.
+  stats: { minHeight: 116 },
   chart: { height: 360 },
   table: { height: 340 },
   feed: { height: 320 },

@@ -1,6 +1,7 @@
 "use client";
 
-import { StatBlock, colors } from "@pulse/ui";
+import { useEffect, useState } from "react";
+import { StatBlock, colors, fonts } from "@pulse/ui";
 import { formatUSD, formatPercent } from "@pulse/sources";
 import type { MarketOverview } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
@@ -88,13 +89,104 @@ export function MetricStrip({ refreshKey }: Props) {
         deltaColor={fgColor}
         sub="alternative.me · 24h"
       />
-      <StatBlock
-        label="Session"
-        value="US·EU"
-        delta="OPEN"
-        deltaColor={colors.green}
-        sub="overlap window"
-      />
+      <SessionStrip />
+    </div>
+  );
+}
+
+/**
+ * Replaces a generic StatBlock for the SESSION cell with a live 3-session view:
+ * Tokyo / London / NewYork — each lights green when its window is open in UTC.
+ *
+ *   TYO  00:00–09:00 UTC
+ *   LDN  08:00–16:00 UTC
+ *   NYC  13:00–22:00 UTC
+ *
+ * Updates every minute so the dim→green transition fires on the boundary.
+ */
+function SessionStrip() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const h = now ? now.getUTCHours() : -1;
+  const sessions = [
+    { name: "TYO", full: "Tokyo",    open: h >= 0 && h < 9 },
+    { name: "LDN", full: "London",   open: h >= 8 && h < 16 },
+    { name: "NYC", full: "New York", open: h >= 13 && h < 22 },
+  ];
+  const openCount = sessions.filter((s) => s.open).length;
+  const utcStr = now
+    ? `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")} UTC`
+    : "—";
+
+  return (
+    <div
+      style={{
+        background: colors.bg1,
+        padding: "8px 10px",
+        minHeight: 0,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: fonts.mono,
+          fontSize: 9,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          color: colors.txt3,
+        }}
+      >
+        Sessions
+      </div>
+      <div
+        className="mono-num"
+        style={{
+          fontFamily: fonts.mono,
+          fontSize: 14,
+          fontWeight: 600,
+          marginTop: 4,
+          display: "flex",
+          gap: 10,
+          letterSpacing: "0.04em",
+        }}
+        title={sessions.map((s) => `${s.full} ${s.open ? "OPEN" : "CLOSED"}`).join("  ·  ")}
+      >
+        {sessions.map((s) => (
+          <span
+            key={s.name}
+            style={{
+              color: s.open ? colors.green : colors.txt4,
+              textShadow: s.open ? `0 0 6px ${colors.green}80` : "none",
+            }}
+          >
+            {s.name}
+          </span>
+        ))}
+      </div>
+      <div
+        style={{
+          fontFamily: fonts.mono,
+          fontSize: 10,
+          marginTop: 2,
+          color: openCount > 0 ? colors.green : colors.txt3,
+        }}
+      >
+        {openCount > 0 ? `${openCount}/3 OPEN` : "ALL CLOSED"}
+      </div>
+      <div
+        style={{
+          fontFamily: fonts.mono,
+          fontSize: 10,
+          marginTop: 2,
+          color: colors.txt3,
+        }}
+      >
+        {utcStr}
+      </div>
     </div>
   );
 }
