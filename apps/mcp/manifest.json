@@ -101,6 +101,14 @@
     {
       "name": "grade_signal",
       "description": "Grade an anomaly finding from detect_anomalies — returns rubric + required output schema for confidence/reasoning/risk_flags"
+    },
+    {
+      "name": "get_order_book",
+      "description": "Top-N bids/asks for Binance spot — hub-cached at 100ms or REST fallback"
+    },
+    {
+      "name": "get_whale_flow",
+      "description": "On-chain whale transfers ≥ $10M — Etherscan USDT/USDC + Mempool.space BTC, exchange-labeled"
     }
   ],
   "user_config": {

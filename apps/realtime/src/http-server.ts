@@ -8,6 +8,7 @@ import {
   type AprReader,
   type OptionsReader,
 } from "./hub-health.js";
+import { getDepth, listDepthSymbols } from "./binance-depth-stream.js";
 
 interface Routes {
   cache: HubCache;
@@ -108,6 +109,20 @@ function handle(req: IncomingMessage, res: ServerResponse, routes: Routes) {
     const list = cache.oiList({ exchange, symbol });
     if (!list.length) return send(res, 404, { error: "no OI for that exchange/symbol" });
     return send(res, 200, list[0]);
+  }
+
+  // GET /depth?symbol=BTCUSDT — Binance partial book top-20 (100ms cadence)
+  if (url.pathname === "/depth") {
+    const symbol = (url.searchParams.get("symbol") ?? "BTCUSDT").toUpperCase();
+    const book = getDepth(symbol);
+    if (!book) {
+      return send(res, 404, {
+        error: "no depth for that symbol",
+        symbol,
+        available: listDepthSymbols(),
+      });
+    }
+    return send(res, 200, book);
   }
 
   // GET /summary — all-in-one debug endpoint

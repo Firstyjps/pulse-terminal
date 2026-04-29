@@ -7,6 +7,7 @@ import { startSnapshotPoller } from "./snapshot-poller.js";
 import { startHttpServer } from "./http-server.js";
 import { cache } from "./cache.js";
 import { createAprReader, preloadAprDriver } from "./apr-reader.js";
+import { startBinanceDepthStream } from "./binance-depth-stream.js";
 
 const WS_PORT = Number(process.env.WS_PORT ?? 8080);
 const HTTP_PORT = Number(process.env.HUB_HTTP_PORT ?? 8081);
@@ -28,6 +29,11 @@ stoppers.push(startHttpServer(HTTP_PORT, { cache, apr: createAprReader() }));
 if (NATIVE_STREAMS.includes("binance")) stoppers.push(startBinanceStream(server));
 if (NATIVE_STREAMS.includes("bybit")) stoppers.push(startBybitStream(server));
 if (NATIVE_STREAMS.includes("okx")) stoppers.push(startOkxStream(server));
+
+// Order book depth (Binance partial book @ 100ms). Disabled by setting PULSE_DEPTH=0.
+if (process.env.PULSE_DEPTH !== "0") {
+  stoppers.push(startBinanceDepthStream());
+}
 
 console.log(`[realtime] native streams: ${NATIVE_STREAMS.join(", ") || "(none — REST poller only)"}`);
 

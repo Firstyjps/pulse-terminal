@@ -20,6 +20,10 @@ export { getFullSnapshot, summarizeSnapshot } from "./snapshot.js";
 export { scanAnomalies, deriveAnomalies } from "./anomalies.js";
 export { getMacro } from "./macro.js";
 export { getPortfolio } from "./portfolio.js";
+export { getDepth } from "./depth.js";
+export type { DepthBook } from "./depth.js";
+export { getWhaleFlow } from "./whale-flow.js";
+export type { WhaleTransfer, WhaleFlowResponse } from "./whale-flow.js";
 
 // Multi-exchange options (Deribit/Binance/Bybit/OKX) — Phase 5A
 export * from "./options/index.js";
