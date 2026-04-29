@@ -145,11 +145,11 @@ interface MempoolTx {
 }
 
 async function btcWhales(btcUsd: number): Promise<WhaleTransfer[]> {
-  // Pull last block's tx list
-  const tipHash = await fetchJson<string>(
-    "https://mempool.space/api/blocks/tip/hash",
-    { revalidate: 60, retries: 1 },
-  );
+  // Mempool.space's /blocks/tip/hash returns plain text (the hash), not JSON.
+  // Fetch raw text first, then JSON for the txs list.
+  const tipRes = await fetch("https://mempool.space/api/blocks/tip/hash", { cache: "no-store" });
+  if (!tipRes.ok) throw new Error(`mempool.space tip-hash HTTP ${tipRes.status}`);
+  const tipHash = (await tipRes.text()).trim();
   const txs = await fetchJson<MempoolTx[]>(
     `https://mempool.space/api/block/${tipHash}/txs`,
     { revalidate: 60, retries: 1 },
