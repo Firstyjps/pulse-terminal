@@ -212,22 +212,40 @@ export default function FundflowPage() {
           )}
         </Panel>
         <Panel span={4} title="TOP CHAINS" badge="TVL">
-          <div style={{ display: "flex", flexDirection: "column", fontFamily: fonts.mono }}>
-            {tvl.data?.byChain.slice(0, 8).map((c) => (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontFamily: fonts.mono,
+              height: "100%",
+              minHeight: 0,
+            }}
+          >
+            {tvl.data?.byChain.slice(0, 8).map((c, idx, arr) => (
               <div
                 key={c.name}
                 style={{
+                  flex: 1,
+                  minHeight: 0,
                   display: "grid",
                   gridTemplateColumns: "1fr auto auto",
+                  alignItems: "center",
                   gap: 12,
-                  padding: "5px 0",
+                  padding: "0 4px",
                   fontSize: 11,
-                  borderBottom: `1px dashed ${colors.line}`,
+                  borderBottom:
+                    idx === arr.length - 1 ? "none" : `1px dashed ${colors.line}`,
                 }}
               >
                 <span style={{ color: colors.amber, fontWeight: 600 }}>{c.name}</span>
                 <span style={{ color: colors.txt3 }}>{formatUSD(c.tvl, { compact: true, decimals: 1 })}</span>
-                <span style={{ color: c.change7d >= 0 ? colors.green : colors.red, width: 56, textAlign: "right" }}>
+                <span
+                  style={{
+                    color: c.change7d >= 0 ? colors.green : colors.red,
+                    width: 56,
+                    textAlign: "right",
+                  }}
+                >
                   {formatPercent(c.change7d)}
                 </span>
               </div>
