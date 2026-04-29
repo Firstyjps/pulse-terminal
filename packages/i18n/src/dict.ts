@@ -27,6 +27,7 @@ export const dict = {
   "nav.backtest": { th: "ทดสอบย้อนหลัง", en: "BACKTEST" },
   "nav.settings": { th: "ตั้งค่า", en: "SETTINGS" },
   "nav.bybit_apr": { th: "Bybit APR", en: "BYBIT APR" },
+  "nav.dual_assets": { th: "Dual Assets", en: "DUAL ASSETS" },
   "nav.analyst": { th: "AI วิเคราะห์", en: "AI ANALYST" },
 
   // Nav section headers

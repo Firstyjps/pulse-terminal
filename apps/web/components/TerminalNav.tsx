@@ -29,6 +29,7 @@ const NAV: { sectionKey: DictKey; items: NavItem[] }[] = [
       { id: "derivatives", labelKey: "nav.derivatives", key: "F4", href: "/derivatives" },
       { id: "options",     labelKey: "nav.options",     key: "F5", href: "/options" },
       { id: "backtest",    labelKey: "nav.backtest",    key: "F6", href: "/backtest" },
+      { id: "dual-assets", labelKey: "nav.dual_assets", key: "F8", href: "/dual-assets" },
     ],
   },
   {
