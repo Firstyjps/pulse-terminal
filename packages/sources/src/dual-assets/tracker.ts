@@ -1,10 +1,14 @@
 // Bybit Dual Assets — fetcher + tick processor.
 // Ported from Bybit Api/tracker.py + notifier.py + config.py.
 //
-// SECURITY: Bybit Dual Assets endpoints require a SIGNED V5 request (BYBIT_API_KEY/SECRET).
-// Use a READ-ONLY key (no trade, no withdrawal). See SECURITY.md.
+// Endpoints (V5 public, no auth — Bybit launched Advanced-Earn DualAssets on 2026-03-24,
+// retiring the previous /v5/earn/dual-asset/product-list paths):
+//   GET /v5/earn/advance/product?category=DualAssets&coin={coin}
+//     → list of productId + duration + status + isVipProduct + settlementTime
+//   GET /v5/earn/advance/product-extra-info?category=DualAssets&productId={id}
+//     → currentPrice + buyLowPrice[]/sellHighPrice[] (each: selectPrice, apyE8, ...)
+// BYBIT_API_KEY/SECRET only needed for place-order endpoints (not used in current path).
 
-import { createHmac } from "node:crypto";
 import { fetchJson } from "../_helpers.js";
 import { saveSnapshot, updateDailySummary } from "./store.js";
 import type { DualAssetDirection, DualAssetProduct, DualAssetSnapshot } from "./types.js";
@@ -19,89 +23,101 @@ const DEFAULT_TARGETS = (process.env.DUAL_ASSETS_TARGETS ?? "78,80")
   .split(",").map((s) => parseFloat(s.trim())).filter((n) => Number.isFinite(n));
 const TIMEZONE = "Asia/Bangkok"; // ICT, UTC+7
 
-interface BybitSignedResp<T> {
+interface BybitResp<T> {
   retCode: number;
   retMsg: string;
   result: T;
 }
 
-interface BybitDualAssetItem {
-  coin?: string;
-  quoteCoin?: string;
-  direction?: string;
-  duration?: string;
-  targetPrice?: string | number;
-  apr?: string | number;
-  indexPrice?: string | number;
-  isVipOnly?: boolean;
-  settlementTime?: string;
+interface BybitProductListItem {
+  category: string;
+  productId: string;
+  baseCoin: string;
+  quoteCoin: string;
+  duration: string;        // "8h" | "1d" | "9d" …
+  status: string;          // "Available" | "NotAvailable" | "SoldOut"
+  isVipProduct: boolean;
+  settlementTime: string;  // ms timestamp
 }
 
-async function signedGet<T>(path: string, params: Record<string, string> = {}): Promise<T | null> {
-  const apiKey = process.env.BYBIT_API_KEY;
-  const apiSecret = process.env.BYBIT_API_SECRET;
-  if (!apiKey || !apiSecret) {
-    console.warn("[dual-assets] BYBIT_API_KEY/SECRET missing — cannot sign request");
-    return null;
-  }
+interface BybitStrikeQuote {
+  selectPrice: string;          // strike (decimal string)
+  apyE8: string;                // APR × 1e8 — e.g. "77585476" = 77.585476%
+  maxInvestmentAmount: string;
+  expiredAt: string;
+}
 
-  const timestamp = String(Date.now());
-  const recvWindow = "5000";
+interface BybitProductExtraInfoItem {
+  productId: string;
+  currentPrice: string;         // index price (decimal string)
+  buyLowPrice: BybitStrikeQuote[];
+  sellHighPrice: BybitStrikeQuote[];
+}
+
+async function publicGet<T>(path: string, params: Record<string, string> = {}): Promise<T | null> {
   const queryString = new URLSearchParams(params).toString();
-  const signPayload = `${timestamp}${apiKey}${recvWindow}${queryString}`;
-  const signature = createHmac("sha256", apiSecret).update(signPayload).digest("hex");
-
   const url = `${BYBIT_BASE}${path}${queryString ? "?" + queryString : ""}`;
-
-  const res = await fetch(url, {
-    headers: {
-      "X-BAPI-API-KEY": apiKey,
-      "X-BAPI-TIMESTAMP": timestamp,
-      "X-BAPI-RECV-WINDOW": recvWindow,
-      "X-BAPI-SIGN": signature,
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    console.warn(`[dual-assets] Bybit HTTP ${res.status}`);
+  try {
+    const json = await fetchJson<BybitResp<T>>(url, { revalidate: 30 });
+    if (json.retCode !== 0) {
+      console.warn(`[dual-assets] Bybit error ${json.retCode}: ${json.retMsg}`);
+      return null;
+    }
+    return json.result;
+  } catch (err) {
+    console.warn(`[dual-assets] Bybit fetch failed: ${(err as Error).message}`);
     return null;
   }
-  const json = (await res.json()) as BybitSignedResp<T>;
-  if (json.retCode !== 0) {
-    console.warn(`[dual-assets] Bybit error ${json.retCode}: ${json.retMsg}`);
-    return null;
-  }
-  return json.result;
 }
 
 /**
- * Fetch Dual Assets products. Bybit's exact V5 endpoint name moves around;
- * try the two known paths in order (per Bybit Api/tracker.py:fetch_dual_asset_products).
+ * Fetch Dual Assets products. Two-step (both endpoints public, no signing):
+ *   1. /v5/earn/advance/product → productIds for {coin}, filter Available + matching quoteCoin
+ *   2. /v5/earn/advance/product-extra-info per productId → currentPrice + strikes + APR
+ * Each (productId × direction × strike) flattens into one DualAssetProduct row.
  */
 export async function getDualAssetProducts(coin = "SOL", quoteCoin = "USDT"): Promise<DualAssetProduct[]> {
-  const params = { coin, quoteCoin };
-  const endpoints = [
-    "/v5/earn/dual-asset/product-list",
-    "/v5/earn/structured-product/list",
-  ];
+  const list = await publicGet<{ list?: BybitProductListItem[] }>("/v5/earn/advance/product", {
+    category: "DualAssets",
+    coin,
+  });
+  const products = (list?.list ?? []).filter(
+    (p) => p.quoteCoin === quoteCoin && p.status === "Available",
+  );
+  if (!products.length) return [];
 
-  for (const ep of endpoints) {
-    const result = await signedGet<{ list?: BybitDualAssetItem[] }>(ep, params);
-    if (result?.list?.length) {
-      return result.list.map((p) => ({
-        coin: p.coin ?? coin,
-        quoteCoin: p.quoteCoin ?? quoteCoin,
-        direction: (p.direction as DualAssetDirection) ?? "BuyLow",
-        duration: p.duration ?? "<1D",
-        targetPrice: typeof p.targetPrice === "string" ? parseFloat(p.targetPrice) : (p.targetPrice ?? 0),
-        apr: typeof p.apr === "string" ? parseFloat(p.apr) : (p.apr ?? 0),
-        indexPrice: typeof p.indexPrice === "string" ? parseFloat(p.indexPrice) : (p.indexPrice ?? 0),
-        isVipOnly: !!p.isVipOnly,
-        settlementTime: p.settlementTime ?? "",
-      }));
-    }
-  }
-  return [];
+  const flat: DualAssetProduct[] = [];
+  await Promise.all(products.map(async (p) => {
+    const extra = await publicGet<{ list?: BybitProductExtraInfoItem[] }>(
+      "/v5/earn/advance/product-extra-info",
+      { category: "DualAssets", productId: p.productId },
+    );
+    const item = extra?.list?.[0];
+    if (!item) return;
+    const indexPrice = parseFloat(item.currentPrice);
+    const settlementMs = Number(p.settlementTime);
+    const settlementTime = Number.isFinite(settlementMs) && settlementMs > 0
+      ? new Date(settlementMs).toISOString()
+      : "";
+
+    const push = (q: BybitStrikeQuote, direction: DualAssetDirection) => {
+      flat.push({
+        coin: p.baseCoin,
+        quoteCoin: p.quoteCoin,
+        direction,
+        duration: p.duration,
+        targetPrice: parseFloat(q.selectPrice),
+        apr: Number(q.apyE8) / 1e6,   // apyE8 = APR_decimal × 1e8 → percent = / 1e6
+        indexPrice,
+        isVipOnly: p.isVipProduct,
+        settlementTime,
+      });
+    };
+    item.buyLowPrice.forEach((q) => push(q, "BuyLow"));
+    item.sellHighPrice.forEach((q) => push(q, "SellHigh"));
+  }));
+
+  return flat;
 }
 
 /** Fetch SOL implied volatility from Deribit — average mark_iv of top-5-by-volume options. */
