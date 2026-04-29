@@ -102,7 +102,15 @@
   - FundingHeatmap COMPACT vs MATRIX toggle
 - **[blocked]** None.
 
-### 2026-04-29 · Code session (latest — 22:00)
+### 2026-04-29 · Code session (latest — 22:50)
+- **[done 22:50]** Reviewed + committed + deployed Desktop's round-3 work. Commit `81fee21` (22 files, +2554/-708) live on https://cryptopulse.buzz.
+  - **Verified:** `pnpm -r typecheck` clean across 8/8 packages · `next build` clean · all 7 pages return 200 (`/`, `/markets`, `/derivatives`, **`/options`** (NEW), `/backtest`, `/fundflow`, `/settings`) · all 6 key APIs return 200 (depth, whale-flow, options/aggregate, options/iv-smile, dual-assets/snapshots, funding).
+  - **Server drift cleaned:** auto-generated `apps/web/next-env.d.ts` was modifying repeatedly across builds — stashed + dropped. Also removed orphan `apps/alerts/apps/` artifact dir.
+  - **API contract integration verified:** Desktop's Options Chain page consumes Code's `/api/options/aggregate?asset=…&expiry=…&side=…` + `/api/options/iv-smile?asset=…&expiry=…` + Cursor's `IVSmile` and `GreeksHeatmap` charts — three-session pipeline working end-to-end.
+  - **No regressions** in MCP/realtime/alerts data layer — Desktop touched zero files in those lanes.
+- **[noted]** TerminalNav F-key map shifted: F1 Overview / F2 Markets / F3 Fundflow / F4 Derivatives / **F5 Options (new)** / F6 Backtest / F7 Settings (Alerts route removed — was never built as a real page).
+
+### 2026-04-29 · Code session (22:00)
 - **[done 22:00]** Round 4 — Order Book L2 + Whale Flow + cleanup. Commit `f25a387` deployed live.
   - **WS depth stream** [apps/realtime/src/binance-depth-stream.ts](apps/realtime/src/binance-depth-stream.ts) — Binance partial book @100ms for BTCUSDT/ETHUSDT/SOLUSDT, in-process Map<DepthBook>, auto-reconnect 1s→30s exponential. Disable via `PULSE_DEPTH=0`.
   - **Hub /depth route** [apps/realtime/src/http-server.ts](apps/realtime/src/http-server.ts) — sub-50ms cached, returns 404 with `available[]` if symbol not subscribed.
