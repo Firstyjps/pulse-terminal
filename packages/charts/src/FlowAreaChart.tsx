@@ -151,6 +151,8 @@ export interface FlowBarChartProps {
   /** Bar color when value < 0. */
   downColor?: string;
   formatY?: (n: number) => string;
+  /** Tooltip label for the cumulative line. Default "CUM". */
+  cumulativeLabel?: string;
 }
 
 /**
@@ -162,6 +164,7 @@ export function FlowBarChart({
   upColor = "#34d399",
   downColor = "#f87171",
   formatY = defaultFmt,
+  cumulativeLabel = "CUM",
 }: FlowBarChartProps) {
   const hasCumulative = data.some((d) => d.cumulative !== undefined);
   return (
@@ -189,6 +192,10 @@ export function FlowBarChart({
               tickFormatter={formatY}
               axisLine={false}
               tickLine={false}
+              // Tight auto-domain — let recharts pick min/max from the visible
+              // window rather than padding from $0. Makes the cumulative line
+              // expressive when the series is a delta or oscillates near zero.
+              domain={["auto", "auto"]}
             />
           )}
           <Tooltip
@@ -246,7 +253,7 @@ export function FlowBarChart({
                   </div>
                   {cumulative !== undefined && (
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                      <span style={{ color: "#7d8a99" }}>CUM</span>
+                      <span style={{ color: "#7d8a99" }}>{cumulativeLabel}</span>
                       <span style={{ color: "#c8d1dc", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
                         {formatY(cumulative)}
                       </span>

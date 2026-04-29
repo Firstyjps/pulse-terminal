@@ -110,13 +110,20 @@ export default function FundflowPage() {
               : "LOADING"
           }
         >
-          {etf.data && (
-            <FlowBarChart
-              data={etf.data.flows
-                .slice(-28)
-                .map((f) => ({ date: f.date, value: f.btc, cumulative: f.btcCumulative }))}
-            />
-          )}
+          {etf.data && (() => {
+            const window28 = etf.data.flows.slice(-28);
+            const startCum = window28[0]?.btcCumulative ?? 0;
+            return (
+              <FlowBarChart
+                cumulativeLabel="28D Δ"
+                data={window28.map((f) => ({
+                  date: f.date,
+                  value: f.btc,
+                  cumulative: (f.btcCumulative ?? 0) - startCum,
+                }))}
+              />
+            );
+          })()}
           {etf.data?._isProxy && (
             <p style={{ marginTop: 8, fontSize: 10, color: colors.amber, fontFamily: fonts.mono }}>
               ⚠ Proxy data — set COINGLASS_API_KEY for real flows
@@ -132,13 +139,20 @@ export default function FundflowPage() {
               : "LOADING"
           }
         >
-          {etf.data && (
-            <FlowBarChart
-              data={etf.data.flows
-                .slice(-28)
-                .map((f) => ({ date: f.date, value: f.eth, cumulative: f.ethCumulative }))}
-            />
-          )}
+          {etf.data && (() => {
+            const window28 = etf.data.flows.slice(-28);
+            const startCum = window28[0]?.ethCumulative ?? 0;
+            return (
+              <FlowBarChart
+                cumulativeLabel="28D Δ"
+                data={window28.map((f) => ({
+                  date: f.date,
+                  value: f.eth,
+                  cumulative: (f.ethCumulative ?? 0) - startCum,
+                }))}
+              />
+            );
+          })()}
         </Panel>
       </WsRow>
 
