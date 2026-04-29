@@ -1,5 +1,4 @@
 // Hourly APR analysis — generates report consumable by both MCP tools and web UI.
-// Ported from Bybit Api/analyzer.py.
 
 import { getHourlyAvg, getBestHours } from "./store.js";
 import type { DualAssetReport } from "./types.js";

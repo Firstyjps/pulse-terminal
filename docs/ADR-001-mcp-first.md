@@ -61,4 +61,4 @@ Re-add the in-browser AI panel only if:
 1. User adopts ≥ 3 collaborators who don't have Claude subscriptions, OR
 2. The MCP server can no longer match the latency target (>500ms/tool reliably)
 
-Either way, restore from git history (`feat/role-6-analysis-panel` lineage) — don't re-port from `_legacy/`.
+Either way, restore from git history (`feat/role-6-analysis-panel` lineage).

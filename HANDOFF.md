@@ -270,36 +270,24 @@ These are explicit non-priorities until UI redesign settles.
 
 ---
 
-## 🆕 Phase 5 backlog (added 2026-04-28 evening) — 3 prior projects to merge
+## ✅ Phase 5A — DONE (2026-04-28/29)
 
-User has 3 prior projects sitting at the Terminal root that should be merged into Pulse:
+The 3 prior reference projects (`Bybit Api/`, `Option Scan/`, `option-dashboard/`) have been
+fully ported into the monorepo and the source folders deleted. Ports landed at:
 
-### `Bybit Api/` (Python · ~250 LOC · standalone)
-- **Purpose:** track Bybit Dual Assets APR (SOL-USDT BuyLow at target prices 78/80) every 5 min, persist to SQLite, find hour-of-day with highest APR
-- **Stack:** pybit + httpx + SQLite + cron + Telegram bot · also fetches Deribit SOL IV
-- **Has:** 26KB blueprint markdown (`bybit-dual-assets-tracker.md`) describing the design intent — **READ THIS** before merging
-- **Plan:** port Python → TypeScript at `packages/sources/src/dual-assets.ts`, fold cron into `apps/alerts/`, add SQLite storage (better-sqlite3) since time-series GROUP-BY-hour needs joinable schema
-- **Telegram:** already replicable via existing `ALERT_WEBHOOK_URL` infrastructure
+| Original | Now lives at |
+|---|---|
+| `Bybit Api/tracker.py` + `analyzer.py` + `models.py` | `packages/sources/src/dual-assets/` (TS + better-sqlite3) |
+| `Bybit Api` cron (Telegram bot) | `apps/alerts/src/dual-assets-tick.ts` + `dual-assets-rollup.ts` (Discord webhook) |
+| `option-dashboard/src/api/*` | `packages/sources/src/options/{deribit,binance,bybit,okx,aggregator}.ts` |
+| `option-dashboard` UI (Vite/React/Zustand) | `apps/web/app/options/page.tsx` (Bloomberg shell) |
+| `Option Scan/app.py` | not yet ported (skipped — Streamlit dashboard, low priority) |
 
-### `Option Scan/app.py` (Python single-file · 51KB)
-- **Status:** OneDrive offline at time of analysis — **bring online before merging** (right-click → Always keep on this device)
-- **Likely:** Streamlit or FastAPI options scanner (single-file size suggests Streamlit dashboard)
+**MCP tools added during Phase 5A:** `get_options_chain`, `get_iv_smile`, `get_options_arbitrage`, `get_dual_assets_apr`, `get_best_dual_assets_hour`, `get_dual_assets_daily_summary` (6 tools).
 
-### `option-dashboard/` (Vite + React 18 + Zustand)
-- **Purpose:** multi-exchange options dashboard — Deribit/Binance/Bybit/OKX for SOL/BTC/ETH
-- **Stack:** TS + Vite 6 + Express CORS proxy + Recharts + Zustand
-- **Tabs:** Best Price · IV Smile · OI · Chain · Arbitrage · Position · Greeks (7 features)
-- **Plan:** port API adapters + aggregator → `packages/sources/src/options/`; replace Express proxy with Next.js catch-all route at `apps/web/app/api/options/proxy/[...path]/route.ts`; UI components → `apps/web/app/options/page.tsx` using NEW design system
+**Cleanup status:** reference project folders removed from disk. `option-dashboard/node_modules` retained (OneDrive lock); gitignored, harmless.
 
-### Phased rollout
-- **5A (data layer · safe to do during UI redesign):** options adapters + dual-assets tracker + API proxies + cron tick + MCP tools (5 new: get_options_chain, get_iv_smile, get_options_arbitrage, get_dual_assets_apr, get_best_dual_assets_hour)
-- **5B (UI tabs · only after redesign settles):** /options tab + /dual-assets tab using new Phosphor Substrate design language
-- **5C (integration polish):** backtest extension, options anomaly detection
-
-### Coordination note
-The other Claude session (this orchestrator, account #1) will work Phase 5A while you (Claude Desktop, account #2) finish UI redesign. Stay out of each other's lanes:
-- Account #1 owns: `packages/sources/src/options/*`, `packages/sources/src/dual-assets.ts`, `apps/web/app/api/options/*`, `apps/web/app/api/dual-assets/*`, `apps/alerts/src/dual-assets-tick.ts`, `apps/mcp/src/index.ts` additions
-- Account #2 (you) owns: ALL of `apps/web/components/*` and `apps/web/app/*/page.tsx` redesign + new design tokens in `packages/ui/`
+For current backlog, see [STATUS.md](./STATUS.md) — this HANDOFF section is preserved as historical context only.
 
 ---
 

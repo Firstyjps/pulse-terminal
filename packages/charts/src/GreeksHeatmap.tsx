@@ -51,7 +51,7 @@ function colorFor(value: number, max: number): string {
  * Greeks heatmap — strike rows × greek columns. Color-coded by sign + magnitude
  * so positive (long-friendly) greeks glow green, negative glow red. Spot row highlighted.
  *
- * Pure CSS grid — no chart library overhead. Designed for option-dashboard "GREEKS" tab.
+ * Pure CSS grid — no chart library overhead. Designed for the Options page "GREEKS" panel.
  */
 export function GreeksHeatmap({
   data,

@@ -1,5 +1,4 @@
 // OKX options adapter — public REST. Only BTC + ETH (no SOL options on OKX).
-// Ported from option-dashboard/src/api/okx.ts.
 
 import { fetchJson } from "../_helpers.js";
 import { normalizeExpiry } from "./_expiry.js";

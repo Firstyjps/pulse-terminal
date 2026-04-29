@@ -1,5 +1,4 @@
 // Binance options adapter (eapi.binance.com) — public REST.
-// Ported from option-dashboard/src/api/binance.ts.
 
 import { fetchJson } from "../_helpers.js";
 import { normalizeExpiry } from "./_expiry.js";

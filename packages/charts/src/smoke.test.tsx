@@ -127,7 +127,7 @@ describe("Candlestick", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// Phase 5A options components — added 2026-04-28 alongside option-dashboard port
+// Phase 5A options components — added 2026-04-28
 // ────────────────────────────────────────────────────────────────────────
 
 describe("IVSmile", () => {

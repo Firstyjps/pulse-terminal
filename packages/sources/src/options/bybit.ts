@@ -1,5 +1,4 @@
 // Bybit options adapter — public REST.
-// Ported from option-dashboard/src/api/bybit.ts.
 
 import { fetchJson } from "../_helpers.js";
 import { normalizeExpiry } from "./_expiry.js";

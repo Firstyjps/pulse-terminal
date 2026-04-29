@@ -44,7 +44,7 @@ const fmtStrike = (n: number) => {
  * IV smile / skew curve. Strike on x-axis, IV (%) on y-axis.
  * If `splitSides` is true (or sides present in data), renders calls + puts as separate lines.
  *
- * Designed for option-dashboard "IV CURVE" tab.
+ * Designed for the Options page "IV SMILE" panel.
  */
 export function IVSmile({
   data,

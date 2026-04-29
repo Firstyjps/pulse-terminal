@@ -47,7 +47,7 @@ const fmtStrike = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.to
  * `mirror=false` (default): side-by-side bars per strike.
  * `mirror=true`: puts rendered as negative values, creating an above/below pyramid.
  *
- * Designed for option-dashboard "OI BY STRIKE" tab.
+ * Designed for the Options page "OI BY STRIKE" panel.
  */
 export function OIByStrike({
   data,

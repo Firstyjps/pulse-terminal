@@ -1,5 +1,4 @@
 // Multi-exchange options data — types shared between server adapters and browser UI.
-// Ported from option-dashboard/src/types/option.ts.
 
 export type OptionExchange = "Deribit" | "Binance" | "Bybit" | "OKX";
 export type OptionAsset = "SOL" | "BTC" | "ETH";

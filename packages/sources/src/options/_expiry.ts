@@ -1,5 +1,4 @@
 // Expiry normalization — handles all 4 venues' string formats.
-// Ported from option-dashboard/src/utils/expiry.ts.
 
 const MONTHS: Record<string, string> = {
   JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",

@@ -1,5 +1,4 @@
 // Bybit Dual Assets — fetcher + tick processor.
-// Ported from Bybit Api/tracker.py + notifier.py + config.py.
 //
 // Endpoints (V5 public, no auth — Bybit launched Advanced-Earn DualAssets on 2026-03-24,
 // retiring the previous /v5/earn/dual-asset/product-list paths):
@@ -16,7 +15,7 @@ import type { DualAssetDirection, DualAssetProduct, DualAssetSnapshot } from "./
 const BYBIT_BASE = "https://api.bybit.com";
 const DERIBIT_BASE = "https://www.deribit.com/api/v2";
 
-// Defaults match Bybit Api/config.py — overridable via env
+// Defaults — overridable via env
 const DEFAULT_PAIRS = (process.env.DUAL_ASSETS_PAIRS ?? "SOL-USDT").split(",");
 const DEFAULT_DIRECTIONS = ((process.env.DUAL_ASSETS_DIRECTIONS ?? "BuyLow").split(",")) as DualAssetDirection[];
 const DEFAULT_TARGETS = (process.env.DUAL_ASSETS_TARGETS ?? "78,80")

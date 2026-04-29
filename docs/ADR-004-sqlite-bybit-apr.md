@@ -6,9 +6,9 @@
 
 ## Context
 
-Phase 5A ports `Bybit Api/` (Python) into the monorepo. The original tracker writes APR snapshots to SQLite (see `Bybit Api/models.py`):
+Phase 5A introduces a Bybit Dual-Asset APR tracker. The schema captures two tables:
 
-- **`apr_snapshots`** — 1 row per (timestamp, coin_pair, target_price, duration, direction). Cadence: every 15-30 min × ~6 target prices × 2 durations = **~50-100 rows/hour, ~1.2k-2.4k/day**.
+- **`apr_snapshots`** — 1 row per (timestamp, coin_pair, target_price, duration, direction). Cadence: every 5 min × ~6 target prices × 2 durations = **~144 rows/hour, ~3.5k/day**.
 - **`daily_summary`** — pre-aggregated per (date, coin_pair, target_price). Refreshed once per day from `apr_snapshots`.
 
 Reads are dominated by aggregations:
@@ -45,7 +45,7 @@ At current cadence (1.2k–2.4k rows/day → ~440k rows/year, ~30MB/year) SQLite
 
 ## Schema
 
-Port directly from `Bybit Api/models.py` with TypeScript-friendly column names:
+TypeScript-friendly column names:
 
 ```sql
 CREATE TABLE IF NOT EXISTS apr_snapshots (
@@ -161,13 +161,7 @@ Single instance per process. Cron worker holds it for the worker's lifetime; web
 
 ## Migration from existing data
 
-`Bybit Api/data/*.db` may already contain historical snapshots from the Python tracker. One-shot import:
-
-```bash
-sqlite3 apps/alerts/data/bybit-apr.sqlite ".read scripts/import-bybit-legacy.sql"
-```
-
-Where `import-bybit-legacy.sql` does `ATTACH DATABASE '_legacy/Bybit Api/data/dual_assets.db' AS legacy; INSERT OR IGNORE INTO apr_snapshots SELECT ... FROM legacy.apr_snapshots;`. Cursor implements during port.
+N/A — no historical data to migrate. APR history accrues from the live cron tick; for manual seeding before the tick has run, use `node --import tsx scripts/dual-assets-tick.mjs --rollup` (see [docs/DUAL-ASSETS.md](./DUAL-ASSETS.md)).
 
 ## Dependency cost
 
@@ -178,7 +172,7 @@ Where `import-bybit-legacy.sql` does `ATTACH DATABASE '_legacy/Bybit Api/data/du
 ## Out of scope (deferred)
 
 - Migrating `alerts.jsonl` → SQLite (ADR-003 still holds; revisit only if its triggers fire)
-- Options OI history storage (will be addressed by a future ADR if/when option-dashboard port needs persistence beyond hub cache)
+- Options OI history storage (will be addressed by a future ADR if/when the options pipeline needs persistence beyond hub cache)
 - Cross-table joins between alerts and APR (no current need)
 
 ## Consequences

@@ -42,15 +42,13 @@ Already covered by `.gitignore`, but double-check before any `git push`:
 git diff --cached --name-only | grep -E '\.env(\..+)?$'  # should be empty
 ```
 
-### 4. `_legacy/` may contain old keys
-The 4 reference projects under `_legacy/` may have their own `.env`, `.env.local`, or `.env.example` with old keys.
+### 4. Reference projects (historical)
+The seven prior projects that were ported into this monorepo have been removed from disk. If you ever restore one from a backup, audit it for stale keys before working on it:
 
 ```bash
-# Audit before sharing the repo
-grep -r "API_KEY\|API_SECRET\|sk-ant-" _legacy/ 2>/dev/null
+grep -r "API_KEY\|API_SECRET\|sk-ant-" <restored-folder>/ 2>/dev/null
 ```
-
-If matches exist: rotate those keys (assume compromised) before deleting `_legacy/`.
+Rotate any matched keys (assume compromised).
 
 ## Soft rules
 

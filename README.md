@@ -2,7 +2,7 @@
 
 > Crypto Macro Intelligence Terminal — multi-source flow analysis, derivatives intel, AI via MCP.
 
-Monorepo consolidating four prior projects (Pulse Command, Crypto-Fundflow-Analyzer, CryptoTerminal, Funding_Oi → all ported, originals archived under `_legacy/`).
+Monorepo consolidating seven prior projects — all ported, originals removed from disk.
 
 **Architecture:** MCP-first. The web app is a visualization layer; AI analysis happens in Claude Desktop via the bundled MCP server, using your Claude Pro/Max subscription (no Anthropic API key needed).
 
@@ -91,10 +91,14 @@ Work is split into 8 roles + Phase 3 sub-phases so multiple Claude Code sessions
 
 ## Reference projects
 
-Four originals archived under [`_legacy/`](_legacy/) (gitignored):
-- `_legacy/Crypto-Fundflow-Analyzer/` (777M) — superseded by `apps/web` + `apps/mcp` + `packages/sources`
-- `_legacy/Funding_Oi/` (89M) — superseded by `apps/realtime` + `packages/sources/funding`
-- `_legacy/CryptoTerminal/` (1.5M) — superseded by `apps/web/markets` + `packages/charts`
-- `_legacy/Pulse Command/` (76K) — superseded by `packages/ui`
+All seven prior projects have been ported and the source folders removed:
 
-Delete `_legacy/` when confident nothing else needs salvaging.
+| Original | Now lives at |
+|---|---|
+| `Crypto-Fundflow-Analyzer` | `apps/web` + `apps/mcp` + `packages/sources` |
+| `Funding_Oi` | `apps/realtime` + `packages/sources/funding` |
+| `CryptoTerminal` | `apps/web/markets` + `packages/charts` |
+| `Pulse Command` | `packages/ui` |
+| `Bybit Api` (Python) | `packages/sources/src/dual-assets/` (TS + better-sqlite3) |
+| `option-dashboard` (Vite) | `packages/sources/src/options/` + `apps/web/app/options/` |
+| `Option Scan` (Streamlit) | not ported — low priority, removed |

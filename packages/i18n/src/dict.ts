@@ -136,7 +136,7 @@ export const dict = {
   "option.exchange": { th: "เอ็กซ์เชนจ์", en: "EXCHANGE" },
   "option.asset": { th: "สินทรัพย์", en: "ASSET" },
 
-  // Options — tabs (mirror TabId in option-dashboard/src/types/option.ts)
+  // Options — tabs
   "option.tab.best": { th: "ดีลที่ดีที่สุด", en: "BEST DEALS" },
   "option.tab.iv": { th: "เส้นโค้ง IV", en: "IV CURVE" },
   "option.tab.oi": { th: "OI ตามสไตรค์", en: "OI BY STRIKE" },
@@ -171,7 +171,7 @@ export const dict = {
   "position.max_profit": { th: "กำไรสูงสุด", en: "MAX PROFIT" },
   "position.max_loss": { th: "ขาดทุนสูงสุด", en: "MAX LOSS" },
 
-  // Bybit — Dual Asset / APR tracker (port of "Bybit Api/")
+  // Bybit — Dual Asset / APR tracker
   "bybit.dual_asset": { th: "Dual Asset", en: "DUAL ASSET" },
   "bybit.apr": { th: "APR", en: "APR" },
   "bybit.apr_pct": { th: "APR (%)", en: "APR %" },

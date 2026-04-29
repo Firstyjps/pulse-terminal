@@ -1,7 +1,7 @@
 // SQLite store for Bybit Dual Assets APR snapshots.
 // Server-only (better-sqlite3 native binding).
 //
-// Schema ported from Bybit Api/models.py:
+// Schema:
 //   - apr_snapshots: per-tick rows, dedup by (timestamp_ict, coin_pair, target_price, duration, direction)
 //   - daily_summary: aggregated rollups (avg/max/min/best_hour/worst_hour) per (date, coin_pair, target_price)
 //

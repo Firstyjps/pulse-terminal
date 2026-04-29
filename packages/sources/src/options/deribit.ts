@@ -1,5 +1,4 @@
-// Deribit options adapter — public REST, no key required.
-// Ported from option-dashboard/src/api/deribit.ts (server-side: hits Deribit directly, no proxy).
+// Deribit options adapter — public REST, server-side direct (no proxy), no key required.
 
 import { fetchJson } from "../_helpers.js";
 import { normalizeExpiry } from "./_expiry.js";

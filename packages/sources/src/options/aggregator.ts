@@ -1,5 +1,4 @@
 // Multi-exchange options aggregator. Fans out + Promise.allSettled.
-// Ported from option-dashboard/src/api/aggregator.ts (server-side now).
 
 import { fetchDeribitOptions } from "./deribit.js";
 import { fetchBinanceOptions } from "./binance.js";

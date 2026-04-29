@@ -1,6 +1,6 @@
 # AGENTS — Work Delegation for Pulse Terminal
 
-> **Path note:** the four reference projects referenced in this doc (`Crypto-Fundflow-Analyzer/`, `CryptoTerminal/`, `Funding_Oi/`, `Pulse Command/`) have been archived under `_legacy/`. When you see them mentioned below, prefix with `_legacy/`.
+> **Path note:** the four original reference projects (`Crypto-Fundflow-Analyzer/`, `CryptoTerminal/`, `Funding_Oi/`, `Pulse Command/`) plus three Phase-5 additions (`Bybit Api/`, `Option Scan/`, `option-dashboard/`) have all been ported into this monorepo and removed from disk. References to them below are historical context only.
 
 The build is split into **8 roles**. Each role owns one slice of the monorepo and exposes a clear contract to the others. Multiple Claude Code sessions can work in parallel without colliding because boundaries are file-level.
 
@@ -220,9 +220,9 @@ get_oi_snapshot()                              // open interest — NEW
 
 ---
 
-## Migration source map (all complete · originals under `_legacy/`)
+## Migration source map (all complete · originals removed from disk)
 
-| ✓ | New location                              | Source (`_legacy/...`)                                            |
+| ✓ | New location                              | Source (historical reference)                                     |
 |---|-------------------------------------------|-------------------------------------------------------------------|
 | ✅ | `packages/ui/src/tokens.ts`               | `Pulse Command/pulsecommand.html` `:root` block                   |
 | ✅ | `packages/ui/src/ThreeBackground.tsx`     | `Pulse Command/pulsecommand.html` Three.js init                   |
