@@ -128,18 +128,20 @@ export function IVSmile({
                 dataKey="callIv"
                 name="Call"
                 stroke={callColor}
-                strokeWidth={1.5}
-                dot={{ r: 2, fill: callColor }}
+                strokeWidth={1.75}
+                dot={{ r: 2.5, fill: callColor, strokeWidth: 0 }}
                 connectNulls
+                isAnimationActive={false}
               />
               <Line
                 type="monotone"
                 dataKey="putIv"
                 name="Put"
                 stroke={putColor}
-                strokeWidth={1.5}
-                dot={{ r: 2, fill: putColor }}
+                strokeWidth={1.75}
+                dot={{ r: 2.5, fill: putColor, strokeWidth: 0 }}
                 connectNulls
+                isAnimationActive={false}
               />
               <Legend wrapperStyle={{ fontSize: 10, color: AXIS }} />
             </>
@@ -149,8 +151,9 @@ export function IVSmile({
               dataKey="iv"
               name="IV"
               stroke={callColor}
-              strokeWidth={1.5}
-              dot={{ r: 2, fill: callColor }}
+              strokeWidth={1.75}
+              dot={{ r: 2.5, fill: callColor, strokeWidth: 0 }}
+              isAnimationActive={false}
             />
           )}
         </LineChart>
