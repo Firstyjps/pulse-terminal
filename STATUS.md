@@ -40,6 +40,18 @@
 
 ## 📰 Activity log (newest at top)
 
+### 2026-04-29 · Cursor session (latest)
+- **[done 15:30]** Quality work — smoke test coverage on Code's adapters. **60 new tests across 5 files**, all passing locally. Sources test suite: **124 → 183 passing** (13 dual-assets failures remain — same SQLite native-binding issue on Windows + Node 24, unchanged from baseline).
+  - **NEW** [packages/sources/src/options/_expiry.test.ts](packages/sources/src/options/_expiry.test.ts) — 14 tests: every venue's expiry-string format, all 12 month abbreviations, fallback paths, sortability invariant
+  - **NEW** [packages/sources/src/options/deribit.test.ts](packages/sources/src/options/deribit.test.ts) — 11 tests: BTC fraction-of-underlying conversion, SOL_USDC raw-USD path, null-bid/null-ask fallback, mark≤0 dropping, malformed instrument filtering, Greek precision rounding
+  - **NEW** [packages/sources/src/options/aggregator.test.ts](packages/sources/src/options/aggregator.test.ts) — 13 tests: cross-venue arbitrage detection, minSpreadPct gating, same-venue exclusion, top-50 cap, IV smile grouping by side/strike/asset/expiry
+  - **NEW** [packages/sources/src/portfolio.test.ts](packages/sources/src/portfolio.test.ts) — 13 tests: opt-in null when keys absent, **LD-prefix Earn assets** (LDUSDT→USDT 1:1, LDBTC→BTC priced via underlying), unpriced FAKE asset dropped from totalUsd, free+locked sum, descending sort, HMAC-SHA256 signature on `/api/v3/account`, 401 error path
+  - **EXTENDED** [packages/sources/src/funding.test.ts](packages/sources/src/funding.test.ts) — +9 tests: **OKX 80-instrument fan-out cap**, USDT-settled+live filtering on listing, fallback 10-symbol set when listing 500s, BTCUSDT→BTC-USDT-SWAP shorthand, partial failure tolerance via allSettled, plus 3 Deribit perp extras (sign preservation, USD-suffix stripping, default-symbol fan-out)
+- **[verified]** `pnpm --filter @pulse/sources test` — 5/5 new files pass (65/65 tests in those files, 183/196 overall — 13 unrelated Win+Node24 SQLite failures unchanged)
+- **[noted]** Optional 🥈 anomaly detectors (`detectMaxOiShift`, `detectAprRegimeChange`) are **already implemented + tested** in [anomalies.ts](packages/sources/src/anomalies.ts) and [anomalies.test.ts](packages/sources/src/anomalies.test.ts) — skipping the optional task as it's already complete.
+- **[noted]** Pre-existing typecheck failures in [server.ts](packages/sources/src/server.ts) (missing `./whale-flow.js` import) are NOT caused by this change — that's untracked Code-lane WIP. My test files all typecheck clean (vitest's transform pass passes them).
+- **[committed only my files]** Other sessions have ~10 uncommitted/untracked files (Desktop's BottomTabNav/AppShell/MoversTable WIP + Code's depth.ts/depth-stream/whale-flow refs). Left untouched — they belong to other lanes and should be committed by their owners.
+
 ### 2026-04-28 · Desktop session (latest)
 - **[done]** Phosphor → Bloomberg amber pivot per `/design_handoff_cryptopulse/` complete
 

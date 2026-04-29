@@ -130,3 +130,162 @@ describe("Deribit OI adapter", () => {
     expect(o.oiUsd).toBe(100);
   });
 });
+
+// ── OKX coverage — instruments listing → cap-80 fan-out ─────────────────────
+
+describe("OKX funding adapter", () => {
+  function buildInstruments(count: number) {
+    return {
+      code: "0",
+      data: Array.from({ length: count }, (_, i) => ({
+        instId: `SYM${i}-USDT-SWAP`,
+        instType: "SWAP",
+        settleCcy: "USDT",
+        state: "live",
+      })),
+    };
+  }
+
+  function fundingRateFor(instId: string) {
+    return {
+      code: "0",
+      data: [{
+        instId,
+        fundingRate: "0.0001",
+        nextFundingTime: "1770000010000",
+        ts: "1770000000000",
+      }],
+    };
+  }
+
+  beforeEach(() => {
+    // 100-instrument listing — adapter must cap to 80
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("okx.com/api/v5/public/instruments")) {
+        return jsonResponse(buildInstruments(100));
+      }
+      if (url.includes("okx.com/api/v5/public/funding-rate?instId=")) {
+        const id = url.split("instId=")[1];
+        return jsonResponse(fundingRateFor(id));
+      }
+      return notOkResponse(503);
+    }) as typeof fetch;
+  });
+
+  it("caps OKX symbol fan-out at 80 instruments per refresh", async () => {
+    const rates = await getFundingRates({ exchange: "okx" });
+    expect(rates.length).toBe(80);
+    expect(rates.every((r) => r.exchange === "okx")).toBe(true);
+  });
+
+  it("filters listing to live + USDT-settled SWAPs only", async () => {
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("okx.com/api/v5/public/instruments")) {
+        return jsonResponse({
+          code: "0",
+          data: [
+            { instId: "BTC-USDT-SWAP", instType: "SWAP", settleCcy: "USDT", state: "live" },
+            { instId: "BTC-USD-SWAP",  instType: "SWAP", settleCcy: "BTC",  state: "live" },   // wrong settleCcy
+            { instId: "DEAD-USDT-SWAP", instType: "SWAP", settleCcy: "USDT", state: "suspend" }, // wrong state
+          ],
+        });
+      }
+      if (url.includes("okx.com/api/v5/public/funding-rate?instId=")) {
+        const id = url.split("instId=")[1];
+        return jsonResponse(fundingRateFor(id));
+      }
+      return notOkResponse(503);
+    }) as typeof fetch;
+    const rates = await getFundingRates({ exchange: "okx" });
+    expect(rates.map((r) => r.symbol)).toEqual(["BTC-USDT-SWAP"]);
+  });
+
+  it("falls back to a default 10-symbol set when the listing call fails", async () => {
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("okx.com/api/v5/public/instruments")) {
+        return notOkResponse(500);
+      }
+      if (url.includes("okx.com/api/v5/public/funding-rate?instId=")) {
+        const id = url.split("instId=")[1];
+        return jsonResponse(fundingRateFor(id));
+      }
+      return notOkResponse(503);
+    }) as typeof fetch;
+    const rates = await getFundingRates({ exchange: "okx" });
+    expect(rates.length).toBe(10);
+    expect(rates.find((r) => r.symbol === "BTC-USDT-SWAP")).toBeDefined();
+    expect(rates.find((r) => r.symbol === "ETH-USDT-SWAP")).toBeDefined();
+  });
+
+  it("translates BTCUSDT shorthand → BTC-USDT-SWAP when symbol is provided", async () => {
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("okx.com/api/v5/public/funding-rate?instId=BTC-USDT-SWAP")) {
+        return jsonResponse(fundingRateFor("BTC-USDT-SWAP"));
+      }
+      return notOkResponse(404);
+    }) as typeof fetch;
+    const rates = await getFundingRates({ exchange: "okx", symbol: "BTCUSDT" });
+    expect(rates).toHaveLength(1);
+    expect(rates[0].symbol).toBe("BTC-USDT-SWAP");
+    expect(rates[0].rate).toBe(0.0001);
+    expect(rates[0].ratePercent).toBeCloseTo(0.01, 12);
+  });
+
+  it("preserves OKX-style instId verbatim when already in canonical form", async () => {
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("okx.com/api/v5/public/funding-rate?instId=ETH-USDT-SWAP")) {
+        return jsonResponse(fundingRateFor("ETH-USDT-SWAP"));
+      }
+      return notOkResponse(404);
+    }) as typeof fetch;
+    const rates = await getFundingRates({ exchange: "okx", symbol: "ETH-USDT-SWAP" });
+    expect(rates[0].symbol).toBe("ETH-USDT-SWAP");
+  });
+
+  it("drops failed per-instrument funding fetches without aborting the batch", async () => {
+    let toggle = 0;
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("okx.com/api/v5/public/instruments")) {
+        return jsonResponse(buildInstruments(5));
+      }
+      if (url.includes("okx.com/api/v5/public/funding-rate?instId=")) {
+        const id = url.split("instId=")[1];
+        toggle++;
+        if (toggle === 3) return notOkResponse(503);  // one failure
+        return jsonResponse(fundingRateFor(id));
+      }
+      return notOkResponse(503);
+    }) as typeof fetch;
+    const rates = await getFundingRates({ exchange: "okx" });
+    expect(rates.length).toBe(4);  // 5 - 1 failure
+  });
+});
+
+// ── Deribit funding — additional coverage ───────────────────────────────────
+
+describe("Deribit funding adapter — extras", () => {
+  it("emits ratePercent = rate × 100 with sign preserved", async () => {
+    const rates = await getFundingRates({ exchange: "deribit", symbol: "ETHUSDT" });
+    expect(rates[0].rate).toBeLessThan(0);
+    expect(rates[0].ratePercent).toBeLessThan(0);
+    expect(rates[0].ratePercent).toBeCloseTo(rates[0].rate * 100, 12);
+  });
+
+  it("strips USD suffix as well as USDT when normalizing instrument name", async () => {
+    const rates = await getFundingRates({ exchange: "deribit", symbol: "BTCUSD" });
+    expect(rates[0].symbol).toBe("BTC-PERPETUAL");
+  });
+
+  it("fan-out yields one entry per default symbol when no symbol is given", async () => {
+    const rates = await getFundingRates({ exchange: "deribit" });
+    expect(rates).toHaveLength(2);
+    expect(new Set(rates.map((r) => r.symbol)))
+      .toEqual(new Set(["BTC-PERPETUAL", "ETH-PERPETUAL"]));
+  });
+});
