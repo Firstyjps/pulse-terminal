@@ -85,15 +85,50 @@ export function FlowAreaChart({
           />
           <Tooltip
             cursor={{ stroke: color, strokeOpacity: 0.3, strokeDasharray: "2 2" }}
-            contentStyle={{
-              background: "#0d111d",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 8,
-              fontSize: 12,
-              color: "#f2f4f8",
+            content={({ active, payload, label: tipLabel }) => {
+              if (!active || !payload || !payload.length) return null;
+              const v = (payload[0]?.value as number) ?? 0;
+              const dateStr =
+                typeof tipLabel === "string" && /^\d{4}-\d{2}-\d{2}$/.test(tipLabel)
+                  ? new Date(tipLabel).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : String(tipLabel ?? "");
+              return (
+                <div
+                  style={{
+                    background: "#0a0d14",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 4,
+                    padding: "8px 12px",
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 11,
+                    minWidth: 140,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: "#a0a0a0",
+                      fontSize: 10,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      paddingBottom: 6,
+                      marginBottom: 6,
+                      borderBottom: "1px dashed rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    {dateStr}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span style={{ color: "#7d8a99", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+                    <span style={{ color: color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmt(v)}</span>
+                  </div>
+                </div>
+              );
             }}
-            labelStyle={{ color: "#9ca3af" }}
-            formatter={(v: number) => [fmt(v), label]}
           />
           <Area type="monotone" dataKey="value" stroke={color} strokeWidth={1.75} fill={`url(#${gradId})`} />
         </AreaChart>
@@ -157,15 +192,70 @@ export function FlowBarChart({
             />
           )}
           <Tooltip
-            contentStyle={{
-              background: "#0d111d",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 8,
-              fontSize: 12,
-              color: "#f2f4f8",
+            content={({ active, payload, label }) => {
+              if (!active || !payload || !payload.length) return null;
+              const dailyEntry = payload.find((p) => p.dataKey === "value");
+              const cumEntry = payload.find((p) => p.dataKey === "cumulative");
+              const daily = (dailyEntry?.value as number) ?? 0;
+              const cumulative = cumEntry?.value as number | undefined;
+
+              const formatSigned = (n: number) =>
+                (n >= 0 ? "+" : "−") + formatY(Math.abs(n));
+              const dailyColor = daily >= 0 ? upColor : downColor;
+
+              const dateStr =
+                typeof label === "string" && /^\d{4}-\d{2}-\d{2}$/.test(label)
+                  ? new Date(label).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : String(label ?? "");
+
+              return (
+                <div
+                  style={{
+                    background: "#0a0d14",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 4,
+                    padding: "8px 12px",
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 11,
+                    minWidth: 160,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: "#a0a0a0",
+                      fontSize: 10,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      paddingBottom: 6,
+                      marginBottom: 6,
+                      borderBottom: "1px dashed rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    {dateStr}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 4 }}>
+                    <span style={{ color: "#7d8a99" }}>DAILY</span>
+                    <span style={{ color: dailyColor, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                      {formatSigned(daily)}
+                    </span>
+                  </div>
+                  {cumulative !== undefined && (
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                      <span style={{ color: "#7d8a99" }}>CUM</span>
+                      <span style={{ color: "#c8d1dc", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                        {formatY(cumulative)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
             }}
-            labelStyle={{ color: "#9ca3af" }}
-            formatter={(v: number, name: string) => [formatY(v), name === "value" ? "Daily" : "Cumulative"]}
+            cursor={{ fill: "rgba(255,176,0,0.06)" }}
           />
           <Bar dataKey="value" radius={[2, 2, 0, 0]} isAnimationActive={false}>
             {data.map((d, i) => (
