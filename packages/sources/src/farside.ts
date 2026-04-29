@@ -21,9 +21,12 @@ import type { ETFFlow } from "./types.js";
 
 const execFileP = promisify(execFile);
 
+// Archive paths — full history (BTC since Jan 2024, ETH since Jul 2024).
+// `/btc/` and `/eth/` only return ~14 most-recent rows; the archive pages
+// return 590+ / 450+ rows so cumulative is true since-inception.
 const URLS = {
-  btc: "https://farside.co.uk/btc/",
-  eth: "https://farside.co.uk/eth/",
+  btc: "https://farside.co.uk/bitcoin-etf-flow/",
+  eth: "https://farside.co.uk/ethereum-etf/",
 };
 
 /** Resolve a curl binary that can pass Cloudflare. Order:
