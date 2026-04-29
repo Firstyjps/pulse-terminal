@@ -20,7 +20,8 @@
 
 - _Code_: `packages/sources/src/{options,dual-assets}/**` (Phase 5A live in prod, do not refactor)
 - _~~Code (round 4)~~_ — UNLOCKED. Round 4 deployed at commit `f25a387`. Files now in `master` and free for any session to extend.
-- _Desktop_: `packages/ui/**`, `apps/web/app/globals.css`, all `apps/web/components/*` EXCEPT `apps/web/components/bloomberg/**` (Code's, awaiting cleanup), `apps/web/app/page.tsx` (Overview), **`apps/web/app/{markets,derivatives,backtest,fundflow,settings,options}/page.tsx`** (round-3: mobile + Bloomberg polish + new options page), **`apps/web/lib/use-media.ts`** (new mobile hook), **`packages/i18n/src/dict.ts`** (new keys for shell labels)
+- _Desktop_: `packages/ui/**`, `apps/web/app/globals.css`, all `apps/web/components/*` EXCEPT `apps/web/components/bloomberg/**` (Code's, awaiting cleanup), `apps/web/app/page.tsx` (Overview)
+- _~~Desktop (round 3)~~_ — UNLOCKED 2026-04-29. Mobile + Bloomberg polish + new /options + i18n shipped via worktree (uncommitted, see latest activity entry).
 - _Cursor_: `packages/sources/src/{format,anomalies,snapshot,_helpers}.ts`, `packages/charts/src/**`, `apps/realtime/src/{hub-health,apr-reader}.{ts,test.ts}` + `vitest.config.ts` (Phase 5A scaffolding + hub v2)
 
 ## ✅ Free for anyone
@@ -39,6 +40,67 @@
 ---
 
 ## 📰 Activity log (newest at top)
+
+### 2026-04-29 · Desktop session (latest)
+- **[done]** Round 3 — Mobile UX/UI + Bloomberg polish across remaining tabs + new Options Chain + i18n coverage. **Workspace typecheck clean across all 8 packages** (`pnpm -r typecheck`). Files staged but **not committed** — user to review and commit.
+
+  **🥇 Task 1 · Mobile Web UX/UI** (< 720px breakpoint)
+  - **NEW** [apps/web/lib/use-media.ts](apps/web/lib/use-media.ts) — `useViewport()` returns `mobile|tablet|desktop|null` (null until first `useEffect` flush so SSR matches desktop layout). `useIsMobile()` and `useIsCompact()` convenience hooks.
+  - **NEW** [apps/web/components/BottomTabNav.tsx](apps/web/components/BottomTabNav.tsx) — fixed-bottom 56px tab bar replacing the 140px left rail on mobile. 6 tabs (Overview / Markets / Flow / Deriv / Options / Settings) with glyphs + ≥44px tap targets per iOS HIG. F1–F7 keyboard nav still wired up so desktop parity is preserved.
+  - [AppShell](apps/web/components/AppShell.tsx) — split into `Frame` sub-component that branches on `useIsMobile()`. Mobile shell drops the left rail and bottom-bar, swaps in `BottomTabNav` and a `compact` prop on `TerminalStatusBar`. Desktop shell unchanged.
+  - [TerminalStatusBar](apps/web/components/TerminalStatusBar.tsx) — accepts `compact` prop. Compact mode drops VER/USR/DESK/DATE/SESS, keeps brand pill + feed dot + UTC HH:MM only. Same component, two faces.
+  - [MetricStrip](apps/web/components/MetricStrip.tsx) — grid responds to `useViewport()`: `2×3` mobile, `3×2` tablet, `6×1` desktop, with min-height adjusted accordingly.
+  - [MoversTable](apps/web/components/MoversTable.tsx) — mobile renders a card list (60px tap-tall rows, asset + price + 24h%/7d%/vol on a 3-col grid + sparkline) instead of the wide table. Desktop still gets the sortable table.
+  - [MarketsTable](apps/web/components/MarketsTable.tsx) — same mobile pivot (card list with watchlist ☆ button as primary tap target). Desktop kept; outer `Card` wrapper removed so it can render edge-to-edge inside a `Panel`.
+  - [packages/ui/src/WsRow.tsx](packages/ui/src/WsRow.tsx) — added `ws-row` + `ws-row--<height>` classes + `workspace` class. Inline styles preserved.
+  - [apps/web/app/globals.css](apps/web/app/globals.css) — added two media-query blocks: `(max-width: 720px)` collapses `.ws-row` to single column with auto height + `min-height` per row preset (`chart 280 / table 320 / feed 220`), tightens `.workspace` padding, raises body to 11px, fades scrollbars, sets 36px min-height on tap-targets. `(720..1023px)` shrinks fixed row heights for tablets.
+
+  **🥈 Task 2 · Bloomberg shell on remaining 5 tabs**
+  - [apps/web/app/markets/page.tsx](apps/web/app/markets/page.tsx) — `Workspace` → `WsRow` with MarketsTable c-5 + CandlestickPanel c-7 (chart row), full MarketsTable c-12 (table row). Killed legacy HSplit/Pane.
+  - [apps/web/app/derivatives/page.tsx](apps/web/app/derivatives/page.tsx) — full-bleed FundingHeatmap c-12 (auto ≥520px) + LIVE WS STREAM c-12 (table). Status dot uses signal palette.
+  - [apps/web/app/backtest/page.tsx](apps/web/app/backtest/page.tsx) — 3 ws-rows: SUMMARY 4-stat strip (StatBlock × 4) + lookahead picker in panel actions; PATTERN HIT RATE table; METHODOLOGY footnote panel.
+  - [apps/web/app/fundflow/page.tsx](apps/web/app/fundflow/page.tsx) — full rewrite, 6 ws-rows wrapping the data hooks from `Dashboard.tsx` (which is now bypassed; safe to delete in a future cleanup). MARKET PULSE / STABLECOINS+DOMINANCE / BTC ETF+ETH ETF / BTC PERP+ETH PERP / DEFI TVL+TOP CHAINS / DEX VOLUME.
+  - [apps/web/app/settings/page.tsx](apps/web/app/settings/page.tsx) — 3 ws-rows: Locale + Refresh c-6+c-6, Notifications + Watchlist c-6+c-6, Reset c-12. Full Bloomberg styling on every control (sharp 0 corners, mono, amber selection).
+  - [CandlestickPanel](apps/web/components/CandlestickPanel.tsx) — outer `Card` removed, can render edge-to-edge into a Panel. Added `hideControls` prop in case the host wants to render its own toolbar.
+
+  **🥉 Task 3 · Funding Heatmap redesign** ("อ่านยาก, cells หน้าตาเหมือนกันหมด" feedback addressed)
+  - [apps/web/components/FundingHeatmap.tsx](apps/web/components/FundingHeatmap.tsx) — full rewrite.
+    - **2 view modes** via toolbar toggle: COMPACT (default) groups top 12 hot longs + top 12 hot shorts under amber section dividers; MATRIX shows top 40 by `|avg|` flat.
+    - **4 venues** consumed (binance/bybit/okx/deribit) — extends previous 3-venue UI to match Code's adapter coverage (~1300+ rates).
+    - **28px rows** with sticky thead + sticky `SYM` first column.
+    - **Color saturation scaled to ±0.05% magnitude** (was ±0.1) — typical rates now read at higher contrast.
+    - **Hover tooltip** (fixed, follows cursor): symbol · venue · signed rate · absolute % · `nextFundingTime` UTC · raw exchange symbol.
+    - Mobile drops the SPRD column; desktop keeps it. Footer hint strip explains AVG/SPRD thresholds.
+  - Note: this is the `/derivatives` heatmap. The Overview's `FundingHeatmapMini` is unchanged (different intent).
+
+  **Task 4 · Options Chain page** (new)
+  - **NEW** [apps/web/app/options/page.tsx](apps/web/app/options/page.tsx) — wired to existing Code endpoints `/api/options/aggregate?asset=X&arbitrage=1` + `/api/options/iv-smile?asset=X&expiry=Y`.
+    - Row 1 (h-stats): asset switcher (BTC/ETH/SOL) + 4 KPIs (Spot · ATM IV call/put · Put/Call ratio · Total OI/Vol).
+    - Row 2 (≥460px): STRIKE LADDER c-7 (calls left, puts right of K, ATM row tinted amber, ITM cells lightly shaded green/red) + IV SMILE c-5 using `@pulse/charts` `IVSmile` (split call/put lines, ATM reference line). Expiry select in panel header.
+    - Row 3 (≥360px): GREEKS HEATMAP c-8 (`@pulse/charts` `GreeksHeatmap`, both sides, 22px rows) + ARBITRAGE HITS c-4 (top 20 spreads with BUY/SELL exchange + spread %).
+  - Wired into nav at F5; Backtest moved to F6, Settings stays F7. The dead `/alerts` link was removed (no route ever existed — alerts are surfaced via `AlertsFeed` on Overview).
+
+  **Task 5 · i18n coverage**
+  - [packages/i18n/src/dict.ts](packages/i18n/src/dict.ts) — added 25 new keys: `nav.flow_short`, `nav.deriv_short`, `nav.backtest`, `nav.settings`, `nav.intel/trading/system`, `status.title/alerts/streams/uplink/armed/socket_live/mcp_ready`, `shell.feed_live/feed_stale/feed_offline/feed_connecting/ready/cmd/profile/latency/help/hotkeys/cmd_palette/lang/session/session_us_eu`.
+  - Migrated [TerminalStatusBar](apps/web/components/TerminalStatusBar.tsx), [TerminalNav](apps/web/components/TerminalNav.tsx), [TerminalBotBar](apps/web/components/TerminalBotBar.tsx), [BottomTabNav](apps/web/components/BottomTabNav.tsx) to `useT(key)`. Brand "CRYPTOPULSE" + abbreviated terminal labels (VER/USR/DESK/UTC/DATE/F1/F8/⌘K) stay English by terminal convention; everything else flips with the LANG button.
+
+  **What I deliberately did NOT touch** (per role boundary)
+  - `packages/sources/**`, `apps/mcp/**`, `apps/alerts/**`, all `apps/web/app/api/*` routes — Code's lane.
+  - `packages/charts/src/{IVSmile,GreeksHeatmap}.tsx` — Cursor's lane (consumed as-is via `@pulse/charts`).
+  - `next.config.js`, `ecosystem.config.cjs`, `package.json` deps — **no new deps added**.
+  - Code's leftover `apps/web/components/bloomberg/*` and `apps/web/app/bloomberg-preview/` — Code already cleaned these in round 4 per [done 20:50] entry.
+
+  **For Code on next deploy:**
+  - Mobile shell uses `position: sticky` + `min-height: 100vh` patterns; on iOS Safari `100vh` excludes the URL bar. The current grid uses fixed-row heights so it should be fine, but please sanity-check on a real iPhone — if the bottom tab bar gets eaten, swap `100vh` → `100svh` in `AppShell.tsx:31`.
+  - The Options page hits `/api/options/aggregate?asset=...&arbitrage=1` — Code's round-4 `?expiry=` and `?side=` filters are not used by this UI but stay available for future deeper-dive views.
+  - `/api/funding` consumers now expect `nextFundingTime` per rate — already provided per Code's adapter, just used to be ignored. No backend change needed.
+
+- **[verified]** `pnpm -r typecheck` — all 8 packages clean (web/ui/i18n/sources/charts/mcp/alerts/realtime).
+- **[doing]** Awaiting user review on https://cryptopulse.buzz once Code redeploys, especially:
+  - Mobile bottom-tab nav at < 720px
+  - `/options` page first paint (BTC default — no expiry picked yet, should auto-select first available)
+  - FundingHeatmap COMPACT vs MATRIX toggle
+- **[blocked]** None.
 
 ### 2026-04-29 · Code session (latest — 22:00)
 - **[done 22:00]** Round 4 — Order Book L2 + Whale Flow + cleanup. Commit `f25a387` deployed live.

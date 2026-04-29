@@ -20,10 +20,45 @@ export const dict = {
   "nav.overview": { th: "ภาพรวม", en: "OVERVIEW" },
   "nav.markets": { th: "ตลาด", en: "MARKETS" },
   "nav.fundflow": { th: "กระแสเงินทุน", en: "FUNDFLOW" },
+  "nav.flow_short": { th: "กระแส", en: "FLOW" },
   "nav.derivatives": { th: "ตราสารอนุพันธ์", en: "DERIVATIVES" },
+  "nav.deriv_short": { th: "อนุพันธ์", en: "DERIV" },
   "nav.options": { th: "ออปชัน", en: "OPTIONS" },
+  "nav.backtest": { th: "ทดสอบย้อนหลัง", en: "BACKTEST" },
+  "nav.settings": { th: "ตั้งค่า", en: "SETTINGS" },
   "nav.bybit_apr": { th: "Bybit APR", en: "BYBIT APR" },
   "nav.analyst": { th: "AI วิเคราะห์", en: "AI ANALYST" },
+
+  // Nav section headers
+  "nav.intel": { th: "อินเทล", en: "INTEL" },
+  "nav.trading": { th: "เทรด", en: "TRADING" },
+  "nav.system": { th: "ระบบ", en: "SYSTEM" },
+
+  // Status block (left rail)
+  "status.title": { th: "สถานะ", en: "STATUS" },
+  "status.alerts": { th: "การแจ้งเตือน", en: "ALERTS" },
+  "status.streams": { th: "สตรีม", en: "STREAMS" },
+  "status.uplink": { th: "การเชื่อมต่อ", en: "UPLINK" },
+  "status.armed": { th: "พร้อม", en: "ARMED" },
+  "status.socket_live": { th: "Socket สด", en: "SOCKET LIVE" },
+  "status.mcp_ready": { th: "MCP พร้อม", en: "MCP READY" },
+
+  // Shell — top status bar + bottom bar (most labels stay short / English by
+  // terminal convention, but feed status + readouts get translated).
+  "shell.feed_live": { th: "ฟีดสด", en: "FEED LIVE" },
+  "shell.feed_stale": { th: "ฟีดล้าสมัย", en: "FEED STALE" },
+  "shell.feed_offline": { th: "ฟีดออฟไลน์", en: "FEED OFFLINE" },
+  "shell.feed_connecting": { th: "กำลังเชื่อมต่อ…", en: "CONNECTING…" },
+  "shell.ready": { th: "พร้อม", en: "READY" },
+  "shell.cmd": { th: "คำสั่ง", en: "CMD" },
+  "shell.profile": { th: "โปรไฟล์", en: "PROFILE" },
+  "shell.latency": { th: "หน่วงเวลา", en: "LATENCY" },
+  "shell.help": { th: "ช่วยเหลือ", en: "Help" },
+  "shell.hotkeys": { th: "ทางลัด", en: "Hotkeys" },
+  "shell.cmd_palette": { th: "พาเลตคำสั่ง", en: "CMD Palette" },
+  "shell.lang": { th: "ภาษา", en: "LANG" },
+  "shell.session": { th: "เซสชัน", en: "SESS" },
+  "shell.session_us_eu": { th: "US·EU เปิดซ้อน", en: "US·EU OVERLAP" },
 
   // Common labels
   "common.loading": { th: "กำลังโหลด…", en: "Loading…" },

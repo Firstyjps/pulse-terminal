@@ -221,10 +221,58 @@ body.sans .num, body.sans .mono, body.sans .mono-num { font-family: var(--mono);
   }
 }
 
-/* ── Mobile (< 720px) — Bloomberg layout collapses gracefully ── */
+/* ═════════════════════════════════════════════════════════════════════════
+   Mobile adapter (< 720px)
+   - WsRow: 12-col grid → single-column stack, auto height
+   - Panel children get full width regardless of `span`
+   - Touch tap-targets meet iOS HIG (44px)
+   - Larger base type for legibility on small screens
+   ═════════════════════════════════════════════════════════════════════════ */
+
 @media (max-width: 720px) {
-  body { font-size: 10px; }
-  .ticker-track { animation-duration: 60s; }
-  table { font-size: 10px !important; }
-  th, td { padding: 4px 6px !important; }
+  body { font-size: 11px; }
+  table { font-size: 11px !important; }
+  th, td { padding: 6px 8px !important; }
+
+  /* Ticker — drop the slow desktop animation to a faster cycle on mobile */
+  .ticker-track { animation-duration: 50s; gap: 24px; }
+
+  /* Workspace — tighter padding so panels feel native to the phone canvas */
+  .workspace {
+    padding: 0 !important;
+    gap: 6px !important;
+  }
+
+  /* WsRow — collapse to single column. Each panel takes its own row. */
+  .ws-row {
+    grid-template-columns: 1fr !important;
+    gap: 1px !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  .ws-row > * {
+    grid-column: 1 / -1 !important;
+  }
+
+  /* Per-row min heights so charts/tables don't squish to nothing on phones */
+  .ws-row.ws-row--chart > *  { min-height: 280px; }
+  .ws-row.ws-row--table > *  { min-height: 320px; }
+  .ws-row.ws-row--feed  > *  { min-height: 220px; }
+  .ws-row.ws-row--stats > *  { min-height: 0; }
+
+  /* Hairline scrollbars overlap content less on phones */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+
+  /* Touch-friendly defaults for any clickable in shell */
+  button, [role="button"], [role="tab"], a {
+    min-height: 36px;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ── Mid breakpoint (tablet 720..1024) — tighter rail, scaled rows ── */
+@media (min-width: 720px) and (max-width: 1023px) {
+  .ws-row.ws-row--chart { height: 320px; }
+  .ws-row.ws-row--table { height: 320px; }
+  .ws-row.ws-row--feed  { height: 280px; }
 }

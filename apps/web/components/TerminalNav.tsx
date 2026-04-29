@@ -3,35 +3,38 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { colors, fonts } from "@pulse/ui";
+import { useT } from "@pulse/i18n";
+import type { DictKey } from "@pulse/i18n";
 
 interface NavItem {
   id: string;
-  label: string;
+  /** i18n dict key for the visible label. */
+  labelKey: DictKey;
   key: string;
   href: string;
 }
 
-const NAV: { section: string; items: NavItem[] }[] = [
+const NAV: { sectionKey: DictKey; items: NavItem[] }[] = [
   {
-    section: "INTEL",
+    sectionKey: "nav.intel",
     items: [
-      { id: "overview",  label: "Overview",  key: "F1", href: "/" },
-      { id: "markets",   label: "Markets",   key: "F2", href: "/markets" },
-      { id: "fundflow",  label: "Fundflow",  key: "F3", href: "/fundflow" },
+      { id: "overview",  labelKey: "nav.overview",  key: "F1", href: "/" },
+      { id: "markets",   labelKey: "nav.markets",   key: "F2", href: "/markets" },
+      { id: "fundflow",  labelKey: "nav.fundflow",  key: "F3", href: "/fundflow" },
     ],
   },
   {
-    section: "TRADING",
+    sectionKey: "nav.trading",
     items: [
-      { id: "derivatives", label: "Derivatives", key: "F4", href: "/derivatives" },
-      { id: "backtest",    label: "Backtest",    key: "F5", href: "/backtest" },
+      { id: "derivatives", labelKey: "nav.derivatives", key: "F4", href: "/derivatives" },
+      { id: "options",     labelKey: "nav.options",     key: "F5", href: "/options" },
+      { id: "backtest",    labelKey: "nav.backtest",    key: "F6", href: "/backtest" },
     ],
   },
   {
-    section: "SYSTEM",
+    sectionKey: "nav.system",
     items: [
-      { id: "alerts",   label: "Alerts",   key: "F6", href: "/alerts" },
-      { id: "settings", label: "Settings", key: "F7", href: "/settings" },
+      { id: "settings", labelKey: "nav.settings", key: "F7", href: "/settings" },
     ],
   },
 ];
@@ -59,6 +62,7 @@ const KEY_TO_HREF = NAV.flatMap((g) => g.items).reduce<Record<string, string>>(
 export function TerminalNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useT();
 
   // F1–F7 keyboard navigation (handoff feature)
   useEffect(() => {
@@ -93,7 +97,7 @@ export function TerminalNav() {
       }}
     >
       {NAV.map((group, gi) => (
-        <div key={group.section}>
+        <div key={group.sectionKey}>
           <div
             style={{
               padding: "8px 10px 4px",
@@ -102,7 +106,7 @@ export function TerminalNav() {
               borderTop: gi === 0 ? "none" : `1px solid ${colors.line}`,
             }}
           >
-            — {group.section} —
+            — {t(group.sectionKey)} —
           </div>
           {group.items.map((it) => {
             const active = isActive(it.href);
@@ -151,13 +155,13 @@ export function TerminalNav() {
                 >
                   {it.key}
                 </span>
-                <span>{it.label}</span>
+                <span>{t(it.labelKey)}</span>
               </button>
             );
           })}
 
           {/* SYSTEM keeps its STATUS block; FEED + DERIV blocks removed per user request 2026-04-28. */}
-          {group.section === "SYSTEM" && <StatusBlock />}
+          {group.sectionKey === "nav.system" && <StatusBlock />}
         </div>
       ))}
 
@@ -172,8 +176,8 @@ export function TerminalNav() {
           letterSpacing: "0.06em",
         }}
       >
-        <div><span style={{ color: colors.green }}>●</span> SOCKET LIVE</div>
-        <div><span style={{ color: colors.amber }}>●</span> MCP READY</div>
+        <div><span style={{ color: colors.green }}>●</span> {t("status.socket_live")}</div>
+        <div><span style={{ color: colors.amber }}>●</span> {t("status.mcp_ready")}</div>
         <div><span style={{ color: colors.txt3 }}>●</span> {new Date().toISOString().slice(0, 10).replace(/-/g, "·")}</div>
       </div>
     </nav>
@@ -224,6 +228,7 @@ function MiniBlock({ title, rows }: { title: string; rows: { k: string; v: React
 }
 
 function StatusBlock() {
+  const t = useT();
   const [latency, setLatency] = useState(14);
   const [now, setNow] = useState(new Date());
 
@@ -238,11 +243,11 @@ function StatusBlock() {
 
   return (
     <MiniBlock
-      title="STATUS"
+      title={t("status.title")}
       rows={[
-        { k: "ALERTS",  v: <span>12 ARMED</span> },
-        { k: "STREAMS", v: <span>3</span> },
-        { k: "UPLINK",  v: <span style={{ color: latency < 20 ? colors.green : colors.amber }}>{latency}ms</span> },
+        { k: t("status.alerts"),  v: <span>12 {t("status.armed")}</span> },
+        { k: t("status.streams"), v: <span>3</span> },
+        { k: t("status.uplink"),  v: <span style={{ color: latency < 20 ? colors.green : colors.amber }}>{latency}ms</span> },
         { k: "UTC",     v: <span>{now.toISOString().slice(11, 16)}</span> },
       ]}
     />

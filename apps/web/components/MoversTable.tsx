@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Sparkbar, colors, fonts } from "@pulse/ui";
 import { formatUSD, formatPercent } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
+import { useIsMobile } from "../lib/use-media";
 import { SkeletonRows } from "./Skeleton";
 
 interface CoinRow {
@@ -46,13 +47,17 @@ interface Props {
  *
  *   # · Asset · Last · 1h% · 24h% · 7d% · Vol·24h · Mkt Cap · 7d Trend
  *
- * Sticky header, sortable columns, search filter, asset icon pill, sparkline.
+ * Desktop: sticky-header sortable table with sparkline cell.
+ * Mobile (< 720px): rendered as a list of tap-friendly cards (≥56px tall) so
+ * thumb scrubbing actually works and you see all the key cells without
+ * horizontal scroll.
  */
 export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSetQuery }: Props) {
   const { data, loading } = useFlow<CoinRow[]>("/api/markets");
   const [localQuery, setLocalQuery] = useState("");
   const query = extQuery ?? localQuery;
   const setQuery = extSetQuery ?? setLocalQuery;
+  const isMobile = useIsMobile();
 
   const [sort, setSort] = useState<{ key: SortKey | "spark"; dir: "asc" | "desc" }>({
     key: "market_cap",
@@ -122,22 +127,118 @@ export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSe
               border: `1px solid ${colors.line2}`,
               color: colors.txt2,
               fontFamily: fonts.mono,
-              fontSize: 10,
-              padding: "2px 6px",
-              width: 130,
+              fontSize: isMobile ? 12 : 10,
+              padding: isMobile ? "6px 8px" : "2px 6px",
+              width: isMobile ? "100%" : 130,
+              minHeight: isMobile ? 36 : undefined,
               outline: "none",
             }}
           />
         </div>
       )}
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", WebkitOverflowScrolling: "touch" }}>
         {loading && !filtered && (
           <div style={{ padding: 8 }}>
             <SkeletonRows rows={8} />
           </div>
         )}
-        {filtered && (
+        {filtered && isMobile && (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {filtered.map((c, i) => {
+              const ch1 = c.price_change_percentage_1h_in_currency ?? 0;
+              const ch24 = c.price_change_percentage_24h_in_currency ?? 0;
+              const ch7 = c.price_change_percentage_7d_in_currency ?? 0;
+              const isActive = activeId === c.id;
+              return (
+                <li
+                  key={c.id}
+                  onClick={() => onPick?.(c.id)}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "auto 1fr auto",
+                    columnGap: 10,
+                    rowGap: 4,
+                    alignItems: "center",
+                    padding: "10px 12px",
+                    minHeight: 60,
+                    borderBottom: `1px solid ${colors.line}`,
+                    background: isActive ? "rgba(255,176,0,0.08)" : "transparent",
+                    cursor: "pointer",
+                    fontFamily: fonts.mono,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 24,
+                      height: 24,
+                      background: colors.bg3,
+                      border: `1px solid ${colors.line2}`,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      color: colors.amber,
+                      fontWeight: 600,
+                      gridRow: "1 / span 2",
+                    }}
+                  >
+                    {c.symbol[0].toUpperCase()}
+                  </span>
+
+                  <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+                    <span style={{ color: colors.amber, fontWeight: 600, fontSize: 12 }}>
+                      {c.symbol.toUpperCase()}
+                    </span>
+                    <span style={{ color: colors.txt4, fontSize: 10, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.name}
+                    </span>
+                    <span style={{ color: colors.txt4, fontSize: 10, marginLeft: "auto" }}>
+                      #{c.market_cap_rank ?? i + 1}
+                    </span>
+                  </span>
+
+                  <span style={{ display: "flex", justifyContent: "flex-end", color: colors.txt1, fontSize: 12, fontWeight: 500, gridRow: 1 }}>
+                    {formatUSD(c.current_price, { compact: false, decimals: c.current_price < 1 ? 4 : 2 })}
+                  </span>
+
+                  <span style={{ display: "flex", gap: 12, fontSize: 10, color: colors.txt4, gridColumn: "2 / 3" }}>
+                    <span>
+                      <span style={{ color: colors.txt4, marginRight: 3 }}>24h</span>
+                      <span style={{ color: ch24 >= 0 ? colors.green : colors.red, fontWeight: 600 }}>
+                        {formatPercent(ch24)}
+                      </span>
+                    </span>
+                    <span>
+                      <span style={{ color: colors.txt4, marginRight: 3 }}>7d</span>
+                      <span style={{ color: ch7 >= 0 ? colors.green : colors.red }}>
+                        {formatPercent(ch7)}
+                      </span>
+                    </span>
+                    <span>
+                      <span style={{ color: colors.txt4, marginRight: 3 }}>vol</span>
+                      <span>{formatUSD(c.total_volume, { compact: true, decimals: 1 })}</span>
+                    </span>
+                  </span>
+
+                  <span style={{ display: "flex", justifyContent: "flex-end", gridColumn: "3 / 4", gridRow: 2 }}>
+                    {c.sparkline_in_7d?.price && (
+                      <Sparkbar
+                        data={c.sparkline_in_7d.price}
+                        color={ch7 >= 0 ? colors.green : colors.red}
+                        asLine
+                        fill
+                        height={18}
+                        width={70}
+                      />
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {filtered && !isMobile && (
           <table
             style={{
               width: "100%",

@@ -4,21 +4,25 @@ import { StatBlock, colors } from "@pulse/ui";
 import { formatUSD, formatPercent } from "@pulse/sources";
 import type { MarketOverview } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
+import { useViewport } from "../lib/use-media";
 
 interface Props {
   refreshKey?: number;
 }
 
 /**
- * MarketPulseStats — 6 stat tiles per handoff Row 1 (h-stats, 96px).
+ * MarketPulseStats — 6 stat tiles.
  *
- *   Total Market Cap · Volume 24h · BTC Dominance · Active Assets · Fear & Greed · Session
+ *   Desktop  (≥1024)  : 6×1  one row per handoff Row 1 (h-stats, 96px)
+ *   Tablet   (720..1024): 3×2 two stacked rows
+ *   Mobile   (<720)   : 2×3 three stacked rows, ≥44px tap-tall
  *
  * 1px gaps between tiles via grid + line-color background showing through.
  */
 export function MetricStrip({ refreshKey }: Props) {
   const overview = useFlow<MarketOverview>("/api/flows/overview", refreshKey);
   const o = overview.data;
+  const vp = useViewport();
 
   const cap = o ? fmtCompact(o.totalMarketCap) : "—";
   const vol = o ? fmtCompact(o.totalVolume24h) : "—";
@@ -37,14 +41,20 @@ export function MetricStrip({ refreshKey }: Props) {
 
   const active = o?.activeCryptocurrencies?.toLocaleString() ?? "—";
 
+  const cols =
+    vp === "mobile" ? "repeat(2, 1fr)" :
+    vp === "tablet" ? "repeat(3, 1fr)" :
+    "repeat(6, 1fr)";
+
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(6, 1fr)",
+        gridTemplateColumns: cols,
         gap: 1,
         background: colors.line,
         height: "100%",
+        minHeight: vp === "mobile" ? 264 : vp === "tablet" ? 192 : "100%",
       }}
     >
       <StatBlock

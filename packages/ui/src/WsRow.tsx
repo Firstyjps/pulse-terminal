@@ -22,12 +22,17 @@ const HEIGHT_MAP: Record<Exclude<WsRowHeight, "auto">, React.CSSProperties> = {
  *   .ws-row    = 12-col grid, 1px gap (line color shows through)
  *
  * Children should be `<Panel span={N}>` where N spans the 12 columns.
+ *
+ * Mobile collapse: globals.css overrides `.ws-row` at < 720px to single-column
+ * with auto height (each panel becomes a stacked card). This keeps fixed-height
+ * desktop rows intact while letting children breathe on phones.
  */
-export function WsRow({ height = "auto", style, children, ...rest }: WsRowProps) {
+export function WsRow({ height = "auto", style, children, className, ...rest }: WsRowProps) {
   const heightStyle = height === "auto" ? {} : HEIGHT_MAP[height];
   return (
     <div
       {...rest}
+      className={["ws-row", `ws-row--${height}`, className].filter(Boolean).join(" ")}
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(12, 1fr)",
@@ -46,10 +51,11 @@ export function WsRow({ height = "auto", style, children, ...rest }: WsRowProps)
  * Workspace — vertical flex of WsRow's, separated by 1px lines (line color
  * showing through gaps). The handoff calls this the workspace container.
  */
-export function Workspace({ style, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+export function Workspace({ style, children, className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       {...rest}
+      className={["workspace", className].filter(Boolean).join(" ")}
       style={{
         display: "flex",
         flexDirection: "column",
