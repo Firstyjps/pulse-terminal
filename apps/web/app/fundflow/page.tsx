@@ -112,7 +112,9 @@ export default function FundflowPage() {
         >
           {etf.data && (
             <FlowBarChart
-              data={etf.data.flows.map((f) => ({ date: f.date, value: f.btc, cumulative: f.btcCumulative }))}
+              data={etf.data.flows
+                .slice(-28)
+                .map((f) => ({ date: f.date, value: f.btc, cumulative: f.btcCumulative }))}
             />
           )}
           {etf.data?._isProxy && (
@@ -132,7 +134,9 @@ export default function FundflowPage() {
         >
           {etf.data && (
             <FlowBarChart
-              data={etf.data.flows.map((f) => ({ date: f.date, value: f.eth, cumulative: f.ethCumulative }))}
+              data={etf.data.flows
+                .slice(-28)
+                .map((f) => ({ date: f.date, value: f.eth, cumulative: f.ethCumulative }))}
             />
           )}
         </Panel>
