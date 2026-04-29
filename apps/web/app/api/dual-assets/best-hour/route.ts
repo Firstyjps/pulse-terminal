@@ -9,9 +9,10 @@ export async function GET(req: Request) {
   const targetPrice = Number(url.searchParams.get("target") ?? 78);
   const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days") ?? 7)));
   const includeCorr = url.searchParams.get("correlation") === "1";
+  const duration = url.searchParams.get("duration") ?? undefined;
 
   try {
-    const report = generateHourlyReport({ coinPair, targetPrice, days });
+    const report = generateHourlyReport({ coinPair, targetPrice, days, duration });
     if (includeCorr && !("error" in report)) {
       return Response.json({ ...report, correlation: getAprIvCorrelation(days) });
     }

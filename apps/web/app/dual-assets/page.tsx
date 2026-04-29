@@ -66,21 +66,27 @@ interface DailySummary {
  * down to the most recent ~50 rows for the picker so we always reflect the
  * live product menu.
  */
+const DURATIONS = ["8h", "1d"] as const;
+type Duration = (typeof DURATIONS)[number];
+
 export default function DualAssetsPage() {
   const [days, setDays] = useState<7 | 14 | 30>(7);
+  const [duration, setDuration] = useState<Duration>("8h");
 
   const snapshots = useFlow<{ count: number; records: Snapshot[] }>(
-    `/api/dual-assets/snapshots?limit=200`,
+    `/api/dual-assets/snapshots?limit=300`,
   );
 
-  // Dynamic target list — distinct strikes from recent snapshots, sorted desc
-  // so near-spot strikes (high APR products) sit near the top.
+  // Dynamic target list — distinct strikes from recent snapshots filtered by
+  // selected duration. Sorted desc so near-spot strikes (high APR) sit near top.
   const availableTargets = useMemo(() => {
     if (!snapshots.data) return [];
     const set = new Set<number>();
-    for (const r of snapshots.data.records) set.add(r.target_price);
+    for (const r of snapshots.data.records) {
+      if (r.duration.toLowerCase() === duration) set.add(r.target_price);
+    }
     return [...set].sort((a, b) => b - a);
-  }, [snapshots.data]);
+  }, [snapshots.data, duration]);
 
   const [target, setTarget] = useState<number | null>(null);
   // Default target = nearest-to-spot strike on first load.
@@ -95,7 +101,7 @@ export default function DualAssetsPage() {
   }, [availableTargets, target, snapshots.data]);
 
   const bestHour = useFlow<BestHourReport | { error: string }>(
-    `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=${target ?? 0}&days=${days}`,
+    `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=${target ?? 0}&days=${days}&duration=${duration}`,
   );
   const summary = useFlow<{ count: number; summaries: DailySummary[] }>(
     `/api/dual-assets/summary?coin_pair=SOL-USDT&target=${target ?? 0}&days=30`,
@@ -116,9 +122,9 @@ export default function DualAssetsPage() {
   const filteredSnapshots = useMemo(() => {
     if (!snapshots.data || target == null) return [];
     return snapshots.data.records
-      .filter((r) => r.target_price === target)
+      .filter((r) => r.target_price === target && r.duration.toLowerCase() === duration)
       .slice(0, 30);
-  }, [snapshots.data, target]);
+  }, [snapshots.data, target, duration]);
 
   const latestSnapshot = filteredSnapshots[0];
   const maxHourlyApr = report
@@ -126,16 +132,45 @@ export default function DualAssetsPage() {
     : 0.001;
 
   const spot = snapshots.data?.records[0]?.index_price ?? null;
+  const durationToggle = (
+    <span style={{ display: "flex", gap: 1, background: colors.line, marginRight: 8 }}>
+      {DURATIONS.map((d) => (
+        <button
+          key={d}
+          onClick={() => {
+            setDuration(d);
+            setTarget(null); // re-pick nearest target for the new duration
+          }}
+          style={{
+            background: duration === d ? colors.bg2 : colors.bg1,
+            border: "none",
+            color: duration === d ? colors.amberBright : colors.txt3,
+            padding: "3px 12px",
+            fontFamily: fonts.mono,
+            fontSize: 9,
+            letterSpacing: "0.10em",
+            fontWeight: duration === d ? 700 : 400,
+            cursor: "pointer",
+            textTransform: "uppercase",
+          }}
+        >
+          {d.toUpperCase()}
+        </button>
+      ))}
+    </span>
+  );
   const headerActions = (
-    <span
-      style={{
-        display: "flex",
-        gap: 1,
-        background: colors.line,
-        maxWidth: 480,
-        overflowX: "auto",
-      }}
-    >
+    <span style={{ display: "flex", alignItems: "center" }}>
+      {durationToggle}
+      <span
+        style={{
+          display: "flex",
+          gap: 1,
+          background: colors.line,
+          maxWidth: 380,
+          overflowX: "auto",
+        }}
+      >
       {availableTargets.length === 0 && (
         <span style={{ padding: "3px 12px", color: colors.txt4, fontSize: 9, fontFamily: fonts.mono }}>
           NO STRIKES YET
@@ -165,6 +200,7 @@ export default function DualAssetsPage() {
           </button>
         );
       })}
+      </span>
     </span>
   );
 
@@ -175,7 +211,7 @@ export default function DualAssetsPage() {
         <Panel
           span={12}
           title="DUAL ASSETS · BYBIT"
-          badge={`SOL-USDT · ${days}D`}
+          badge={`SOL-USDT · ${duration.toUpperCase()} · ${days}D ANALYSIS`}
           actions={headerActions}
           flush
         >

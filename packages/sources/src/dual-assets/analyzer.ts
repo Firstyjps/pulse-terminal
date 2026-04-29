@@ -7,12 +7,13 @@ export function generateHourlyReport(opts: {
   coinPair?: string;
   targetPrice?: number;
   days?: number;
+  duration?: string;
 } = {}): DualAssetReport | { error: string } {
-  const { coinPair = "SOL-USDT", targetPrice = 78, days = 7 } = opts;
-  const hourly = getHourlyAvg({ coinPair, targetPrice, days });
+  const { coinPair = "SOL-USDT", targetPrice = 78, days = 7, duration } = opts;
+  const hourly = getHourlyAvg({ coinPair, targetPrice, days, duration });
   if (!hourly.length) return { error: "No data available yet — wait for cron to populate." };
 
-  const best = getBestHours({ coinPair, targetPrice, days, topN: 3 });
+  const best = getBestHours({ coinPair, targetPrice, days, topN: 3, duration });
   const avgAll = hourly.reduce((s, h) => s + h.avg_apr, 0) / hourly.length;
 
   const hotHours = hourly.filter((h) => h.avg_apr >= avgAll * 1.1).map((h) => h.hour_ict);

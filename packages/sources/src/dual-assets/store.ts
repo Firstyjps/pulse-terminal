@@ -191,11 +191,27 @@ export function updateDailySummary(dateStr: string, coinPair = "SOL-USDT"): void
   }
 }
 
-/** Hourly average APR over the last N days for a (coin_pair, target_price). */
-export function getHourlyAvg(opts: { coinPair?: string; targetPrice?: number; days?: number } = {}): HourlyAprStat[] {
-  const { coinPair = "SOL-USDT", targetPrice = 78, days = 7 } = opts;
+/** Hourly average APR over the last N days for a (coin_pair, target_price[, duration]). */
+export function getHourlyAvg(opts: { coinPair?: string; targetPrice?: number; days?: number; duration?: string } = {}): HourlyAprStat[] {
+  const { coinPair = "SOL-USDT", targetPrice = 78, days = 7, duration } = opts;
   const db = tryGetDb();
   if (!db) return [];
+  if (duration) {
+    return db.prepare(`
+      SELECT hour_ict,
+             ROUND(AVG(apr_pct), 2)     AS avg_apr,
+             ROUND(MAX(apr_pct), 2)     AS max_apr,
+             ROUND(MIN(apr_pct), 2)     AS min_apr,
+             ROUND(AVG(index_price), 2) AS avg_price,
+             ROUND(AVG(sol_iv_pct), 2)  AS avg_iv,
+             COUNT(*)                    AS samples
+      FROM apr_snapshots
+      WHERE coin_pair = ? AND target_price = ? AND duration = ?
+        AND timestamp_utc >= datetime('now', ?)
+      GROUP BY hour_ict
+      ORDER BY hour_ict
+    `).all(coinPair, targetPrice, duration, `-${days} days`) as HourlyAprStat[];
+  }
   return db.prepare(`
     SELECT hour_ict,
            ROUND(AVG(apr_pct), 2)     AS avg_apr,
@@ -212,7 +228,7 @@ export function getHourlyAvg(opts: { coinPair?: string; targetPrice?: number; da
   `).all(coinPair, targetPrice, `-${days} days`) as HourlyAprStat[];
 }
 
-export function getBestHours(opts: { coinPair?: string; targetPrice?: number; days?: number; topN?: number } = {}): HourlyAprStat[] {
+export function getBestHours(opts: { coinPair?: string; targetPrice?: number; days?: number; topN?: number; duration?: string } = {}): HourlyAprStat[] {
   const { topN = 3, ...rest } = opts;
   return getHourlyAvg(rest)
     .slice()

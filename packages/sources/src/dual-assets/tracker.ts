@@ -27,6 +27,13 @@ const DEFAULT_TARGETS_RAW = (process.env.DUAL_ASSETS_TARGETS ?? "all").trim();
 const DEFAULT_TARGETS: number[] | null = DEFAULT_TARGETS_RAW.toLowerCase() === "all" || DEFAULT_TARGETS_RAW === ""
   ? null
   : DEFAULT_TARGETS_RAW.split(",").map((s) => parseFloat(s.trim())).filter((n) => Number.isFinite(n));
+// DUAL_ASSETS_DURATIONS: Bybit returns "8h" / "1d" / "3d" / "8d" / "29d".
+//   - "all" (default) → save every duration.
+//   - "8h,1d" → focus on the high-APR short-duration menu (recommended for active traders).
+const DEFAULT_DURATIONS_RAW = (process.env.DUAL_ASSETS_DURATIONS ?? "all").trim().toLowerCase();
+const DEFAULT_DURATIONS: string[] | null = DEFAULT_DURATIONS_RAW === "all" || DEFAULT_DURATIONS_RAW === ""
+  ? null
+  : DEFAULT_DURATIONS_RAW.split(",").map((s) => s.trim()).filter(Boolean);
 const TIMEZONE = "Asia/Bangkok"; // ICT, UTC+7
 
 interface BybitResp<T> {
@@ -185,6 +192,7 @@ export async function runDualAssetTick(opts: {
     const products = await getDualAssetProducts(coin, quoteCoin);
     for (const p of products) {
       if (targets !== null && !targets.includes(p.targetPrice)) continue;
+      if (DEFAULT_DURATIONS !== null && !DEFAULT_DURATIONS.includes(p.duration.toLowerCase())) continue;
       if (!directions.includes(p.direction)) continue;
 
       const snap: DualAssetSnapshot = {
