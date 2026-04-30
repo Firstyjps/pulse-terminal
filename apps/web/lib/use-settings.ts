@@ -10,7 +10,7 @@ export interface WebhookSettings {
 }
 
 /** UI scale option — "auto" picks based on viewport, numeric values override. */
-export type UiScale = "auto" | 1 | 1.25 | 1.5 | 1.75;
+export type UiScale = "auto" | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5;
 
 export interface Settings {
   /** Polling interval for `useFlow` data (ms). Default 60s. */

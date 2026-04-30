@@ -15,6 +15,8 @@ const SCALE_PRESETS: { value: UiScale; label: string; hint: string }[] = [
   { value: 1.25, label: "1.25×", hint: "125%" },
   { value: 1.5, label: "1.5×", hint: "150%" },
   { value: 1.75, label: "1.75×", hint: "175%" },
+  { value: 2, label: "2×", hint: "200%" },
+  { value: 2.5, label: "2.5×", hint: "250%" },
 ];
 
 const ROW: React.CSSProperties = {
