@@ -18,6 +18,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { id: "overview",  label: "OVERVIEW",  key: "F1", href: "/" },
       { id: "markets",   label: "MARKETS",   key: "F2", href: "/markets" },
       { id: "fundflow",  label: "FUNDFLOW",  key: "F3", href: "/fundflow" },
+      { id: "intel",     label: "INTEL",     key: "F9", href: "/intel" },
     ],
   },
   {

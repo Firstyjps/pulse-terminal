@@ -15,7 +15,7 @@ interface TabDef {
 const TABS: TabDef[] = [
   { id: "overview",    label: "OVERVIEW", glyph: "◆", href: "/",            fkey: "F1" },
   { id: "markets",     label: "MARKETS",  glyph: "▦", href: "/markets",     fkey: "F2" },
-  { id: "fundflow",    label: "FLOW",     glyph: "≈", href: "/fundflow",    fkey: "F3" },
+  { id: "intel",       label: "INTEL",    glyph: "ℹ", href: "/intel",       fkey: "F9" },
   { id: "derivatives", label: "DERIV",    glyph: "Ξ", href: "/derivatives", fkey: "F4" },
   { id: "options",     label: "OPTIONS",  glyph: "Σ", href: "/options",     fkey: "F5" },
   { id: "settings",    label: "SETTINGS", glyph: "⚙", href: "/settings",    fkey: "F7" },

@@ -93,6 +93,25 @@ export default function SettingsPage() {
               style={INPUT}
             />
           </div>
+          <div style={{ ...ROW, borderBottom: "none" }}>
+            <div>
+              <div style={LABEL}>Whale alert threshold (USD)</div>
+              <div style={HINT}>Min BTC mempool tx size shown on /intel · default $1,000,000</div>
+            </div>
+            <input
+              type="number"
+              min={100_000}
+              max={1_000_000_000}
+              step={100_000}
+              value={settings.whaleThresholdUsd}
+              onChange={(e) =>
+                update({
+                  whaleThresholdUsd: Math.max(100_000, Math.min(1_000_000_000, Number(e.target.value) || 1_000_000)),
+                })
+              }
+              style={{ ...INPUT, width: 140 }}
+            />
+          </div>
         </Panel>
       </WsRow>
 

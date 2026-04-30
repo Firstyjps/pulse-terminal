@@ -9,6 +9,8 @@ export interface Settings {
   alertScanSec: number;
   /** Mute toast notifications */
   notificationsMuted: boolean;
+  /** Whale-alerts USD threshold (used by /intel WhaleAlerts panel). */
+  whaleThresholdUsd: number;
 }
 
 const KEY = "pulse.settings";
@@ -17,6 +19,7 @@ const DEFAULTS: Settings = {
   refreshIntervalMs: 60_000,
   alertScanSec: 60,
   notificationsMuted: false,
+  whaleThresholdUsd: 1_000_000,
 };
 
 function read(): Settings {

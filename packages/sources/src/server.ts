@@ -30,6 +30,16 @@ export type { DepthBook } from "./depth.js";
 export { getWhaleFlow } from "./whale-flow.js";
 export type { WhaleTransfer, WhaleFlowResponse } from "./whale-flow.js";
 
+// Phase 5 — Intelligence & Analytics
+export { getCryptoNews } from "./news.js";
+export type { NewsItem, NewsFilter } from "./news.js";
+export { getOnChainMetrics } from "./on-chain.js";
+export type { OnChainMetrics } from "./on-chain.js";
+export { getWhaleAlerts } from "./whale-alerts.js";
+export type { WhaleAlertTx, WhaleAlertsResponse } from "./whale-alerts.js";
+export { getSocialBuzz } from "./social.js";
+export type { SocialMention, SocialBuzzResponse } from "./social.js";
+
 // Multi-exchange options (Deribit/Binance/Bybit/OKX) — Phase 5A
 export * from "./options/index.js";
 

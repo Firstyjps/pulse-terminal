@@ -41,7 +41,48 @@
 
 ## 📰 Activity log (newest at top)
 
-### 2026-04-30 · Code session (latest — Overview UX polish round)
+### 2026-05-01 · Code session (latest — Phase 5 Intelligence & Analytics)
+**4 features shipped: news / on-chain / whale-mempool / social — consolidated under new `/intel` tab (F9).**
+
+  **🆕 Source adapters (`packages/sources/src/`):**
+  - **news.ts** — `getCryptoNews(filter)` via CryptoPanic public API (`?public=true`, no key). Filter: `all|BTC|ETH|hot|bullish|bearish` mapping to `currencies=`/`filter=` params. Returns top 30 with title, source, ticker tags, vote summary. Revalidate 300s.
+  - **on-chain.ts** — `getOnChainMetrics()` via blockchain.info public q endpoints. Hashrate (GH/s → EH/s), difficulty (raw → T), mempool count, block height + chart API for active addresses. Each value is its own try/catch — partial failures show "—" instead of nuking the whole panel.
+  - **whale-alerts.ts** — `getWhaleAlerts(thresholdUsd, btcPrice)` scans `blockchain.info/unconfirmed-transactions` mempool, surfaces tx whose total OUTPUT > threshold. Caller passes BTC spot price (separation of concerns — engine doesn't fetch price). Complements `whale-flow.ts` which reads CONFIRMED tx; this fires sooner (broadcast not block). Revalidate 30s.
+  - **social.ts** — `getSocialBuzz()` aggregates `r/CryptoCurrency`, `r/Bitcoin`, `r/ethfinance` hot posts, extracts ticker mentions via regex with 60-word blacklist (filters ALL/AND/THE/SEC/CEO/etc), engagement score = upvotes × ln(comments+1). Returns top 10 trending. Allorigins fallback for CORS-blocked datacenter IPs.
+
+  **🆕 API routes:**
+  - `/api/news?filter=...` (revalidate 300)
+  - `/api/on-chain` (revalidate 600)
+  - `/api/whale-alerts?threshold=N` (revalidate 60) — BTC spot fetched server-side from CoinGecko `/simple/price`
+  - `/api/social` (revalidate 900)
+
+  **🆕 React components (`apps/web/components/`):**
+  - **NewsFeed.tsx** — 6-pill filter row + scrollable card list. Each row: relative time / title / source · ticker pills · ★important badge / open-tab arrow. Click opens external `window.open(url, "_blank", "noopener")`.
+  - **OnChainMetrics.tsx** — 5-tile auto-fit grid (≥140px each). Tints per metric (amber hashrate / cyan difficulty / red mempool > 50K / green block height / amber-bright addrs).
+  - **WhaleAlerts.tsx** — 60s polling tick. Header strip shows threshold + scanned count + new-tx badge with blink. Each tx flashes green border + bg for 8s when first seen (tracked in `localStorage[pulse.whale.seen]`, cap 500). Click opens `blockchain.com/btc/tx/<hash>`. Threshold pulled from `useSettings`.
+  - **SocialBuzz.tsx** — sticky-header table (#/Ticker/Mentions/Score/Top Post). Score in compact form (K/M). Click row opens the top post on Reddit.
+
+  **🆕 `/intel` page** [apps/web/app/intel/page.tsx](apps/web/app/intel/page.tsx) — 3 ws-rows:
+  - Row 1 (h-stats): ON-CHAIN METRICS c-12 (5 mini-cards)
+  - Row 2 (h-feed): MARKET NEWS c-7 + WHALE ALERTS c-5
+  - Row 3 (h-table): SOCIAL BUZZ c-12
+
+  **Nav wiring:**
+  - [TerminalNav](apps/web/components/TerminalNav.tsx) — added `F9 INTEL` under INTEL section. Existing F1-F8 unchanged.
+  - [BottomTabNav](apps/web/components/BottomTabNav.tsx) — `INTEL ℹ` replaces FUNDFLOW slot on mobile (Fundflow still reachable via desktop F3 + direct URL).
+
+  **Settings extension:**
+  - [use-settings.ts](apps/web/lib/use-settings.ts) — new `whaleThresholdUsd` field (default $1,000,000, range $100K – $1B).
+  - [/settings page](apps/web/app/settings/page.tsx) — added input row under DATA REFRESH panel.
+
+- **[verified]** `pnpm -r typecheck` — all 7 packages clean.
+- **[doing]** nothing — handing back.
+- **[blocked]** None. All sources opt-in:
+  - News, on-chain, social → no API keys ever needed (public)
+  - Whale alerts → uses CoinGecko fallback for BTC price; no key required
+- **[next]** Push + deploy.
+
+### 2026-04-30 · Code session — Overview UX polish round
 **Six UX adjustments per user screenshot review.**
 
   **🆕 Bigger sidebar** — left rail 140 → 172px, font 10 → 12px, row height 5px → 9px padding (≥36px tap-tall), heavier weight on active. F-key prefix bumped to 22px column with bolder weight. AppShell grid updated to match.

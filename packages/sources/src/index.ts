@@ -33,6 +33,12 @@ export type { MacroPoint, MacroSeries, MacroResponse } from "./macro.js";
 export type { PortfolioBalance, PortfolioSnapshot, PortfolioSource } from "./portfolio.js";
 export type { MultiPortfolioSnapshot } from "./portfolio-multi.js";
 
+// Phase 5 — Intelligence & Analytics types (browser-safe)
+export type { NewsItem, NewsFilter } from "./news.js";
+export type { OnChainMetrics } from "./on-chain.js";
+export type { WhaleAlertTx, WhaleAlertsResponse } from "./whale-alerts.js";
+export type { SocialMention, SocialBuzzResponse } from "./social.js";
+
 // Phase 5A — multi-exchange options types (browser-safe; pure types + expiry helper)
 export type {
   OptionExchange,
