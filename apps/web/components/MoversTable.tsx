@@ -11,6 +11,7 @@ interface CoinRow {
   id: string;
   symbol: string;
   name: string;
+  image?: string;
   market_cap_rank?: number;
   current_price: number;
   market_cap: number;
@@ -22,6 +23,47 @@ interface CoinRow {
   price_change_percentage_24h_in_currency?: number;
   price_change_percentage_7d_in_currency?: number;
   sparkline_in_7d?: { price: number[] };
+}
+
+/**
+ * Coin logo with letter-glyph fallback when the image fails to load
+ * (CoinGecko serves a 0-byte 404 for some new listings).
+ */
+function CoinAvatar({ url, symbol, size }: { url?: string; symbol: string; size: number }) {
+  const [broken, setBroken] = useState(!url);
+  if (broken || !url) {
+    return (
+      <span
+        style={{
+          width: size,
+          height: size,
+          background: colors.bg3,
+          border: `1px solid ${colors.line2}`,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: Math.max(8, size * 0.55),
+          color: colors.amber,
+          fontWeight: 600,
+          flexShrink: 0,
+          borderRadius: "50%",
+        }}
+      >
+        {symbol[0]?.toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      width={size}
+      height={size}
+      onError={() => setBroken(true)}
+      style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, display: "block" }}
+    />
+  );
 }
 
 export type SortKey =
@@ -168,22 +210,8 @@ export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSe
                     fontFamily: fonts.mono,
                   }}
                 >
-                  <span
-                    style={{
-                      width: 24,
-                      height: 24,
-                      background: colors.bg3,
-                      border: `1px solid ${colors.line2}`,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 11,
-                      color: colors.amber,
-                      fontWeight: 600,
-                      gridRow: "1 / span 2",
-                    }}
-                  >
-                    {c.symbol[0].toUpperCase()}
+                  <span style={{ gridRow: "1 / span 2", display: "inline-flex" }}>
+                    <CoinAvatar url={c.image} symbol={c.symbol} size={24} />
                   </span>
 
                   <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
@@ -307,22 +335,7 @@ export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSe
                     </td>
                     <td style={cellLeft}>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                        <span
-                          style={{
-                            width: 14,
-                            height: 14,
-                            background: colors.bg3,
-                            border: `1px solid ${colors.line2}`,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 8,
-                            color: colors.amber,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {c.symbol[0].toUpperCase()}
-                        </span>
+                        <CoinAvatar url={c.image} symbol={c.symbol} size={16} />
                         <span style={{ color: colors.amber, fontWeight: 600 }}>
                           {c.symbol.toUpperCase()}
                         </span>
