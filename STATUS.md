@@ -41,7 +41,46 @@
 
 ## 📰 Activity log (newest at top)
 
-### 2026-04-30 · Code session (latest — Phase 4 multi-portfolio + Deribit term structure)
+### 2026-04-30 · Code session (latest — Phase 4 final 3 items)
+**Closing out the remaining Phase 4 backlog from HANDOFF.md:262 — Tron whale-flow extension, multi-channel push notifications (ntfy.sh + Telegram), and a /backtest UI panel surfacing the existing graded-backtest engine.**
+
+  **🆕 Tron USDT whale-flow** (item 3 — on-chain extend)
+  - [packages/sources/src/whale-flow.ts](packages/sources/src/whale-flow.ts) — added 4th source: TronScan public API (`apilist.tronscanapi.com/api/transfer/trc20`). USDT-TRC20 contract (`TR7NHqj…`) is the largest USDT supply (~$60B+).
+  - 6-decimal raw-amount conversion. 100 latest transfers per tick, filtered by `WHALE_FLOW_MIN_USD` (default $10M).
+  - **NEW exchange address book for Tron** — Binance (4 hot wallets) · OKX (3) · HTX (2) · KuCoin (2) · Bybit · Bitfinex · Tether Treasury. Coverage gaps fall through to "UNKNOWN".
+  - `WhaleTransfer.chain` widened: `"btc" | "eth"` → `"btc" | "eth" | "tron"`.
+  - Slotted into existing `Promise.allSettled` parallel fan-out — Tron failure doesn't block ETH/BTC sources.
+  - **All 4 whale-flow tests still pass** (no test fixtures needed updating — Tron path not exercised in the fixture-mocked tests; live-fetch path validated separately).
+
+  **🆕 Multi-channel push notifications** (item 1 — replace single webhook)
+  - [apps/alerts/src/notifier.ts](apps/alerts/src/notifier.ts) — full rewrite as channel array. Each channel is opt-in via env, parallel `Promise.allSettled` send, partial failure isolated per-channel.
+  - **3 channels supported:**
+    - `webhook` — existing Discord/Slack URL (kept for back-compat).
+    - `ntfy` — `PULSE_NTFY_TOPIC` (just topic name → resolves to `https://ntfy.sh/<topic>`, or full URL for self-hosted). Auto-priority by severity (low=3, med=4, high=5) overridable via `PULSE_NTFY_PRIORITY`. Title includes symbol + severity. Free push to iOS/Android via the ntfy app — no account needed.
+    - `telegram` — `PULSE_TELEGRAM_BOT_TOKEN` + `PULSE_TELEGRAM_CHAT_ID`. Markdown V1 with proper escaping for `_*[]\``. `disable_web_page_preview: true` to keep alert clean.
+  - `Notifier.channelNames()` exposed; alerts `index.ts` startup log now shows `channels [webhook, ntfy, telegram]` instead of just `webhook ON/OFF`.
+  - Renamed log line `(webhook: …)` → `(notified: …)` since multi-channel.
+
+  **🆕 /backtest GRADED BACKTEST panel** (item 2 — surface existing engine)
+  - The graded-backtest data layer was already 100% built (`grade-replay.ts` + `grade-replay-runner.ts` + `/api/backtest/grade` route + `scripts/grade-replay.mjs` CLI + MCP `grade_signal` tool). What was missing: a **web UI** to display the calibration results.
+  - [apps/web/app/backtest/page.tsx](apps/web/app/backtest/page.tsx) — new Row 3 (`minHeight 360`):
+    - **GRADED BACKTEST c-7** — calibration table: confidence bin / samples / mean confidence / realized hit-rate / **calibration delta** (hitRate − meanConfidence; green when |Δ|≤10%, amber up to 20%, red beyond).
+    - **BY CATEGORY c-5** — per-category bucket: N / hit% / conf% / realized Δ.
+  - Both panels share the `?lookahead=` setting from the existing toolbar (4h / 24h / 72h / 168h). Lookback fixed at 30 days, threshold at 1% (calibration robust enough for the user's data volume; can be made configurable later).
+  - Updated METHODOLOGY footnote to explain pattern hit-rate (existing) vs graded backtest (new).
+
+- **[verified]** `pnpm -r typecheck` — all 7 clean. `pnpm --filter @pulse/sources test src/{whale-flow,grade-replay,grade-signal}.test.ts` — **42/42 pass**.
+- **[doing]** nothing — handing back to user.
+- **[blocked]** None. New channels are opt-in; absent env = silent skip.
+- **[next]** Deploy. Set on Hetzner `.env.local` to activate channels:
+  ```
+  PULSE_NTFY_TOPIC=pulse-firsty-<random>     # then subscribe in ntfy iOS/Android app
+  PULSE_TELEGRAM_BOT_TOKEN=<from @BotFather>
+  PULSE_TELEGRAM_CHAT_ID=<your chat>
+  ```
+  Tron whale-flow works immediately (TronScan public, no key). Graded-backtest UI works on existing alerts JSONL (3+ days of data already collected).
+
+### 2026-04-30 · Code session — Phase 4 multi-portfolio + Deribit term structure
 **2 Phase 4 items shipped — multi-CEX portfolio aggregation + Deribit IV term structure / OI breakdown.**
 
   **🆕 Multi-portfolio (Bybit + OKX read-only)** — Binance was the only configured source previously

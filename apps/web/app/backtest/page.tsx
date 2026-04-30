@@ -28,6 +28,42 @@ interface ApiResp {
   stats: PatternStats[];
 }
 
+interface BucketStats {
+  count: number;
+  hits: number;
+  hitRate: number;
+  meanConfidence: number;
+  meanRealizedPct: number;
+}
+interface CalibrationBucket {
+  bin: string;
+  binMin: number;
+  binMax: number;
+  count: number;
+  hitRate: number;
+  meanConfidence: number;
+}
+interface GradedReport {
+  generatedAt: string;
+  totalReplayed: number;
+  totalScored: number;
+  overall: BucketStats;
+  byCategory: Record<string, BucketStats>;
+  bySeverity: Record<string, BucketStats>;
+  calibration: CalibrationBucket[];
+}
+interface GradedResp {
+  report: GradedReport;
+  meta: {
+    sourceFile: string;
+    lookaheadHours: number;
+    thresholdPercent: number;
+    sinceMs: number | null;
+    syntheticUsed?: boolean;
+  };
+  error?: string;
+}
+
 const LOOKAHEADS = [4, 24, 72, 168] as const;
 
 /**
@@ -39,6 +75,10 @@ const LOOKAHEADS = [4, 24, 72, 168] as const;
 export default function BacktestPage() {
   const [hours, setHours] = useState<number>(24);
   const { data, loading } = useFlow<ApiResp>(`/api/backtest?hours=${hours}`, hours);
+  const graded = useFlow<GradedResp>(
+    `/api/backtest/grade?lookahead=${hours}&threshold=1.0&lookback=30`,
+    hours,
+  );
 
   return (
     <Workspace>
@@ -167,20 +207,184 @@ export default function BacktestPage() {
         </Panel>
       </WsRow>
 
+      <WsRow height="auto" style={{ minHeight: 360 }}>
+        <Panel
+          span={7}
+          title="GRADED BACKTEST"
+          badge={
+            graded.data?.report
+              ? `${graded.data.report.totalScored} SCORED · OVERALL ${(graded.data.report.overall.hitRate * 100).toFixed(0)}%`
+              : "LOADING"
+          }
+          flush
+        >
+          <GradedCalibrationTable graded={graded.data ?? null} />
+        </Panel>
+        <Panel
+          span={5}
+          title="BY CATEGORY"
+          badge={graded.data?.report ? `MEAN CONF ${(graded.data.report.overall.meanConfidence * 100).toFixed(0)}%` : "LOADING"}
+          flush
+        >
+          <GradedCategoryTable graded={graded.data ?? null} />
+        </Panel>
+      </WsRow>
+
       <WsRow height="auto">
         <Panel span={12} title="METHODOLOGY" badge="HOW HITS ARE SCORED">
           <p style={{ margin: 0, fontSize: 11, color: colors.txt3, lineHeight: 1.6, fontFamily: fonts.mono }}>
+            <strong style={{ color: colors.txt2 }}>Pattern hit-rate</strong> (above): binary direction-match per category.
             Hit = BTC moved in expected direction within window:
             <br />
             <span style={{ color: colors.red }}>etf / funding / futures / tvl / dex</span> → expect <span style={{ color: colors.red }}>down</span>
             <br />
             <span style={{ color: colors.green }}>stablecoin</span> → expect <span style={{ color: colors.green }}>up</span>
             <br /><br />
-            Reads <code style={{ color: colors.cyan }}>apps/alerts/data/alerts.jsonl</code>. Run alerts worker to populate.
+            <strong style={{ color: colors.txt2 }}>Graded backtest</strong>: same outcomes but bucketed by the rubric's
+            confidence score (signalStrength + regimeAlignment + crossSourceConfirmation + historicalHitRate). Calibration
+            should be monotonic — high-confidence buckets should hit more often than low-confidence ones, and the
+            mean confidence in each bucket should track the realized hit-rate within ±10%.
+            <br /><br />
+            Both views read <code style={{ color: colors.cyan }}>apps/alerts/data/alerts.jsonl</code>. Run alerts worker to populate.
           </p>
         </Panel>
       </WsRow>
     </Workspace>
+  );
+}
+
+function GradedCalibrationTable({ graded }: { graded: GradedResp | null }) {
+  if (!graded?.report || graded.error) {
+    return (
+      <p style={{ padding: 16, fontSize: 11, color: colors.txt3, fontFamily: fonts.mono }}>
+        {graded?.error ?? "Loading graded backtest…"}
+      </p>
+    );
+  }
+  const buckets = graded.report.calibration;
+  if (!buckets.length) {
+    return (
+      <p style={{ padding: 16, fontSize: 11, color: colors.txt3, fontFamily: fonts.mono }}>
+        Not enough scored findings yet. Each confidence bucket needs ≥ 3 samples.
+      </p>
+    );
+  }
+  return (
+    <div style={{ height: "100%", overflow: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: fonts.mono, fontSize: 11 }}>
+        <thead>
+          <tr style={{ textAlign: "left", color: colors.txt3, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <th style={cellHeader}>Confidence Bin</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>Samples</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>Mean Conf</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>Realized Hit-rate</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>Calibration Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {buckets.map((b) => {
+            const delta = b.hitRate - b.meanConfidence; // positive = under-confident, negative = over-confident
+            const wellCalibrated = Math.abs(delta) <= 0.1;
+            return (
+              <tr key={b.bin} style={{ borderBottom: `1px solid ${colors.line}` }}>
+                <td style={{ ...cellBody, color: colors.amber, fontWeight: 600 }}>{b.bin}</td>
+                <td style={{ ...cellBody, textAlign: "right", color: colors.txt3 }}>{b.count}</td>
+                <td style={{ ...cellBody, textAlign: "right", color: colors.txt2 }}>
+                  {(b.meanConfidence * 100).toFixed(0)}%
+                </td>
+                <td
+                  style={{
+                    ...cellBody,
+                    textAlign: "right",
+                    color: b.hitRate >= 0.5 ? colors.green : colors.red,
+                    fontWeight: 600,
+                  }}
+                >
+                  {(b.hitRate * 100).toFixed(0)}%
+                </td>
+                <td
+                  style={{
+                    ...cellBody,
+                    textAlign: "right",
+                    color: wellCalibrated ? colors.green : Math.abs(delta) > 0.2 ? colors.red : colors.amber,
+                    fontWeight: 600,
+                  }}
+                >
+                  {delta >= 0 ? "+" : ""}{(delta * 100).toFixed(0)}%
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function GradedCategoryTable({ graded }: { graded: GradedResp | null }) {
+  if (!graded?.report || graded.error) {
+    return (
+      <p style={{ padding: 16, fontSize: 11, color: colors.txt3, fontFamily: fonts.mono }}>
+        {graded?.error ?? "Loading…"}
+      </p>
+    );
+  }
+  const rows = Object.entries(graded.report.byCategory)
+    .filter(([, s]) => (s as BucketStats).count > 0)
+    .sort(([, a], [, b]) => (b as BucketStats).count - (a as BucketStats).count);
+
+  if (!rows.length) {
+    return (
+      <p style={{ padding: 16, fontSize: 11, color: colors.txt3, fontFamily: fonts.mono }}>No category samples yet.</p>
+    );
+  }
+  return (
+    <div style={{ height: "100%", overflow: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: fonts.mono, fontSize: 11 }}>
+        <thead>
+          <tr style={{ textAlign: "left", color: colors.txt3, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <th style={cellHeader}>Category</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>N</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>Hit %</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>Conf %</th>
+            <th style={{ ...cellHeader, textAlign: "right" }}>Realized Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([cat, s]) => {
+            const stats = s as BucketStats;
+            return (
+              <tr key={cat} style={{ borderBottom: `1px solid ${colors.line}` }}>
+                <td style={{ ...cellBody, color: colors.amber, fontWeight: 600, textTransform: "uppercase" }}>{cat}</td>
+                <td style={{ ...cellBody, textAlign: "right", color: colors.txt3 }}>{stats.count}</td>
+                <td
+                  style={{
+                    ...cellBody,
+                    textAlign: "right",
+                    color: stats.hitRate >= 0.5 ? colors.green : colors.red,
+                    fontWeight: 600,
+                  }}
+                >
+                  {(stats.hitRate * 100).toFixed(0)}%
+                </td>
+                <td style={{ ...cellBody, textAlign: "right", color: colors.txt2 }}>
+                  {(stats.meanConfidence * 100).toFixed(0)}%
+                </td>
+                <td
+                  style={{
+                    ...cellBody,
+                    textAlign: "right",
+                    color: stats.meanRealizedPct >= 0 ? colors.green : colors.red,
+                  }}
+                >
+                  {stats.meanRealizedPct >= 0 ? "+" : ""}{stats.meanRealizedPct.toFixed(2)}%
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -29,14 +29,15 @@ async function tick() {
     rec.sent_webhook = await notifier.maybeNotify(rec);
     await store.append(rec);
     console.log(
-      `[alerts] tick done in ${Date.now() - start}ms — ${scan.findings.length} finding(s) (webhook: ${rec.sent_webhook})`,
+      `[alerts] tick done in ${Date.now() - start}ms — ${scan.findings.length} finding(s) (notified: ${rec.sent_webhook})`,
     );
   } catch (err) {
     console.warn("[alerts] tick failed:", (err as Error).message);
   }
 }
 
-console.log(`[alerts] starting — interval ${INTERVAL_MS}ms, log ${LOG_PATH}, webhook ${WEBHOOK_URL ? "ON" : "OFF"}, symbol ${SYMBOL}`);
+const channels = notifier.channelNames();
+console.log(`[alerts] starting — interval ${INTERVAL_MS}ms, log ${LOG_PATH}, channels [${channels.length ? channels.join(", ") : "none"}], symbol ${SYMBOL}`);
 void tick();
 const timer = setInterval(tick, INTERVAL_MS);
 

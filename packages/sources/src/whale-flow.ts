@@ -1,11 +1,12 @@
 // On-chain whale flow — self-index from public block explorers.
-// Free / no auth (Etherscan free tier 5 req/sec, Mempool.space unlimited public).
+// Free / no auth (Etherscan free tier 5 req/sec, Mempool.space unlimited public,
+// TronScan public API 5 req/sec).
 //
 // Strategy:
 //   1. Etherscan: poll latest 100 ERC-20 transfers for known stablecoins (USDT/USDC).
-//      Native ETH whales come from /api/?module=account&action=txlist on big addresses.
 //   2. Mempool.space: scan recent BTC blocks for outputs above threshold.
-//   3. Resolve from/to against a hardcoded exchange address book → label as
+//   3. TronScan: latest TRC-20 USDT transfers (Tron is the largest USDT supply ~$60B+).
+//   4. Resolve from/to against a hardcoded exchange address book → label as
 //      "BINANCE", "COINBASE", "KRAKEN", etc. Unknown addrs → "UNKNOWN".
 //
 // The threshold is per-asset (BTC > 100, ETH > 1000, USDT/USDC > 5_000_000)
@@ -16,7 +17,7 @@
 import { fetchJson } from "./_helpers.js";
 
 export interface WhaleTransfer {
-  chain: "btc" | "eth";
+  chain: "btc" | "eth" | "tron";
   asset: string;          // BTC / ETH / USDT / USDC
   amount: number;         // human-readable (BTC, ETH, or token units)
   amountUsd: number;
@@ -70,6 +71,38 @@ const ETH_TOKEN_CONTRACTS = {
   USDT: "0xdac17f958d2ee523a2206206994597c13d831ec7",
   USDC: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
 };
+
+// Tron USDT (TRC-20). Tron is the largest USDT supply (~$60B+).
+const TRON_USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+
+// Curated TRX exchange address book. Coverage gaps fall through to "UNKNOWN".
+const TRON_EXCHANGES: Record<string, string> = {
+  // Binance hot wallets (Tron)
+  "TWd4WrZ9wn84f5x1hZhL4DHvk738ns5jwb": "BINANCE",
+  "TKHuVq1oKVruCGLvqVexFs6dawKv6fQgFs": "BINANCE",
+  "TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9": "BINANCE",
+  "TNXoiAJ3dct8Fjg4M9fkLFh9S2v9TXc32G": "BINANCE",
+  // OKX
+  "TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax": "OKX",
+  "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7": "OKX",
+  "TFVqiD4SXvLY3M6mxe7BfZ6pFJgHr1xQAR": "OKX",
+  // HTX (Huobi)
+  "THPvaUhoh2Qn2y9THCZML3H815hhFhn5YC": "HTX",
+  "TEDdnAa4QDWB8FcyFjnfPJBSk9LmXZupJM": "HTX",
+  // KuCoin
+  "TAkv2vjqBnyCsELnZ55zNS3GehywnvD9NY": "KUCOIN",
+  "TWvzcN5RxiAY8KRJUsGbpjPnDGHXRwgfyL": "KUCOIN",
+  // Bybit
+  "TM1zzNDZD2DPASbKcgdVoTYhfmYgtfwx9R": "BYBIT",
+  // Bitfinex
+  "TYDzsYUEpvnYmQk4zGP9sWWcTEd2MiAtW6": "BITFINEX",
+  // Tether Treasury (Tron)
+  "TKHuVq1oKVruCGLvqVexFs6dawKv6fQgFs_treasury": "TETHER_TREASURY",
+};
+
+function labelTron(addr: string): string {
+  return TRON_EXCHANGES[addr] ?? "UNKNOWN";
+}
 
 // Whale thresholds — minimum size to surface
 const THRESHOLD_USD = Number(process.env.WHALE_FLOW_MIN_USD ?? 10_000_000);
@@ -131,6 +164,50 @@ async function ethTokenTransfers(contract: string, symbol: "USDT" | "USDC"): Pro
       direction: classifyDirection(fromLabel, toLabel),
       txHash: tx.hash,
       ts: parseInt(tx.timeStamp, 10) * 1000,
+    });
+  }
+  return out;
+}
+
+// ── Tron USDT (TronScan public API) ─────────────────────────────────────────
+interface TronScanTransfer {
+  transaction_id: string;
+  from_address: string;
+  to_address: string;
+  /** Raw amount (string), 6 decimals for USDT-TRC20. */
+  quant: string;
+  block_ts: number;        // ms epoch
+  contract_address: string;
+}
+interface TronScanResp { data?: TronScanTransfer[]; total?: number }
+
+async function tronUsdtTransfers(): Promise<WhaleTransfer[]> {
+  // direction=0 = both in+out, sorted desc by time
+  const url =
+    `https://apilist.tronscanapi.com/api/transfer/trc20` +
+    `?contract_address=${TRON_USDT_CONTRACT}` +
+    `&start=0&limit=100&direction=0`;
+  const json = await fetchJson<TronScanResp>(url, { revalidate: 60, retries: 1 });
+  if (!json.data?.length) return [];
+
+  const out: WhaleTransfer[] = [];
+  for (const tx of json.data) {
+    const amount = parseFloat(tx.quant) / 1e6; // USDT-TRC20 = 6 decimals
+    if (amount < THRESHOLD_USD) continue;
+    const fromLabel = labelTron(tx.from_address);
+    const toLabel = labelTron(tx.to_address);
+    out.push({
+      chain: "tron",
+      asset: "USDT",
+      amount,
+      amountUsd: amount,           // stablecoin ≈ $1
+      from: tx.from_address,
+      to: tx.to_address,
+      fromLabel,
+      toLabel,
+      direction: classifyDirection(fromLabel, toLabel),
+      txHash: tx.transaction_id,
+      ts: tx.block_ts,
     });
   }
   return out;
@@ -209,6 +286,7 @@ export async function getWhaleFlow(): Promise<WhaleFlowResponse> {
     ethTokenTransfers(ETH_TOKEN_CONTRACTS.USDT, "USDT").then((r) => { ok.push("etherscan/USDT"); return r; }).catch((e) => { fail.push(`etherscan/USDT: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
     ethTokenTransfers(ETH_TOKEN_CONTRACTS.USDC, "USDC").then((r) => { ok.push("etherscan/USDC"); return r; }).catch((e) => { fail.push(`etherscan/USDC: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
     btcWhales(btcUsd).then((r) => { ok.push("mempool.space"); return r; }).catch((e) => { fail.push(`mempool.space: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
+    tronUsdtTransfers().then((r) => { ok.push("tronscan/USDT"); return r; }).catch((e) => { fail.push(`tronscan/USDT: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
   ]);
 
   const transfers = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
