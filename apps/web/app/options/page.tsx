@@ -47,8 +47,13 @@ const ASSETS: OptionAsset[] = ["BTC", "ETH", "SOL"];
  *
  *   Row 1 (h-stats, 96px): asset switcher + 4 KPIs (ATM IV / P/C / Total OI / Total Vol)
  *   Row 2 (h-chart, ≥420px): STRIKE LADDER c-7 + IV SMILE c-5
- *   Row 3 (h-table, 340px): GREEKS HEATMAP c-8 + ARBITRAGE c-4
- *   Row 4 (h-chart, 320px): IV TERM STRUCTURE c-7 + OI BY EXPIRY c-5
+ *   Row 3 (h-chart, 320px): IV TERM STRUCTURE c-7 + OI BY EXPIRY c-5
+ *   Row 4 (h-table, 340px): GREEKS HEATMAP c-8 + ARBITRAGE / SIMULATOR c-4
+ *
+ * Multi-expiry overview (term structure + total OI per expiry) sits above
+ * the per-strike detail (greeks + simulator) so the user reads top-down:
+ * which expiry has IV/OI worth trading → which strike inside that expiry
+ * has the right greeks → simulate the position.
  */
 type Side = "call" | "put";
 
@@ -223,6 +228,31 @@ export default function OptionsPage() {
         </Panel>
       </WsRow>
 
+      <WsRow height="auto" style={{ minHeight: 320 }}>
+        <Panel
+          span={7}
+          title="IV TERM STRUCTURE"
+          badge={
+            term.data
+              ? `${term.data.termStructure.length} EXPIRIES · ATM IV`
+              : "LOADING"
+          }
+        >
+          <TermStructureChart data={term.data} />
+        </Panel>
+        <Panel
+          span={5}
+          title="OI BY EXPIRY"
+          badge={
+            term.data
+              ? `${compact(term.data.totals.totalOI)} TOTAL · P/C ${term.data.totals.putCallOIRatio.toFixed(2)}`
+              : "LOADING"
+          }
+        >
+          <OIByExpiryChart data={term.data} />
+        </Panel>
+      </WsRow>
+
       <WsRow height="auto" style={{ minHeight: 360 }}>
         <Panel
           span={8}
@@ -261,31 +291,6 @@ export default function OptionsPage() {
           ) : (
             <ArbitrageList items={arbitrage} />
           )}
-        </Panel>
-      </WsRow>
-
-      <WsRow height="auto" style={{ minHeight: 320 }}>
-        <Panel
-          span={7}
-          title="IV TERM STRUCTURE"
-          badge={
-            term.data
-              ? `${term.data.termStructure.length} EXPIRIES · ATM IV`
-              : "LOADING"
-          }
-        >
-          <TermStructureChart data={term.data} />
-        </Panel>
-        <Panel
-          span={5}
-          title="OI BY EXPIRY"
-          badge={
-            term.data
-              ? `${compact(term.data.totals.totalOI)} TOTAL · P/C ${term.data.totals.putCallOIRatio.toFixed(2)}`
-              : "LOADING"
-          }
-        >
-          <OIByExpiryChart data={term.data} />
         </Panel>
       </WsRow>
     </Workspace>
