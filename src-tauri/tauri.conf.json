@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Pulse Terminal",
+  "version": "1.0.0",
+  "identifier": "com.cryptopulse.terminal",
+  "build": {
+    "frontendDist": "../apps/web/.next/standalone",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "pnpm --filter @pulse/web dev",
+    "beforeBuildCommand": "pnpm --filter @pulse/web build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "◆ Pulse Terminal",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 720,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false,
+      "tooltip": "Pulse Terminal"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "deb", "appimage", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Finance",
+    "shortDescription": "Crypto Macro Intelligence Terminal",
+    "longDescription": "Real-time crypto macro + derivatives intelligence — overview, fund flows, ETFs, perp futures, DEX volume, TVL, funding rates, open interest, options analytics, and cross-source anomaly detection."
+  }
+}

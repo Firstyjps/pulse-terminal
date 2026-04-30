@@ -16,6 +16,7 @@ When a Claude Code session starts, the first thing it should do is **announce it
 - Cron worker for AI alerts (`apps/alerts`)
 - Tailwind + custom design tokens (`packages/ui`)
 - Lightweight Charts v4.2 (`packages/charts`) — DO NOT upgrade to v5
+- Tauri 2.x desktop wrapper (`src-tauri/`) — optional, web app works standalone without it
 
 ## Run
 ```bash

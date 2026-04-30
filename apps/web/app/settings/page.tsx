@@ -232,6 +232,12 @@ export default function SettingsPage() {
       </WsRow>
 
       <WsRow height="auto">
+        <Panel span={12} title="EXTERNAL ALERTS" badge="WEBHOOKS">
+          <WebhooksSection />
+        </Panel>
+      </WsRow>
+
+      <WsRow height="auto">
         <Panel span={12} title="RESET" badge="DESTRUCTIVE">
           <div style={{ ...ROW, borderBottom: "none" }}>
             <div>
@@ -257,5 +263,133 @@ export default function SettingsPage() {
         </Panel>
       </WsRow>
     </Workspace>
+  );
+}
+
+function WebhooksSection() {
+  const { settings, update } = useSettings();
+  const toast = useToast();
+  const w = settings.webhooks;
+
+  type Channel = "discord" | "telegram" | "ntfy";
+  const [busy, setBusy] = useState<Channel | null>(null);
+
+  async function send(channel: Channel) {
+    setBusy(channel);
+    try {
+      let payload: Record<string, unknown>;
+      if (channel === "discord") {
+        if (!w.discordUrl) throw new Error("Enter Discord webhook URL first");
+        payload = { channel, webhook: w.discordUrl };
+      } else if (channel === "telegram") {
+        if (!w.telegramToken || !w.telegramChatId) throw new Error("Enter Telegram token + chat id first");
+        payload = { channel, token: w.telegramToken, chatId: w.telegramChatId };
+      } else {
+        if (!w.ntfyTopic) throw new Error("Enter ntfy topic first");
+        payload = { channel, topic: w.ntfyTopic };
+      }
+      const res = await fetch("/api/notify/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!j.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      toast.push({ tone: "success", title: `${channel} test sent`, body: "Check your inbox." });
+    } catch (err) {
+      toast.push({ tone: "error", title: `${channel} test failed`, body: (err as Error).message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={ROW}>
+        <div style={{ flex: 1 }}>
+          <div style={LABEL}>Discord webhook</div>
+          <div style={HINT}>https://discord.com/api/webhooks/&lt;id&gt;/&lt;token&gt;</div>
+        </div>
+        <input
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={w.discordUrl}
+          onChange={(e) => update({ webhooks: { ...w, discordUrl: e.target.value.trim() } })}
+          placeholder="Paste webhook URL"
+          style={{ ...INPUT, width: 280 }}
+        />
+        <button
+          type="button"
+          onClick={() => send("discord")}
+          disabled={busy !== null}
+          style={segButton(false)}
+        >
+          {busy === "discord" ? "…" : "TEST"}
+        </button>
+      </div>
+      <div style={ROW}>
+        <div style={{ flex: 1 }}>
+          <div style={LABEL}>Telegram bot</div>
+          <div style={HINT}>token from @BotFather + chat id</div>
+        </div>
+        <input
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={w.telegramToken}
+          onChange={(e) => update({ webhooks: { ...w, telegramToken: e.target.value.trim() } })}
+          placeholder="bot token"
+          style={{ ...INPUT, width: 200 }}
+        />
+        <input
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={w.telegramChatId}
+          onChange={(e) => update({ webhooks: { ...w, telegramChatId: e.target.value.trim() } })}
+          placeholder="chat id"
+          style={{ ...INPUT, width: 110 }}
+        />
+        <button
+          type="button"
+          onClick={() => send("telegram")}
+          disabled={busy !== null}
+          style={segButton(false)}
+        >
+          {busy === "telegram" ? "…" : "TEST"}
+        </button>
+      </div>
+      <div style={{ ...ROW, borderBottom: "none" }}>
+        <div style={{ flex: 1 }}>
+          <div style={LABEL}>ntfy.sh topic</div>
+          <div style={HINT}>topic name (auto https://ntfy.sh/&lt;topic&gt;) or full self-hosted URL</div>
+        </div>
+        <input
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={w.ntfyTopic}
+          onChange={(e) => update({ webhooks: { ...w, ntfyTopic: e.target.value.trim() } })}
+          placeholder="pulse-firsty-xxx"
+          style={{ ...INPUT, width: 280 }}
+        />
+        <button
+          type="button"
+          onClick={() => send("ntfy")}
+          disabled={busy !== null}
+          style={segButton(false)}
+        >
+          {busy === "ntfy" ? "…" : "TEST"}
+        </button>
+      </div>
+      <div style={{ padding: "10px 12px", fontSize: 10, color: colors.txt3, fontFamily: fonts.mono, borderTop: `1px dashed ${colors.line}` }}>
+        Test buttons fire a one-shot via the server (Discord and Telegram both block direct browser POSTs).
+        For automated alert delivery on the server side, set the same values in <code>~/pulse-terminal/.env.local</code>:
+        <br />
+        <code>ALERT_WEBHOOK_URL · PULSE_TELEGRAM_BOT_TOKEN · PULSE_TELEGRAM_CHAT_ID · PULSE_NTFY_TOPIC</code>
+        {" "}— then <code>pm2 restart pulse-alerts --update-env</code>.
+      </div>
+    </div>
   );
 }

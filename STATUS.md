@@ -41,7 +41,56 @@
 
 ## 📰 Activity log (newest at top)
 
-### 2026-05-01 · Code session (latest — Phase 5 Intelligence & Analytics)
+### 2026-05-01 · Code session (latest — Phase 6 Extended Platform)
+**4 features shipped: snapshot history · webhook test UI · popup chart · Tauri desktop wrapper config.**
+
+  **🆕 Feature 6.1 — Daily snapshot history (90-day rolling)**
+  - **NEW** [packages/sources/src/snapshot-history.ts](packages/sources/src/snapshot-history.ts) — SQLite store at `apps/alerts/data/snapshot-history.sqlite`. Schema: date PK, ts, total_mcap, total_volume, btc_dom, eth_dom, fg_value, fg_label, top10 (JSON). Methods: `saveDailySnapshot` (UPSERT + 90-day prune) · `getSnapshotHistory(days)` · `getAllSnapshots` · `clearSnapshots` · `getSnapshotStats`.
+  - **NEW** [packages/sources/src/snapshot-collector.ts](packages/sources/src/snapshot-collector.ts) — `collectAndSaveDailySnapshot()` pulls overview + top10 markets in parallel, no-op on zero-mcap (rate-limited CG response).
+  - **NEW** [apps/alerts/src/snapshot-cron.ts](apps/alerts/src/snapshot-cron.ts) — fires at 00:05 UTC daily + one-shot at boot. Wired into existing `alerts/src/index.ts` shutdown handler.
+  - **API routes:**
+    - `GET /api/snapshot/history?days=30|60|90` — read window
+    - `POST /api/snapshot/history` — manual collect (force)
+    - `POST /api/snapshot/history/clear` — wipe table
+    - `GET /api/snapshot/history/export` — JSON download with `Content-Disposition` filename
+  - **NEW** [apps/web/app/history/page.tsx](apps/web/app/history/page.tsx) — 3 ws-rows:
+    - Row 1 (h-stats): SUMMARY (count / earliest / latest / window Δ)
+    - Row 2: MARKET tab (totalMcap/totalVolume/btcDom/fgValue picker) OR COINS tab (per-coin price line). 30/60/90 window selector. Uses existing `PriceLine` chart with metric-specific color tints.
+    - Row 3 (h-table): RECENT SNAPSHOTS — last 14 rows with all metrics + BTC price.
+  - Toolbar buttons: ▶ COLLECT NOW · ⬇ EXPORT JSON · 🗑 CLEAR (with confirm).
+  - Keyboard `H` while on `/history` → refresh.
+
+  **🆕 Feature 6.2 — Webhook test UI**
+  - [use-settings.ts](apps/web/lib/use-settings.ts) — new `webhooks: { discordUrl, telegramToken, telegramChatId, ntfyTopic }` shape with safe migration (existing settings are merged with new defaults).
+  - **NEW** [apps/web/app/api/notify/test/route.ts](apps/web/app/api/notify/test/route.ts) — `POST { channel, ...creds }` server-side proxy that fires a one-shot test message. URL/token are NOT stored server-side. Validates Discord webhook URL pattern. Discord sends with cyan-color embed; Telegram uses Markdown V1 with proper escaping.
+  - [apps/web/app/settings/page.tsx](apps/web/app/settings/page.tsx) — new EXTERNAL ALERTS panel with 3 channel rows + per-row TEST button + footer noting that production-side env vars (`ALERT_WEBHOOK_URL`, `PULSE_TELEGRAM_BOT_TOKEN/CHAT_ID`, `PULSE_NTFY_TOPIC`) drive the alerts cron.
+
+  **🆕 Feature 6.3 — Popup chart with parent sync**
+  - **NEW** [apps/web/app/chart-popup/page.tsx](apps/web/app/chart-popup/page.tsx) — standalone chart route. Reads `?symbol=&tf=&type=` from URL. Listens for `postMessage` updates from `window.opener` so parent symbol/tf flips sync to popup. Self-polls `/api/klines` every 30s. Auto-closes when parent unloads. Has its own picker + line/candle toggle + 🪟 button to spawn another popup.
+  - [apps/web/components/AppShell.tsx](apps/web/components/AppShell.tsx) — bypass route check (`/chart-popup` skips TerminalNav/StatusBar/BotBar shell). Just renders `ToastProvider + children`.
+  - [apps/web/components/OverviewPriceChart.tsx](apps/web/components/OverviewPriceChart.tsx) — added 🪟 button next to TF selector. Tracks opened popups in a ref, broadcasts symbol/tf changes via `postMessage`, closes them all on `beforeunload`.
+
+  **🆕 Feature 6.4 — Tauri 2.x desktop wrapper (config + docs)**
+  - **NEW** [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) — Tauri 2 schema. Window 1400×900 min 1024×720, `◆ Pulse Terminal` title, finance category. Tray icon + bundle targets (msi/deb/dmg/AppImage).
+  - **NEW** [src-tauri/Cargo.toml](src-tauri/Cargo.toml) — Rust deps (tauri 2, tauri-plugin-shell/notification).
+  - **NEW** [src-tauri/src/main.rs](src-tauri/src/main.rs) — system-tray with Show/Hide/Refresh/Quit menu, left-click toggle, hide-to-tray on close-button.
+  - **NEW** [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json) — minimal permission set (core + shell:open + notification).
+  - **NEW** [src-tauri/build.rs](src-tauri/build.rs) — standard Tauri build hook.
+  - **NEW** [src-tauri/README.md](src-tauri/README.md) — prerequisites, icon generation, dev/build commands, platform notes.
+  - [.gitignore](.gitignore) — added `src-tauri/{target,gen,icons,Cargo.lock}` (Rust target is ~3-5 GB).
+  - [README.md](README.md) — new "Desktop build (optional · Tauri 2.x)" section.
+  - [CLAUDE.md](CLAUDE.md) — Tauri added to stack list with note "optional, web app works standalone".
+  - **No actual Rust build done** — config files only. User runs `cargo tauri dev` themselves once toolchain is installed.
+
+  **Nav:**
+  - [TerminalNav](apps/web/components/TerminalNav.tsx) — added F10 HISTORY under INTEL section.
+
+- **[verified]** `pnpm -r typecheck` — all 7 packages clean.
+- **[doing]** nothing — handing back.
+- **[blocked]** None.
+- **[next]** Push + deploy. Snapshot cron fires immediately at boot so prod will have today's row right after restart.
+
+### 2026-05-01 · Code session — Phase 5 Intelligence & Analytics
 **4 features shipped: news / on-chain / whale-mempool / social — consolidated under new `/intel` tab (F9).**
 
   **🆕 Source adapters (`packages/sources/src/`):**

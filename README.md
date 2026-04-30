@@ -84,6 +84,21 @@ Available tools (17):
 
 Tools query the local hub at `:8081` for sub-50ms latency, with graceful fallback to direct upstream fetch when the hub is unreachable.
 
+## Desktop build (optional · Tauri 2.x)
+
+The web app runs standalone — Tauri is purely an optional native shell.
+
+**Prerequisites:** Rust toolchain (`rustup`) + Tauri 2 CLI (`cargo install tauri-cli --version "^2.0"`) + platform deps (Xcode CLT on macOS · MSVC + WebView2 on Windows · `libwebkit2gtk-4.1-dev` on Linux). See https://tauri.app/start/prerequisites/.
+
+```bash
+# from monorepo root
+cargo tauri icon path/to/source.png   # one-time icon generation
+cargo tauri dev                        # boots Next + opens native window
+cargo tauri build                      # produces .msi / .dmg / .deb / .AppImage
+```
+
+System tray menu: **Show/Hide · Refresh · Quit**. Click tray icon to toggle window. Closing the main window hides to tray (typical desktop UX). Full guide: [src-tauri/README.md](./src-tauri/README.md).
+
 ## How to contribute
 
 Work is split into 8 roles + Phase 3 sub-phases so multiple Claude Code sessions can run in parallel without colliding. See [AGENTS.md](./AGENTS.md) for current status board, contracts, and what's safe to touch. Cross-session sync uses the template in [SYNC.md](./SYNC.md).

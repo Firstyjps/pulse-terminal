@@ -5,6 +5,7 @@ import { AlertStore, type ScanRecord } from "./storage.js";
 import { Notifier } from "./notifier.js";
 import { startDualAssetsTick } from "./dual-assets-tick.js";
 import { startDualAssetsRollup } from "./dual-assets-rollup.js";
+import { startSnapshotCron } from "./snapshot-cron.js";
 
 const INTERVAL_MS = Number(process.env.ALERT_INTERVAL_MS ?? 240_000);
 const LOG_PATH = resolve(process.env.ALERT_LOG_PATH ?? "./data/alerts.jsonl");
@@ -45,11 +46,15 @@ const timer = setInterval(tick, INTERVAL_MS);
 const stopDualAssets = startDualAssetsTick();
 const stopRollup = startDualAssetsRollup();
 
+// Phase 6 — Daily market snapshot cron (00:05 UTC, 90-day rolling history)
+const stopSnapshotCron = startSnapshotCron();
+
 const shutdown = (sig: string) => {
   console.log(`[alerts] ${sig} — shutting down`);
   clearInterval(timer);
   stopDualAssets();
   stopRollup();
+  stopSnapshotCron();
   process.exit(0);
 };
 process.on("SIGINT", () => shutdown("SIGINT"));

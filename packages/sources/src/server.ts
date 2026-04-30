@@ -40,6 +40,23 @@ export type { WhaleAlertTx, WhaleAlertsResponse } from "./whale-alerts.js";
 export { getSocialBuzz } from "./social.js";
 export type { SocialMention, SocialBuzzResponse } from "./social.js";
 
+// Phase 6 — Extended Platform: snapshot history (SQLite-backed, 90-day rolling)
+export {
+  saveDailySnapshot,
+  getSnapshotHistory,
+  getAllSnapshots,
+  clearSnapshots,
+  getSnapshotStats,
+} from "./snapshot-history.js";
+export type {
+  MarketSnapshot,
+  MarketSnapshotTop10,
+} from "./snapshot-history.js";
+export {
+  collectDailySnapshot,
+  collectAndSaveDailySnapshot,
+} from "./snapshot-collector.js";
+
 // Multi-exchange options (Deribit/Binance/Bybit/OKX) — Phase 5A
 export * from "./options/index.js";
 

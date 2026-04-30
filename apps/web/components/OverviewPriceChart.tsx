@@ -90,6 +90,38 @@ export function OverviewPriceChart() {
     [data],
   );
 
+  // Track popup windows so we can broadcast symbol/tf changes + close on parent unload
+  const popupsRef = useRef<Window[]>([]);
+  function popoutChart() {
+    if (typeof window === "undefined") return;
+    const w = window.open(
+      `/chart-popup?symbol=${symbol}&tf=${tf}&type=line`,
+      `pulse_chart_${symbol}_${Date.now()}`,
+      "width=900,height=600,resizable=yes",
+    );
+    if (w) popupsRef.current.push(w);
+  }
+  // Broadcast updates whenever the parent flips symbol/tf so synced popups follow.
+  useEffect(() => {
+    for (const popup of popupsRef.current) {
+      try {
+        if (!popup.closed) {
+          popup.postMessage({ type: "pulse:chart-popup-update", symbol, tf }, "*");
+        }
+      } catch { /* ignore */ }
+    }
+  }, [symbol, tf]);
+  // Close popups when parent unloads
+  useEffect(() => {
+    const onUnload = () => {
+      for (const p of popupsRef.current) {
+        try { if (!p.closed) p.close(); } catch { /* ignore */ }
+      }
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, []);
+
   // Headline price + 24h change
   const last = data[data.length - 1];
   const first = data[0];
@@ -165,32 +197,51 @@ export function OverviewPriceChart() {
           </>
         )}
 
-        <span style={{ marginLeft: "auto", display: "inline-flex", border: `1px solid ${colors.line2}` }}>
-          {TIMEFRAMES.map((t, i) => {
-            const active = tf === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTf(t.id)}
-                style={{
-                  background: active ? colors.amber : "transparent",
-                  border: "none",
-                  borderRight: i < TIMEFRAMES.length - 1 ? `1px solid ${colors.line2}` : "none",
-                  color: active ? "#000" : colors.txt3,
-                  fontFamily: "inherit",
-                  fontSize: 9,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  padding: "2px 8px",
-                  cursor: "pointer",
-                  fontWeight: active ? 600 : 400,
-                }}
-              >
-                {t.id}
-              </button>
-            );
-          })}
+        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <span style={{ display: "inline-flex", border: `1px solid ${colors.line2}` }}>
+            {TIMEFRAMES.map((t, i) => {
+              const active = tf === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTf(t.id)}
+                  style={{
+                    background: active ? colors.amber : "transparent",
+                    border: "none",
+                    borderRight: i < TIMEFRAMES.length - 1 ? `1px solid ${colors.line2}` : "none",
+                    color: active ? "#000" : colors.txt3,
+                    fontFamily: "inherit",
+                    fontSize: 9,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    padding: "2px 8px",
+                    cursor: "pointer",
+                    fontWeight: active ? 600 : 400,
+                  }}
+                >
+                  {t.id}
+                </button>
+              );
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={popoutChart}
+            title="Pop out into a separate window"
+            style={{
+              background: "transparent",
+              border: `1px solid ${colors.line2}`,
+              color: colors.txt2,
+              fontFamily: "inherit",
+              fontSize: 11,
+              padding: "1px 7px",
+              cursor: "pointer",
+              lineHeight: 1.2,
+            }}
+          >
+            🪟
+          </button>
         </span>
       </div>
 

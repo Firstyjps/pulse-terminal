@@ -39,6 +39,9 @@ export type { OnChainMetrics } from "./on-chain.js";
 export type { WhaleAlertTx, WhaleAlertsResponse } from "./whale-alerts.js";
 export type { SocialMention, SocialBuzzResponse } from "./social.js";
 
+// Phase 6 — Extended Platform types (browser-safe)
+export type { MarketSnapshot, MarketSnapshotTop10 } from "./snapshot-history.js";
+
 // Phase 5A — multi-exchange options types (browser-safe; pure types + expiry helper)
 export type {
   OptionExchange,

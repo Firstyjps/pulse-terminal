@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { ToastProvider } from "./ToastProvider";
 import { AlertWatcher } from "./AlertWatcher";
 import { TerminalStatusBar } from "./TerminalStatusBar";
@@ -8,6 +9,8 @@ import { TerminalNav } from "./TerminalNav";
 import { TerminalBotBar } from "./TerminalBotBar";
 import { BottomTabNav } from "./BottomTabNav";
 import { useIsMobile } from "../lib/use-media";
+
+const SHELL_BYPASS_ROUTES = ["/chart-popup"];
 
 /**
  * AppShell — Bloomberg/CryptoPulse responsive terminal grid.
@@ -29,6 +32,11 @@ import { useIsMobile } from "../lib/use-media";
  *   └──────────────────────────────────────────────────────┘
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const bypass = SHELL_BYPASS_ROUTES.some((p) => pathname?.startsWith(p));
+  if (bypass) {
+    return <ToastProvider>{children}</ToastProvider>;
+  }
   return (
     <ToastProvider>
       <AlertWatcher />

@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+export interface WebhookSettings {
+  discordUrl: string;
+  telegramToken: string;
+  telegramChatId: string;
+  ntfyTopic: string;
+}
+
 export interface Settings {
   /** Polling interval for `useFlow` data (ms). Default 60s. */
   refreshIntervalMs: number;
@@ -11,15 +18,25 @@ export interface Settings {
   notificationsMuted: boolean;
   /** Whale-alerts USD threshold (used by /intel WhaleAlerts panel). */
   whaleThresholdUsd: number;
+  /** External webhook config — held client-side only, used by Settings test buttons. */
+  webhooks: WebhookSettings;
 }
 
 const KEY = "pulse.settings";
+
+const DEFAULT_WEBHOOKS: WebhookSettings = {
+  discordUrl: "",
+  telegramToken: "",
+  telegramChatId: "",
+  ntfyTopic: "",
+};
 
 const DEFAULTS: Settings = {
   refreshIntervalMs: 60_000,
   alertScanSec: 60,
   notificationsMuted: false,
   whaleThresholdUsd: 1_000_000,
+  webhooks: DEFAULT_WEBHOOKS,
 };
 
 function read(): Settings {
@@ -28,7 +45,11 @@ function read(): Settings {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<Settings>;
-    return { ...DEFAULTS, ...parsed };
+    return {
+      ...DEFAULTS,
+      ...parsed,
+      webhooks: { ...DEFAULT_WEBHOOKS, ...(parsed.webhooks ?? {}) },
+    };
   } catch {
     return DEFAULTS;
   }

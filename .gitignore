@@ -34,3 +34,9 @@ logs/
 
 # Prompt drafts (compose in editor, pipe to claude — local only)
 _prompts/
+
+# Tauri (desktop wrapper) — Rust target is huge, gen/ is auto-regenerated
+src-tauri/target/
+src-tauri/gen/
+src-tauri/icons/
+src-tauri/Cargo.lock
