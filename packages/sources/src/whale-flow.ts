@@ -343,7 +343,7 @@ export async function getWhaleFlow(): Promise<WhaleFlowResponse> {
     ethTokenTransfers(ETH_TOKEN_CONTRACTS.USDT, "USDT").then((r) => { ok.push("etherscan/USDT"); return r; }).catch((e) => { fail.push(`etherscan/USDT: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
     ethTokenTransfers(ETH_TOKEN_CONTRACTS.USDC, "USDC").then((r) => { ok.push("etherscan/USDC"); return r; }).catch((e) => { fail.push(`etherscan/USDC: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
     btcWhales(btcUsd).then((r) => { ok.push("mempool.space"); return r; }).catch((e) => { fail.push(`mempool.space: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
-    tronUsdtTransfers().then((r) => { ok.push("tronscan/USDT"); return r; }).catch((e) => { fail.push(`tronscan/USDT: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
+    tronUsdtTransfers().then((r) => { ok.push("trongrid/USDT"); return r; }).catch((e) => { fail.push(`trongrid/USDT: ${(e as Error).message}`); return [] as WhaleTransfer[]; }),
   ]);
 
   const transfers = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
