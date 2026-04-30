@@ -57,8 +57,8 @@ function Frame({ children }: { children: React.ReactNode }) {
         style={{
           display: "grid",
           gridTemplateRows: "22px 26px 1fr 56px",
-          height: "100vh",
-          width: "100vw",
+          height: "100%",
+          width: "100%",
           background: "var(--bg)",
           color: "var(--fg)",
           overflow: "hidden",
@@ -87,8 +87,8 @@ function Frame({ children }: { children: React.ReactNode }) {
       style={{
         display: "grid",
         gridTemplateRows: "22px 26px 1fr 22px",
-        height: "100vh",
-        width: "100vw",
+        height: "100%",
+        width: "100%",
         background: "var(--bg)",
         color: "var(--fg)",
         overflow: "hidden",
