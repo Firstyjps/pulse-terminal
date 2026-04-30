@@ -28,6 +28,8 @@ export interface PriceLineProps {
   filled?: boolean;
   /** Render a horizontal price-line marker at the latest close. */
   showLastMarker?: boolean;
+  /** Custom y-axis label formatter (e.g. compact "$2.63T" for market cap). */
+  priceFormatter?: (value: number) => string;
 }
 
 /**
@@ -47,6 +49,7 @@ export function PriceLine({
   showVolume = true,
   filled = true,
   showLastMarker = true,
+  priceFormatter,
 }: PriceLineProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
@@ -66,6 +69,9 @@ export function PriceLine({
         fontFamily: "JetBrains Mono, Courier New, monospace",
         fontSize: 11,
       },
+      ...(priceFormatter
+        ? { localization: { priceFormatter } }
+        : {}),
       grid: {
         vertLines: { color: "rgba(255,255,255,0.04)" },
         horzLines: { color: "rgba(255,255,255,0.05)" },
@@ -146,7 +152,7 @@ export function PriceLine({
       lineRef.current = null;
       volRef.current = null;
     };
-  }, [height, color, filled, showVolume, showLastMarker]);
+  }, [height, color, filled, showVolume, showLastMarker, priceFormatter]);
 
   React.useEffect(() => {
     if (!lineRef.current) return;

@@ -212,7 +212,6 @@ export default function DualAssetsPage() {
           span={12}
           title="DUAL ASSETS · BYBIT"
           badge={`SOL-USDT · ${duration.toUpperCase()} · ${days}D ANALYSIS`}
-          actions={headerActions}
           flush
         >
           <div
@@ -281,25 +280,28 @@ export default function DualAssetsPage() {
           title="APR BY HOUR · ICT"
           badge={report ? `${report.hourly_data.length}/24 ACTIVE` : "—"}
           actions={
-            <span style={{ display: "flex", gap: 1, background: colors.line }}>
-              {([7, 14, 30] as const).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDays(d)}
-                  style={{
-                    background: days === d ? colors.bg2 : colors.bg1,
-                    border: "none",
-                    color: days === d ? colors.amber : colors.txt3,
-                    padding: "3px 10px",
-                    fontFamily: fonts.mono,
-                    fontSize: 9,
-                    letterSpacing: "0.08em",
-                    cursor: "pointer",
-                  }}
-                >
-                  {d}D
-                </button>
-              ))}
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {headerActions}
+              <span style={{ display: "flex", gap: 1, background: colors.line }}>
+                {([7, 14, 30] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDays(d)}
+                    style={{
+                      background: days === d ? colors.bg2 : colors.bg1,
+                      border: "none",
+                      color: days === d ? colors.amber : colors.txt3,
+                      padding: "3px 10px",
+                      fontFamily: fonts.mono,
+                      fontSize: 9,
+                      letterSpacing: "0.08em",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {d}D
+                  </button>
+                ))}
+              </span>
             </span>
           }
         >

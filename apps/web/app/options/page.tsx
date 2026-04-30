@@ -458,10 +458,22 @@ function buildLadder(opts: OptionData[], expiry: string | null, spot: number): L
 
 function buildIvPoints(s: IVSmileResp | null): IVPoint[] {
   if (!s) return [];
-  const xs: IVPoint[] = [];
-  for (const c of s.calls) xs.push({ strike: c.strike, iv: c.iv, side: "call" });
-  for (const p of s.puts) xs.push({ strike: p.strike, iv: p.iv, side: "put" });
-  return xs;
+  // Multiple exchanges quote the same (strike, side) — average their IVs
+  // so the smile chart sees one clean point per (strike, side) instead of
+  // arbitrary last-writer-wins overwrites in the chart's pivoter.
+  const sums = new Map<string, { strike: number; side: "call" | "put"; ivSum: number; n: number }>();
+  const acc = (strike: number, iv: number, side: "call" | "put") => {
+    if (!Number.isFinite(iv) || iv <= 0) return;
+    const key = `${strike}-${side}`;
+    const cur = sums.get(key);
+    if (cur) { cur.ivSum += iv; cur.n += 1; }
+    else sums.set(key, { strike, side, ivSum: iv, n: 1 });
+  };
+  for (const c of s.calls) acc(c.strike, c.iv, "call");
+  for (const p of s.puts) acc(p.strike, p.iv, "put");
+  return Array.from(sums.values())
+    .map((v) => ({ strike: v.strike, iv: +(v.ivSum / v.n).toFixed(1), side: v.side }))
+    .sort((a, b) => a.strike - b.strike || (a.side === "call" ? -1 : 1));
 }
 
 function buildGreeksRows(opts: OptionData[], expiry: string | null): GreeksRow[] {
