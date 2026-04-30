@@ -59,9 +59,9 @@ export function MacroOverlay() {
           >
             Correlation BTC · 30d
           </div>
-          <div style={{ padding: "0 10px 8px", display: "grid", gap: 4 }}>
+          <div style={{ padding: "0 12px 8px", display: "grid", gap: 4 }}>
             {rows.map((r) => (
-              <CorrRow key={r.s.symbol} sym={r.s.label} corr={r.corr} />
+              <CorrRow key={r.s.symbol} sym={r.s.symbol} corr={r.corr} />
             ))}
           </div>
         </div>
@@ -77,30 +77,39 @@ function Row({ s }: { s: MacroSeries }) {
 
   return (
     <div
+      title={s.label}
       style={{
         display: "grid",
-        gridTemplateColumns: "50px 1fr 80px 60px",
-        gap: 8,
-        padding: "6px 8px",
+        gridTemplateColumns: "64px 1fr 90px 64px",
+        gap: 10,
+        padding: "8px 12px",
         borderBottom: `1px solid ${colors.line}`,
         alignItems: "center",
         fontSize: 11,
         fontFamily: fonts.mono,
+        whiteSpace: "nowrap",
       }}
     >
-      <span style={{ color: colors.amber, fontWeight: 600 }}>{s.label}</span>
-      <div style={{ height: 18, minWidth: 0 }}>
-        <Sparkbar data={series} asLine fill color={color} height={18} width={120} />
+      <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+        <span style={{ color: colors.amber, fontWeight: 700, fontSize: 13, letterSpacing: "0.06em" }}>
+          {s.symbol}
+        </span>
+        <span style={{ color: colors.txt4, fontSize: 8.5, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          {s.label}
+        </span>
+      </span>
+      <div style={{ height: 22, minWidth: 0 }}>
+        <Sparkbar data={series} asLine fill color={color} height={22} width={160} />
       </div>
       <span
         className="mono-num"
-        style={{ textAlign: "right", color: colors.txt2 }}
+        style={{ textAlign: "right", color: colors.txt1, fontWeight: 500 }}
       >
         {s.current.toLocaleString(undefined, { maximumFractionDigits: s.current < 10 ? 3 : 2 })}
       </span>
       <span
         className="mono-num"
-        style={{ textAlign: "right", color }}
+        style={{ textAlign: "right", color, fontWeight: 600 }}
       >
         {formatPercent(s.change24h)}
       </span>
@@ -115,14 +124,14 @@ function CorrRow({ sym, corr }: { sym: string; corr: number }) {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "50px 1fr 50px",
-        gap: 8,
+        gridTemplateColumns: "40px 1fr 50px",
+        gap: 10,
         alignItems: "center",
         fontSize: 10,
         fontFamily: fonts.mono,
       }}
     >
-      <span style={{ color: colors.amber }}>{sym}</span>
+      <span style={{ color: colors.amber, fontWeight: 600, letterSpacing: "0.06em" }}>{sym}</span>
       <div style={{ height: 8, background: colors.bg3, position: "relative" }}>
         <div
           style={{
