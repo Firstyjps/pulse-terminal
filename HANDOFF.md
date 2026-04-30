@@ -236,7 +236,7 @@ Other relevant skills:
 bg0:    #04050a   bg2: #0d111d   line: rgba(255,255,255,0.06)
 accent: #7c5cff   accent2: #22d3ee
 green:  #34d399   red: #f87171   gold: #fbbf24   btc: #f7931a   eth: #627eea
-fonts:  Space Grotesk · Inter · JetBrains Mono · IBM Plex Sans Thai
+fonts:  Space Grotesk · Inter · JetBrains Mono
 ```
 Treat these as **starting point**, not gospel. Redesign may want a new palette.
 
