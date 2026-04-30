@@ -75,9 +75,12 @@ const ETH_TOKEN_CONTRACTS = {
 // Tron USDT (TRC-20). Tron is the largest USDT supply (~$60B+).
 const TRON_USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
-// Curated TRX exchange address book. Coverage gaps fall through to "UNKNOWN".
+// Curated TRX exchange address book (base58, T-prefix). Coverage gaps fall
+// through to "UNKNOWN". Maintained in human-readable form here, then converted
+// to hex at module init for matching against TronGrid event payloads (which
+// return raw hex addresses).
 const TRON_EXCHANGES: Record<string, string> = {
-  // Binance hot wallets (Tron)
+  // Binance hot wallets
   "TWd4WrZ9wn84f5x1hZhL4DHvk738ns5jwb": "BINANCE",
   "TKHuVq1oKVruCGLvqVexFs6dawKv6fQgFs": "BINANCE",
   "TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9": "BINANCE",
@@ -96,12 +99,58 @@ const TRON_EXCHANGES: Record<string, string> = {
   "TM1zzNDZD2DPASbKcgdVoTYhfmYgtfwx9R": "BYBIT",
   // Bitfinex
   "TYDzsYUEpvnYmQk4zGP9sWWcTEd2MiAtW6": "BITFINEX",
-  // Tether Treasury (Tron)
-  "TKHuVq1oKVruCGLvqVexFs6dawKv6fQgFs_treasury": "TETHER_TREASURY",
 };
 
-function labelTron(addr: string): string {
-  return TRON_EXCHANGES[addr] ?? "UNKNOWN";
+const B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+/** Decode base58 (no checksum verify) → bytes. Tron addrs are 25 bytes. */
+function b58decode(s: string): Uint8Array {
+  let n = 0n;
+  for (const c of s) {
+    const i = B58_ALPHABET.indexOf(c);
+    if (i < 0) throw new Error(`invalid base58 char: ${c}`);
+    n = n * 58n + BigInt(i);
+  }
+  const bytes: number[] = [];
+  while (n > 0n) {
+    bytes.unshift(Number(n & 0xffn));
+    n >>= 8n;
+  }
+  for (const c of s) {
+    if (c !== "1") break;
+    bytes.unshift(0);
+  }
+  return new Uint8Array(bytes);
+}
+
+/** Tron base58check addr → 0x-prefixed 20-byte hex (lowercase). */
+function tronBase58ToHex(addr: string): string {
+  const bytes = b58decode(addr);
+  // Tron base58check = [0x41, ...20 bytes..., 4-byte checksum]
+  if (bytes.length !== 25) throw new Error(`bad tron addr len ${bytes.length}: ${addr}`);
+  if (bytes[0] !== 0x41) throw new Error(`bad tron prefix 0x${bytes[0].toString(16)}: ${addr}`);
+  const hex = Array.from(bytes.slice(1, 21))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return "0x" + hex;
+}
+
+// Build a hex→label map at module init so TronGrid events can be labeled
+// without per-tx base58 encoding. Skip malformed entries silently.
+const TRON_EXCHANGES_HEX: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const [b58, label] of Object.entries(TRON_EXCHANGES)) {
+    try {
+      out[tronBase58ToHex(b58).toLowerCase()] = label;
+    } catch {
+      // ignore malformed entries
+    }
+  }
+  return out;
+})();
+
+function labelTronHex(hexAddr: string): string {
+  return TRON_EXCHANGES_HEX[hexAddr.toLowerCase()] ?? "UNKNOWN";
 }
 
 // Whale thresholds — minimum size to surface
@@ -169,45 +218,53 @@ async function ethTokenTransfers(contract: string, symbol: "USDT" | "USDC"): Pro
   return out;
 }
 
-// ── Tron USDT (TronScan public API) ─────────────────────────────────────────
-interface TronScanTransfer {
+// ── Tron USDT (TronGrid official) ───────────────────────────────────────────
+// TronScan was unstable on Hetzner (HTTP 200 with empty body when rate-
+// limited). TronGrid is the official public node — addresses come back as
+// hex (0x-prefixed) so we match against TRON_EXCHANGES_HEX.
+//
+// TRON_API_KEY (optional) bumps the free tier rate limit.
+interface TronGridEvent {
+  block_timestamp: number;       // ms epoch
   transaction_id: string;
-  from_address: string;
-  to_address: string;
-  /** Raw amount (string), 6 decimals for USDT-TRC20. */
-  quant: string;
-  block_ts: number;        // ms epoch
-  contract_address: string;
+  result: {
+    from: string;                // 0x-prefixed hex
+    to: string;
+    value: string;               // raw amount, USDT = 6 decimals
+  };
 }
-interface TronScanResp { data?: TronScanTransfer[]; total?: number }
+interface TronGridResp { data?: TronGridEvent[]; success?: boolean }
 
 async function tronUsdtTransfers(): Promise<WhaleTransfer[]> {
-  // direction=0 = both in+out, sorted desc by time
   const url =
-    `https://apilist.tronscanapi.com/api/transfer/trc20` +
-    `?contract_address=${TRON_USDT_CONTRACT}` +
-    `&start=0&limit=100&direction=0`;
-  const json = await fetchJson<TronScanResp>(url, { revalidate: 60, retries: 1 });
+    `https://api.trongrid.io/v1/contracts/${TRON_USDT_CONTRACT}/events` +
+    `?event_name=Transfer&order_by=block_timestamp,desc&limit=100`;
+  const headers: Record<string, string> = { "Accept": "application/json" };
+  if (process.env.TRON_API_KEY) headers["TRON-PRO-API-KEY"] = process.env.TRON_API_KEY;
+  const res = await fetch(url, { headers, cache: "no-store" });
+  if (!res.ok) throw new Error(`trongrid HTTP ${res.status}`);
+  const json = (await res.json()) as TronGridResp;
   if (!json.data?.length) return [];
 
   const out: WhaleTransfer[] = [];
-  for (const tx of json.data) {
-    const amount = parseFloat(tx.quant) / 1e6; // USDT-TRC20 = 6 decimals
+  for (const evt of json.data) {
+    if (!evt.result?.value) continue;
+    const amount = parseFloat(evt.result.value) / 1e6; // USDT-TRC20 = 6 decimals
     if (amount < THRESHOLD_USD) continue;
-    const fromLabel = labelTron(tx.from_address);
-    const toLabel = labelTron(tx.to_address);
+    const fromLabel = labelTronHex(evt.result.from);
+    const toLabel = labelTronHex(evt.result.to);
     out.push({
       chain: "tron",
       asset: "USDT",
       amount,
       amountUsd: amount,           // stablecoin ≈ $1
-      from: tx.from_address,
-      to: tx.to_address,
+      from: evt.result.from,
+      to: evt.result.to,
       fromLabel,
       toLabel,
       direction: classifyDirection(fromLabel, toLabel),
-      txHash: tx.transaction_id,
-      ts: tx.block_ts,
+      txHash: evt.transaction_id,
+      ts: evt.block_timestamp,
     });
   }
   return out;
