@@ -85,7 +85,10 @@ export default function OptionsPage() {
 
   const stats = useMemo(() => buildStats(opts, expiry, spot), [opts, expiry, spot]);
   const ladderRows = useMemo(() => buildLadder(opts, expiry, spot), [opts, expiry, spot]);
-  const ivPoints: IVPoint[] = useMemo(() => buildIvPoints(ivSmile.data), [ivSmile.data]);
+  const ivPoints: IVPoint[] = useMemo(
+    () => buildIvPoints(ivSmile.data, spot),
+    [ivSmile.data, spot],
+  );
   const greeksRows: GreeksRow[] = useMemo(() => buildGreeksRows(opts, expiry), [opts, expiry]);
 
   const headerActions = (
@@ -497,15 +500,19 @@ function buildLadder(opts: OptionData[], expiry: string | null, spot: number): L
   }));
 }
 
-function buildIvPoints(s: IVSmileResp | null): IVPoint[] {
+function buildIvPoints(s: IVSmileResp | null, spot: number): IVPoint[] {
   if (!s) return [];
   // Per (strike, side), prefer Deribit's IV — it is the deepest options book
   // in crypto and its mark IV is the cleanest. Bybit / OKX / Binance often
-  // serve stale or wide-spread IVs that hit 100%+ on illiquid strikes,
-  // which would dominate any averaging and flatten the visible smile.
+  // serve stale or wide-spread IVs that hit 100%+ on illiquid strikes.
   // Falls back to Bybit → OKX → Binance if Deribit didn't quote that strike.
+  // Also restrict to strikes within ±20% of spot — beyond that, the deep
+  // ITM/OTM rows in this contract are illiquid and the IV reading is mostly
+  // noise, which both makes the smile chart unreadable and isn't actionable.
   const PREF: Record<string, number> = { Deribit: 0, Bybit: 1, OKX: 2, Binance: 3 };
   const best = new Map<string, { strike: number; side: "call" | "put"; iv: number; rank: number }>();
+  const minK = spot > 0 ? spot * 0.8 : 0;
+  const maxK = spot > 0 ? spot * 1.2 : Number.POSITIVE_INFINITY;
   const accept = (
     strike: number,
     iv: number,
@@ -513,6 +520,7 @@ function buildIvPoints(s: IVSmileResp | null): IVPoint[] {
     exchange: string,
   ) => {
     if (!Number.isFinite(iv) || iv < 5 || iv > 200) return;
+    if (strike < minK || strike > maxK) return;
     const rank = PREF[exchange] ?? 99;
     const key = `${strike}-${side}`;
     const cur = best.get(key);

@@ -108,6 +108,10 @@ export function IVSmile({
             axisLine={false}
             tickLine={false}
             width={48}
+            domain={[
+              (dataMin: number) => Math.max(0, Math.floor((dataMin - 5) / 5) * 5),
+              (dataMax: number) => Math.ceil((dataMax + 5) / 5) * 5,
+            ]}
           />
           <Tooltip
             contentStyle={{
