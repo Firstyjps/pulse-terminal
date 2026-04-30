@@ -65,6 +65,8 @@
 
 * { box-sizing: border-box; }
 
+html { --ui-scale: 1; }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -79,7 +81,8 @@ html, body {
   text-rendering: geometricPrecision;
 }
 
-body { overflow: hidden; height: 100vh; }
+/* Whole-app zoom — driven by useUiScale (auto for 4K, manual via Settings). */
+body { overflow: hidden; height: 100vh; zoom: var(--ui-scale, 1); }
 
 /* Sans variant — softens chrome, numerics stay mono */
 body.sans { --type: var(--sans); font-size: 12px; }

@@ -9,6 +9,7 @@ import { TerminalNav } from "./TerminalNav";
 import { TerminalBotBar } from "./TerminalBotBar";
 import { BottomTabNav } from "./BottomTabNav";
 import { useIsMobile } from "../lib/use-media";
+import { useUiScale } from "../lib/use-ui-scale";
 
 const SHELL_BYPASS_ROUTES = ["/chart-popup"];
 
@@ -47,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function Frame({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
+  useUiScale();
 
   if (isMobile) {
     return (

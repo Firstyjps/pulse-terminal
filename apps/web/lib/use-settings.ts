@@ -9,6 +9,9 @@ export interface WebhookSettings {
   ntfyTopic: string;
 }
 
+/** UI scale option — "auto" picks based on viewport, numeric values override. */
+export type UiScale = "auto" | 1 | 1.25 | 1.5 | 1.75;
+
 export interface Settings {
   /** Polling interval for `useFlow` data (ms). Default 60s. */
   refreshIntervalMs: number;
@@ -20,6 +23,8 @@ export interface Settings {
   whaleThresholdUsd: number;
   /** External webhook config — held client-side only, used by Settings test buttons. */
   webhooks: WebhookSettings;
+  /** Whole-app zoom factor — "auto" scales by viewport width (4K = 1.4x). */
+  uiScale: UiScale;
 }
 
 const KEY = "pulse.settings";
@@ -37,6 +42,7 @@ const DEFAULTS: Settings = {
   notificationsMuted: false,
   whaleThresholdUsd: 1_000_000,
   webhooks: DEFAULT_WEBHOOKS,
+  uiScale: "auto",
 };
 
 function read(): Settings {
