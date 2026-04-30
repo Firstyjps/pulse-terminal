@@ -23,8 +23,8 @@ export function MacroOverlay() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      {/* Section A — current values + sparkline per row */}
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+      {/* Section A — current values + sparkline per row (rows expand to fill) */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {rows.map((r) => (
           <Row key={r.s.symbol} s={r.s} />
         ))}
@@ -80,36 +80,46 @@ function Row({ s }: { s: MacroSeries }) {
       title={s.label}
       style={{
         display: "grid",
-        gridTemplateColumns: "64px 1fr 90px 64px",
-        gap: 10,
-        padding: "8px 12px",
+        gridTemplateColumns: "72px 1fr 96px 72px",
+        gap: 12,
+        padding: "10px 14px",
         borderBottom: `1px solid ${colors.line}`,
         alignItems: "center",
-        fontSize: 11,
+        fontSize: 12,
         fontFamily: fonts.mono,
         whiteSpace: "nowrap",
+        flex: 1,
+        minHeight: 0,
       }}
     >
-      <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-        <span style={{ color: colors.amber, fontWeight: 700, fontSize: 13, letterSpacing: "0.06em" }}>
+      <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+        <span style={{ color: colors.amber, fontWeight: 700, fontSize: 14, letterSpacing: "0.06em" }}>
           {s.symbol}
         </span>
-        <span style={{ color: colors.txt4, fontSize: 8.5, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+        <span style={{ color: colors.txt4, fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase" }}>
           {s.label}
         </span>
       </span>
-      <div style={{ height: 22, minWidth: 0 }}>
-        <Sparkbar data={series} asLine fill color={color} height={22} width={160} />
+      <div style={{ height: "100%", minWidth: 0, display: "flex", alignItems: "stretch", padding: "4px 0" }}>
+        <Sparkbar
+          data={series}
+          asLine
+          fill
+          color={color}
+          height={56}
+          width={600}
+          style={{ width: "100%", height: "100%" }}
+        />
       </div>
       <span
         className="mono-num"
-        style={{ textAlign: "right", color: colors.txt1, fontWeight: 500 }}
+        style={{ textAlign: "right", color: colors.txt1, fontWeight: 500, fontSize: 14 }}
       >
         {s.current.toLocaleString(undefined, { maximumFractionDigits: s.current < 10 ? 3 : 2 })}
       </span>
       <span
         className="mono-num"
-        style={{ textAlign: "right", color, fontWeight: 600 }}
+        style={{ textAlign: "right", color, fontWeight: 600, fontSize: 12 }}
       >
         {formatPercent(s.change24h)}
       </span>

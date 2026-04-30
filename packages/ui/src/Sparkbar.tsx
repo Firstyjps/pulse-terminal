@@ -13,6 +13,8 @@ export interface SparkbarProps {
   asLine?: boolean;
   /** Add area fill under the line. */
   fill?: boolean;
+  /** Inline style override for the root <svg> — useful for CSS sizing (e.g. `width: "100%"`). */
+  style?: React.CSSProperties;
 }
 
 /**
@@ -32,9 +34,10 @@ export function Sparkbar({
   color,
   asLine = false,
   fill = false,
+  style,
 }: SparkbarProps) {
   if (!data || data.length < 2) {
-    return <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} aria-hidden />;
+    return <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} style={style} aria-hidden />;
   }
 
   // Downsample for bar mode
@@ -70,7 +73,7 @@ export function Sparkbar({
         preserveAspectRatio="none"
         width={width}
         height={height}
-        style={{ display: "block", width: "100%" }}
+        style={{ display: "block", width: "100%", ...style }}
         aria-hidden
       >
         {fill && <path d={dFill} fill={stroke} opacity={0.12} />}
@@ -88,7 +91,7 @@ export function Sparkbar({
       viewBox={`0 0 ${width} ${height}`}
       width={width}
       height={height}
-      style={{ display: "block", overflow: "visible" }}
+      style={{ display: "block", overflow: "visible", ...style }}
       aria-hidden
     >
       {sample.map((v, i) => {
