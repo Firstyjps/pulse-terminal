@@ -41,7 +41,38 @@
 
 ## 📰 Activity log (newest at top)
 
-### 2026-04-30 · Code session (latest — i18n removal · ENGLISH-ONLY)
+### 2026-04-30 · Code session (latest — Phase 4 multi-portfolio + Deribit term structure)
+**2 Phase 4 items shipped — multi-CEX portfolio aggregation + Deribit IV term structure / OI breakdown.**
+
+  **🆕 Multi-portfolio (Bybit + OKX read-only)** — Binance was the only configured source previously
+  - **NEW** [packages/sources/src/portfolio-bybit.ts](packages/sources/src/portfolio-bybit.ts) — V5 unified-account `/v5/account/wallet-balance?accountType=UNIFIED`. Bybit returns `usdValue` per coin pre-priced — no separate price fetch needed. HMAC-SHA256 signed (`timestamp + apiKey + recvWindow + queryString`). Opt-in via `BYBIT_API_KEY` + `BYBIT_API_SECRET` (returns null if missing).
+  - **NEW** [packages/sources/src/portfolio-okx.ts](packages/sources/src/portfolio-okx.ts) — V5 `/api/v5/account/balance`. Returns `eqUsd` per asset pre-priced. Sig is `Base64(HMAC-SHA256(secret, timestamp + method + path + body))`. Needs `OKX_API_KEY` + `OKX_API_SECRET` + `OKX_API_PASSPHRASE`.
+  - **NEW** [packages/sources/src/portfolio-multi.ts](packages/sources/src/portfolio-multi.ts) — `getMultiPortfolio()` aggregator. `Promise.allSettled` across all 3 sources — partial failure on one source surfaces as `status[].error`, doesn't kill the others. Returns `{ sources[], totalUsd, status[], ts }`.
+  - **Type:** `PortfolioSnapshot.source` widened from `"binance"` → `"binance" | "bybit" | "okx"` ([portfolio.ts](packages/sources/src/portfolio.ts)). Exposed `PortfolioSource` + `MultiPortfolioSnapshot` from both browser-safe `@pulse/sources` and `@pulse/sources/server`.
+  - **API rewire** [apps/web/app/api/portfolio/route.ts](apps/web/app/api/portfolio/route.ts) — `/api/portfolio` now calls `getMultiPortfolio()`. Returns multi-source payload. Hint message lists all 3 envs.
+  - **UI rewrite** [apps/web/components/PortfolioPanel.tsx](apps/web/components/PortfolioPanel.tsx):
+    - Aggregates balances across sources by asset (BTC across Binance+Bybit+OKX → one row).
+    - Per-source share strip below total equity (color-coded BINANCE gold / BYBIT orange / OKX cyan).
+    - Per-source legend with $ + %.
+    - Holding-bar tooltip shows per-source breakdown when asset spans multiple CEX.
+    - "X SOURCES" footer beneath asset count.
+
+  **🆕 Deribit IV Term Structure + OI Breakdown** — fills out options analytics
+  - **NEW** [packages/sources/src/options/term-structure.ts](packages/sources/src/options/term-structure.ts) — `getOptionsTermStructure(asset)` derived from existing `fetchDeribitOptions()` (no extra API calls). For each expiry: ATM strike (closest to spot), `atmCallIV`/`atmPutIV`/`atmIV` (avg), `callOI`/`putOI`/`totalOI`/`callVol`/`putVol`, `dte` (days-to-expiry). Sorted by DTE ascending. Aggregate stats include `putCallOIRatio` across all expiries.
+  - **NEW** [apps/web/app/api/options/term-structure/route.ts](apps/web/app/api/options/term-structure/route.ts) — `?asset=BTC|ETH|SOL`, `revalidate: 30`.
+  - **UI Row 4** [apps/web/app/options/page.tsx](apps/web/app/options/page.tsx) — added `WsRow height="auto" minHeight 320`:
+    - **IV TERM STRUCTURE c-7** — Recharts `ComposedChart` with 3 lines: ATM IV (amber, solid, dots), Call IV (green dashed), Put IV (red dashed). X = DTE, Y = IV%. Tooltip shows expiry + DTE + ATM strike. `isAnimationActive={false}` for React 19 compat.
+    - **OI BY EXPIRY c-5** — stacked bar chart (call OI green / put OI red) for next 12 expiries. Compact axis labels (MM/DD).
+  - Panel badges show `${expiriesCount} EXPIRIES · ATM IV` and `${totalOI compact} TOTAL · P/C ${ratio}`.
+
+- **[verified]** `pnpm -r typecheck` — all 7 packages clean. `pnpm --filter @pulse/sources test src/portfolio.test.ts src/options/aggregator.test.ts` — **25/25 pass** (no regressions).
+- **[noted]** Phase 4 items remaining (explicitly punted, no scope creep this round):
+  - Mobile push notifications · LLM-graded backtest · On-chain Tron/SOL extension to whale-flow
+- **[doing]** nothing — handing back.
+- **[blocked]** None. New Bybit/OKX sources are opt-in via env (no behavior change if keys absent).
+- **[next]** Deploy to prod. Set `BYBIT_API_KEY/SECRET` + `OKX_API_KEY/SECRET/PASSPHRASE` (read-only) on Hetzner `.env.local` to activate multi-portfolio. Term structure works immediately with no env config needed.
+
+### 2026-04-30 · Code session — i18n removal · ENGLISH-ONLY
 **Hard pivot: product is now English-only. `packages/i18n/` deleted; bilingual infra retired.**
 
 - **Deleted** `packages/i18n/` (entire package — 5 files: dict.ts, t.ts, Bilingual.tsx, LocaleContext.tsx, index.ts).

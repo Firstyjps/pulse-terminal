@@ -13,3 +13,5 @@ export {
   findOptionsArbitrage,
   buildIVSmile,
 } from "./aggregator.js";
+export { getOptionsTermStructure } from "./term-structure.js";
+export type { TermStructurePoint, OptionsTermStructure } from "./term-structure.js";

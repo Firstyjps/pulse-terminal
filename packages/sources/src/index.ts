@@ -30,7 +30,8 @@ export type {
   AnomalySeverity,
 } from "./anomalies.js";
 export type { MacroPoint, MacroSeries, MacroResponse } from "./macro.js";
-export type { PortfolioBalance, PortfolioSnapshot } from "./portfolio.js";
+export type { PortfolioBalance, PortfolioSnapshot, PortfolioSource } from "./portfolio.js";
+export type { MultiPortfolioSnapshot } from "./portfolio-multi.js";
 
 // Phase 5A — multi-exchange options types (browser-safe; pure types + expiry helper)
 export type {
@@ -42,6 +43,7 @@ export type {
   OptionsArbitrage,
 } from "./options/types.js";
 export { normalizeExpiry, formatExpiry } from "./options/_expiry.js";
+export type { TermStructurePoint, OptionsTermStructure } from "./options/term-structure.js";
 
 // Phase 5A — dual-assets types (browser-safe; SQLite store stays server-only)
 export type {

@@ -15,8 +15,10 @@ export interface PortfolioBalance {
   usdValue?: number;
 }
 
+export type PortfolioSource = "binance" | "bybit" | "okx";
+
 export interface PortfolioSnapshot {
-  source: "binance";
+  source: PortfolioSource;
   totalUsd: number;
   balances: PortfolioBalance[];
   ts: number;

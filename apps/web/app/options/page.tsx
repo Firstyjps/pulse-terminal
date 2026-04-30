@@ -11,9 +11,23 @@ import type {
   OptionExchange,
   OptionsAggregateResponse,
   OptionsArbitrage,
+  OptionsTermStructure,
 } from "@pulse/sources";
 import { MCPQuickAsk } from "../../components/MCPQuickAsk";
 import { useFlow } from "../../lib/use-flow";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip as RTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 type AggregateWithArb = OptionsAggregateResponse & { arbitrage?: OptionsArbitrage[] };
 
@@ -34,6 +48,7 @@ const ASSETS: OptionAsset[] = ["BTC", "ETH", "SOL"];
  *   Row 1 (h-stats, 96px): asset switcher + 4 KPIs (ATM IV / P/C / Total OI / Total Vol)
  *   Row 2 (h-chart, ≥420px): STRIKE LADDER c-7 + IV SMILE c-5
  *   Row 3 (h-table, 340px): GREEKS HEATMAP c-8 + ARBITRAGE c-4
+ *   Row 4 (h-chart, 320px): IV TERM STRUCTURE c-7 + OI BY EXPIRY c-5
  */
 export default function OptionsPage() {
   const [asset, setAsset] = useState<OptionAsset>("BTC");
@@ -43,6 +58,7 @@ export default function OptionsPage() {
   const ivSmile = useFlow<IVSmileResp>(
     expiry ? `/api/options/iv-smile?asset=${asset}&expiry=${expiry}` : `/api/options/iv-smile?asset=${asset}`,
   );
+  const term = useFlow<OptionsTermStructure>(`/api/options/term-structure?asset=${asset}`);
 
   // First expiry is the default; user can switch.
   useEffect(() => {
@@ -203,7 +219,183 @@ export default function OptionsPage() {
           <ArbitrageList items={arbitrage} />
         </Panel>
       </WsRow>
+
+      <WsRow height="auto" style={{ minHeight: 320 }}>
+        <Panel
+          span={7}
+          title="IV TERM STRUCTURE"
+          badge={
+            term.data
+              ? `${term.data.termStructure.length} EXPIRIES · ATM IV`
+              : "LOADING"
+          }
+        >
+          <TermStructureChart data={term.data} />
+        </Panel>
+        <Panel
+          span={5}
+          title="OI BY EXPIRY"
+          badge={
+            term.data
+              ? `${compact(term.data.totals.totalOI)} TOTAL · P/C ${term.data.totals.putCallOIRatio.toFixed(2)}`
+              : "LOADING"
+          }
+        >
+          <OIByExpiryChart data={term.data} />
+        </Panel>
+      </WsRow>
     </Workspace>
+  );
+}
+
+function TermStructureChart({ data }: { data: OptionsTermStructure | null }) {
+  if (!data || data.termStructure.length === 0) {
+    return (
+      <p style={{ padding: 16, color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
+        No term-structure data
+      </p>
+    );
+  }
+  return (
+    <div style={{ height: 280, padding: "8px 12px 12px" }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data.termStructure} margin={{ top: 6, right: 12, left: -8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="2 4" stroke={colors.line} vertical={false} />
+          <XAxis
+            dataKey="dte"
+            tickFormatter={(v: number) => (v < 1 ? "<1d" : `${Math.round(v)}d`)}
+            tick={{ fill: colors.txt3, fontSize: 10, fontFamily: "JetBrains Mono" }}
+            axisLine={{ stroke: colors.line }}
+            tickLine={false}
+            label={{ value: "DTE", position: "insideBottomRight", offset: -2, fill: colors.txt4, fontSize: 9 }}
+          />
+          <YAxis
+            tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+            tick={{ fill: colors.txt3, fontSize: 10, fontFamily: "JetBrains Mono" }}
+            axisLine={{ stroke: colors.line }}
+            tickLine={false}
+            domain={["auto", "auto"]}
+          />
+          <RTooltip
+            contentStyle={{
+              background: colors.bg2,
+              border: `1px solid ${colors.line}`,
+              fontFamily: "JetBrains Mono",
+              fontSize: 11,
+              padding: "6px 10px",
+            }}
+            labelStyle={{ color: colors.txt2, marginBottom: 4 }}
+            itemStyle={{ color: colors.txt1 }}
+            formatter={(value: number, name: string) => [`${value.toFixed(2)}%`, name]}
+            labelFormatter={(label: number, items) => {
+              const point = items?.[0]?.payload as typeof data.termStructure[number] | undefined;
+              if (!point) return `DTE ${label.toFixed(1)}d`;
+              return `${point.expiry} · ${label.toFixed(1)}d · K ${point.atmStrike}`;
+            }}
+          />
+          <Legend
+            verticalAlign="top"
+            height={20}
+            iconType="line"
+            wrapperStyle={{ fontFamily: "JetBrains Mono", fontSize: 10, color: colors.txt3 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="atmIV"
+            name="ATM IV"
+            stroke={colors.amber}
+            strokeWidth={2}
+            dot={{ r: 3, fill: colors.amber }}
+            activeDot={{ r: 5 }}
+            isAnimationActive={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="atmCallIV"
+            name="Call IV"
+            stroke={colors.green}
+            strokeWidth={1.25}
+            strokeDasharray="3 3"
+            dot={false}
+            isAnimationActive={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="atmPutIV"
+            name="Put IV"
+            stroke={colors.red}
+            strokeWidth={1.25}
+            strokeDasharray="3 3"
+            dot={false}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function OIByExpiryChart({ data }: { data: OptionsTermStructure | null }) {
+  if (!data || data.termStructure.length === 0) {
+    return (
+      <p style={{ padding: 16, color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
+        No OI data
+      </p>
+    );
+  }
+  // Show only the next 12 expiries to avoid clutter on /SOL where there are 60+
+  const series = data.termStructure.slice(0, 12).map((p) => ({
+    expiry: p.expiry.length === 8 ? `${p.expiry.slice(4, 6)}/${p.expiry.slice(6, 8)}` : p.expiry,
+    callOI: p.callOI,
+    putOI: p.putOI,
+  }));
+  return (
+    <div style={{ height: 280, padding: "8px 12px 12px" }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={series} margin={{ top: 6, right: 8, left: -12, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="2 4" stroke={colors.line} vertical={false} />
+          <XAxis
+            dataKey="expiry"
+            tick={{ fill: colors.txt3, fontSize: 9, fontFamily: "JetBrains Mono" }}
+            axisLine={{ stroke: colors.line }}
+            tickLine={false}
+            interval={0}
+            angle={-30}
+            height={40}
+            textAnchor="end"
+          />
+          <YAxis
+            tickFormatter={(v: number) => compact(v)}
+            tick={{ fill: colors.txt3, fontSize: 10, fontFamily: "JetBrains Mono" }}
+            axisLine={{ stroke: colors.line }}
+            tickLine={false}
+          />
+          <RTooltip
+            contentStyle={{
+              background: colors.bg2,
+              border: `1px solid ${colors.line}`,
+              fontFamily: "JetBrains Mono",
+              fontSize: 11,
+              padding: "6px 10px",
+            }}
+            labelStyle={{ color: colors.txt2 }}
+            itemStyle={{ color: colors.txt1 }}
+            formatter={(value: number, name: string) => [compact(value), name]}
+          />
+          <Legend
+            verticalAlign="top"
+            height={20}
+            wrapperStyle={{ fontFamily: "JetBrains Mono", fontSize: 10, color: colors.txt3 }}
+          />
+          <Bar dataKey="callOI" name="Call OI" stackId="oi" fill={colors.green} isAnimationActive={false}>
+            {series.map((_, i) => <Cell key={`c-${i}`} fill={colors.green} fillOpacity={0.85} />)}
+          </Bar>
+          <Bar dataKey="putOI" name="Put OI" stackId="oi" fill={colors.red} isAnimationActive={false}>
+            {series.map((_, i) => <Cell key={`p-${i}`} fill={colors.red} fillOpacity={0.85} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
