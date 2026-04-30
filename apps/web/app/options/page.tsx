@@ -499,23 +499,29 @@ function buildLadder(opts: OptionData[], expiry: string | null, spot: number): L
 
 function buildIvPoints(s: IVSmileResp | null): IVPoint[] {
   if (!s) return [];
-  // Multiple exchanges quote the same (strike, side) — average their IVs
-  // so the smile chart sees one clean point per (strike, side) instead of
-  // arbitrary last-writer-wins overwrites in the chart's pivoter.
-  // Drop deep ITM/OTM outliers (IV > 200% or < 5%) — those are stale or
-  // illiquid quotes that compress the actual smile against the y-axis.
-  const sums = new Map<string, { strike: number; side: "call" | "put"; ivSum: number; n: number }>();
-  const acc = (strike: number, iv: number, side: "call" | "put") => {
+  // Per (strike, side), prefer Deribit's IV — it is the deepest options book
+  // in crypto and its mark IV is the cleanest. Bybit / OKX / Binance often
+  // serve stale or wide-spread IVs that hit 100%+ on illiquid strikes,
+  // which would dominate any averaging and flatten the visible smile.
+  // Falls back to Bybit → OKX → Binance if Deribit didn't quote that strike.
+  const PREF: Record<string, number> = { Deribit: 0, Bybit: 1, OKX: 2, Binance: 3 };
+  const best = new Map<string, { strike: number; side: "call" | "put"; iv: number; rank: number }>();
+  const accept = (
+    strike: number,
+    iv: number,
+    side: "call" | "put",
+    exchange: string,
+  ) => {
     if (!Number.isFinite(iv) || iv < 5 || iv > 200) return;
+    const rank = PREF[exchange] ?? 99;
     const key = `${strike}-${side}`;
-    const cur = sums.get(key);
-    if (cur) { cur.ivSum += iv; cur.n += 1; }
-    else sums.set(key, { strike, side, ivSum: iv, n: 1 });
+    const cur = best.get(key);
+    if (!cur || rank < cur.rank) best.set(key, { strike, side, iv, rank });
   };
-  for (const c of s.calls) acc(c.strike, c.iv, "call");
-  for (const p of s.puts) acc(p.strike, p.iv, "put");
-  return Array.from(sums.values())
-    .map((v) => ({ strike: v.strike, iv: +(v.ivSum / v.n).toFixed(1), side: v.side }))
+  for (const c of s.calls) accept(c.strike, c.iv, "call", c.exchange);
+  for (const p of s.puts) accept(p.strike, p.iv, "put", p.exchange);
+  return Array.from(best.values())
+    .map((v) => ({ strike: v.strike, iv: +v.iv.toFixed(1), side: v.side }))
     .sort((a, b) => a.strike - b.strike || (a.side === "call" ? -1 : 1));
 }
 
