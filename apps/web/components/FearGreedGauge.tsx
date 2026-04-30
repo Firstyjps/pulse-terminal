@@ -4,38 +4,38 @@ import { colors, fonts } from "@pulse/ui";
 import { useFlow } from "../lib/use-flow";
 import type { MarketOverview } from "@pulse/sources";
 
-interface Props {
-  /** 7-day history values for the bottom mini-bars (defaults to current value flat). */
-  history?: number[];
-}
-
 /**
- * FearGreedGauge — half-arc gauge per handoff Row 2 right c-4 (360px).
+ * FearGreedGauge — half-arc gauge + 7-day history bars.
  *
- *   5 segments (Extreme Fear → Extreme Greed) at radius 70, center (95, 80)
- *   Needle at angle = -90 + (value/100)*180 (rotated via SVG transform)
- *   Big number 38px below, classification label, 7-day mini-bars
+ *   Top: 5-segment half-arc (Extreme Fear → Extreme Greed) with needle.
+ *   Center: live value (38px) + classification.
+ *   Bottom: 7-day history bars — height ∝ value, color by F&G zone, value
+ *           printed on each bar. Today's bar is the rightmost ("NOW").
  */
-export function FearGreedGauge({ history }: Props) {
+export function FearGreedGauge() {
   const overview = useFlow<MarketOverview>("/api/flows/overview");
   const fg = overview.data?.fearGreedIndex;
   const value = fg?.value ?? 50;
   const label = fg?.classification ?? "—";
 
   const ang = -90 + (value / 100) * 180;
-  const valueColor =
-    value < 25 ? colors.red :
-    value < 45 ? colors.orange :
-    value < 55 ? colors.amber :
-    value < 75 ? "#9ade2f" : colors.green;
+
+  // Build the 7-day series — pad with nulls if we have fewer than 7 days.
+  const seriesRaw = fg?.history ?? [];
+  // Ensure exactly 7 slots, oldest → newest
+  const padded: ({ value: number; classification: string } | null)[] = Array.from(
+    { length: 7 },
+    (_, i) => {
+      const offsetFromEnd = 6 - i; // 6 = oldest slot, 0 = newest
+      const idx = seriesRaw.length - 1 - offsetFromEnd;
+      return idx >= 0 ? seriesRaw[idx] : null;
+    },
+  );
 
   const r = 70, cx = 95, cy = 80;
   const segs = 5;
   const segColors = [colors.red, colors.orange, colors.amber, "#9ade2f", colors.green];
   const labels7 = ["7d", "6d", "5d", "4d", "3d", "2d", "NOW"];
-
-  // history fallback: 7 flat values
-  const hist = history && history.length === 7 ? history : Array.from({ length: 7 }, () => value);
 
   function polar(a: number) {
     const r2 = (a * Math.PI) / 180;
@@ -62,7 +62,6 @@ export function FearGreedGauge({ history }: Props) {
           const e = -180 + ((i + 1) * 180) / segs - 1.5;
           return <path key={i} d={arc(s, e)} stroke={segColors[i]} strokeWidth="10" fill="none" opacity="0.5" />;
         })}
-        {/* needle */}
         <g transform={`rotate(${ang} ${cx} ${cy})`}>
           <line x1={cx} y1={cy} x2={cx} y2={cy - r + 4} stroke={colors.txt1} strokeWidth="2" />
           <circle cx={cx} cy={cy - r + 4} r="3" fill={colors.txt1} />
@@ -78,7 +77,7 @@ export function FearGreedGauge({ history }: Props) {
           fontWeight: 500,
           marginTop: -36,
           letterSpacing: "-0.02em",
-          color: valueColor,
+          color: zoneColor(value),
         }}
       >
         {fg ? value : "—"}
@@ -90,52 +89,98 @@ export function FearGreedGauge({ history }: Props) {
           textTransform: "uppercase",
           letterSpacing: "0.12em",
           marginTop: 2,
-          color: valueColor,
+          color: zoneColor(value),
         }}
       >
         {label.toUpperCase()}
       </div>
 
+      {/* 7-day history bars — height ∝ value, color by zone, value label on each bar */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 2,
+          gap: 4,
           width: "100%",
-          marginTop: 10,
-          padding: "0 8px",
+          marginTop: 14,
+          padding: "0 12px",
         }}
+        title="Historical Fear & Greed values from alternative.me · color = zone, height = value"
       >
-        {hist.map((v, i) => (
-          <div
-            key={i}
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}
-          >
+        {padded.map((p, i) => {
+          const v = p?.value ?? null;
+          const c = v != null ? zoneColor(v) : colors.txt4;
+          const isToday = i === 6;
+          return (
             <div
-              style={{
-                width: "100%",
-                background: colors.bg3,
-                height: 18,
-                position: "relative",
-              }}
+              key={i}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}
+              title={p ? `${labels7[i]} · ${p.value} ${p.classification.toUpperCase()}` : `${labels7[i]} · no data`}
             >
               <div
+                className="mono-num"
                 style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: colors.amber,
-                  height: `${v}%`,
+                  fontFamily: fonts.mono,
+                  fontSize: 10,
+                  color: v != null ? c : colors.txt4,
+                  fontWeight: isToday ? 700 : 500,
+                  letterSpacing: "-0.02em",
+                  height: 12,
+                  lineHeight: "12px",
                 }}
-              />
+              >
+                {v ?? "—"}
+              </div>
+              <div
+                style={{
+                  width: "100%",
+                  height: 36,
+                  background: colors.bg3,
+                  border: isToday ? `1px solid ${c}88` : `1px solid ${colors.line}`,
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                {v != null && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: c,
+                      height: `${Math.max(8, v)}%`,
+                      boxShadow: isToday ? `0 0 6px ${c}77 inset` : "none",
+                      opacity: isToday ? 1 : 0.85,
+                      transition: "height .35s ease, background .35s ease",
+                    }}
+                  />
+                )}
+              </div>
+              <div
+                style={{
+                  fontFamily: fonts.mono,
+                  fontSize: 9,
+                  color: isToday ? colors.amber : colors.txt3,
+                  letterSpacing: "0.06em",
+                  fontWeight: isToday ? 700 : 400,
+                }}
+              >
+                {labels7[i]}
+              </div>
             </div>
-            <div style={{ fontFamily: fonts.mono, fontSize: 8, color: colors.txt3 }}>
-              {labels7[i]}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
+}
+
+function zoneColor(v: number): string {
+  // Same thresholds the gauge uses for the 5 segments
+  if (v < 25) return colors.red;
+  if (v < 45) return colors.orange;
+  if (v < 55) return colors.amber;
+  if (v < 75) return "#9ade2f";
+  return colors.green;
 }

@@ -41,7 +41,46 @@
 
 ## 📰 Activity log (newest at top)
 
-### 2026-04-30 · Code session (latest — Phase 4 final 3 items)
+### 2026-04-30 · Code session (latest — Overview UX polish round)
+**Six UX adjustments per user screenshot review.**
+
+  **🆕 Bigger sidebar** — left rail 140 → 172px, font 10 → 12px, row height 5px → 9px padding (≥36px tap-tall), heavier weight on active. F-key prefix bumped to 22px column with bolder weight. AppShell grid updated to match.
+
+  **🆕 FEAR & GREED panel rebuild** — the yellow 7d/6d "lines" were thin all-amber bars defaulting to `value` (i.e. flat rectangles) because no real history was fetched.
+  - [packages/sources/src/overview.ts](packages/sources/src/overview.ts) — alternative.me query expanded `?limit=1` → `?limit=7`. Returns oldest→newest history array per day with value + classification + ts.
+  - [packages/sources/src/types.ts](packages/sources/src/types.ts) — `MarketOverview.fearGreedIndex.history?` field added.
+  - [apps/web/components/FearGreedGauge.tsx](apps/web/components/FearGreedGauge.tsx) — full rewrite of bottom strip:
+    - Each bar height = `Math.max(8, value)%` (so even Extreme Fear days are visible).
+    - Bar color = F&G zone (red < 25 / orange < 45 / amber < 55 / lime < 75 / green ≥ 75) — instead of all-amber.
+    - Numeric F&G value prints above each bar in zone color.
+    - Today's bar (`NOW` slot) gets amber border + inner glow + 100% opacity; older days dimmed to 0.85.
+    - Hover tooltip per bar: `7d · 32 FEAR`.
+
+  **🆕 SESSION cell — active-only big** — was showing `TYO LDN NYC` all together inline.
+  - [apps/web/components/MetricStrip.tsx](apps/web/components/MetricStrip.tsx) `SessionStrip` rewritten:
+    - Picks the *primary* active session (latest-starting one currently open, so during US·EU overlap LDN takes precedence over TYO).
+    - **Big 26px symbol** of the active session (TYO/LDN/NYC) centered, green with glow.
+    - When all closed, shows the next upcoming session in amber + `OPENS IN Nh`.
+    - Header strip: `SESSION · 1/3 OPEN`.
+    - Footer: `UTC HH:MM` aligned right.
+    - Thin 2px progress bar at bottom showing % through the active window with green glow.
+
+  **🆕 Overview layout reshuffle** — Live Anomaly moved to bottom strip, Macro proportion bumped:
+  ```
+  Row 4 (h-feed):   MACRO OVERLAY c-7 + FUNDING RATES c-5    (was Anomaly c-5 + Macro c-4 + Funding c-3)
+  Row 5 (auto, ≥220px):  LIVE ANOMALY FEED c-12              (full-width strip at bottom)
+  ```
+
+  **🆕 Price Chart → Line/Area** — was Lightweight Charts Candlestick:
+  - **NEW** [packages/charts/src/PriceLine.tsx](packages/charts/src/PriceLine.tsx) — LWC v4.2 Area series wrapper. Top stroke 2px, translucent fill below (32% → 2% gradient), volume histogram 22% bottom margin auto-colored by direction (green up / red down). Crosshair amber-dashed with label backgrounds. Optional `filled` switch falls back to plain line, `showLastMarker` adds dashed price-line at latest close.
+  - [apps/web/components/OverviewPriceChart.tsx](apps/web/components/OverviewPriceChart.tsx) — switched to `PriceLine`. Reduces candles to close-only points. Sub-header now shows headline price + 24h change %. Line/fill color flips green/red based on tf-window change so the chart tints itself bullish/bearish.
+
+- **[verified]** `pnpm -r typecheck` — all 7 packages clean.
+- **[doing]** nothing — handing back.
+- **[blocked]** None.
+- **[next]** Push + Deploy.
+
+### 2026-04-30 · Code session — Phase 4 final 3 items
 **Closing out the remaining Phase 4 backlog from HANDOFF.md:262 — Tron whale-flow extension, multi-channel push notifications (ntfy.sh + Telegram), and a /backtest UI panel surfacing the existing graded-backtest engine.**
 
   **🆕 Tron USDT whale-flow** (item 3 — on-chain extend)

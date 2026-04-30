@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Candlestick, type Candle } from "@pulse/charts";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PriceLine, type PriceLinePoint } from "@pulse/charts";
 import { colors, fonts } from "@pulse/ui";
+
+interface RawCandle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
 
 const TIMEFRAMES = [
   { id: "1H",  interval: "1m",  limit: 60  },
@@ -36,7 +45,7 @@ const COINS = [
 export function OverviewPriceChart() {
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [tf, setTf] = useState<Tf>("24H");
-  const [data, setData] = useState<Candle[]>([]);
+  const [data, setData] = useState<RawCandle[]>([]);
   const [loading, setLoading] = useState(true);
 
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -74,6 +83,22 @@ export function OverviewPriceChart() {
   }, [symbol, tf]);
 
   const config = TIMEFRAMES.find((t) => t.id === tf)!;
+
+  // Reduce candles → close-only points; line chart uses close + volume only.
+  const linePoints = useMemo<PriceLinePoint[]>(
+    () => data.map((d) => ({ time: d.time, value: d.close, volume: d.volume })),
+    [data],
+  );
+
+  // Headline price + 24h change
+  const last = data[data.length - 1];
+  const first = data[0];
+  const lastPrice = last?.close;
+  const firstPrice = first?.close;
+  const change = lastPrice != null && firstPrice != null && firstPrice > 0
+    ? ((lastPrice - firstPrice) / firstPrice) * 100
+    : null;
+  const changeColor = change == null ? colors.txt3 : change >= 0 ? colors.green : colors.red;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -116,7 +141,29 @@ export function OverviewPriceChart() {
         </select>
 
         <span style={{ color: colors.txt4 }}>·</span>
-        <span>{config.limit}× {config.interval} CANDLES</span>
+        <span>{config.limit}× {config.interval}</span>
+
+        {lastPrice != null && (
+          <>
+            <span style={{ color: colors.txt4 }}>·</span>
+            <span className="mono-num" style={{ color: colors.txt1, fontSize: 11, fontWeight: 600 }}>
+              {fmtPrice(lastPrice)}
+            </span>
+            {change != null && (
+              <span
+                className="mono-num"
+                style={{
+                  color: changeColor,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: 0,
+                }}
+              >
+                {change >= 0 ? "+" : ""}{change.toFixed(2)}%
+              </span>
+            )}
+          </>
+        )}
 
         <span style={{ marginLeft: "auto", display: "inline-flex", border: `1px solid ${colors.line2}` }}>
           {TIMEFRAMES.map((t, i) => {
@@ -165,9 +212,21 @@ export function OverviewPriceChart() {
             <span className="blink">▒ AWAITING FEED ▒</span>
           </div>
         ) : (
-          <Candlestick data={data} height={bodyHeight} />
+          <PriceLine
+            data={linePoints}
+            height={bodyHeight}
+            color={change == null ? colors.amber : change >= 0 ? colors.green : colors.red}
+            filled
+            showVolume
+          />
         )}
       </div>
     </div>
   );
+}
+
+function fmtPrice(v: number): string {
+  if (v >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (v >= 1)    return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return v.toLocaleString(undefined, { maximumFractionDigits: 6 });
 }

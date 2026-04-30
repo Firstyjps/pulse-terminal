@@ -89,7 +89,7 @@ function Frame({ children }: { children: React.ReactNode }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "140px 1fr",
+          gridTemplateColumns: "172px 1fr",
           overflow: "hidden",
           minHeight: 0,
         }}

@@ -66,15 +66,15 @@ export function TerminalNav() {
   return (
     <nav
       style={{
-        width: 140,
+        width: 172,
         background: colors.bg1,
         borderRight: `1px solid ${colors.line}`,
         display: "flex",
         flexDirection: "column",
         fontFamily: fonts.mono,
-        fontSize: 10,
+        fontSize: 12,
         textTransform: "uppercase",
-        letterSpacing: "0.08em",
+        letterSpacing: "0.06em",
         height: "100%",
         minHeight: 0,
         overflow: "auto",
@@ -84,9 +84,10 @@ export function TerminalNav() {
         <div key={group.section}>
           <div
             style={{
-              padding: "8px 10px 4px",
+              padding: "12px 14px 6px",
               color: colors.txt4,
-              fontSize: 9,
+              fontSize: 10,
+              letterSpacing: "0.10em",
               borderTop: gi === 0 ? "none" : `1px solid ${colors.line}`,
             }}
           >
@@ -102,20 +103,22 @@ export function TerminalNav() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "5px 10px",
+                  gap: 10,
+                  padding: "9px 14px",
                   width: "100%",
                   background: active ? colors.bg2 : "transparent",
                   color: active ? colors.amber : colors.txt3,
                   border: "none",
-                  borderLeft: `2px solid ${active ? colors.amber : "transparent"}`,
+                  borderLeft: `3px solid ${active ? colors.amber : "transparent"}`,
                   cursor: "pointer",
                   textAlign: "left",
                   fontFamily: "inherit",
-                  fontSize: 10,
-                  letterSpacing: "0.08em",
+                  fontSize: 12,
+                  fontWeight: active ? 700 : 500,
+                  letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   userSelect: "none",
+                  minHeight: 36,
                 }}
                 onMouseEnter={(e) => {
                   if (!active) {
@@ -132,9 +135,11 @@ export function TerminalNav() {
               >
                 <span
                   style={{
-                    width: 14,
+                    width: 22,
                     color: active ? colors.amber : colors.txt4,
-                    fontSize: 9,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.04em",
                   }}
                 >
                   {it.key}

@@ -6,6 +6,9 @@ export type { SparklineProps } from "./Sparkline";
 export { Candlestick } from "./Candlestick";
 export type { Candle, CandlestickProps } from "./Candlestick";
 
+export { PriceLine } from "./PriceLine";
+export type { PriceLinePoint, PriceLineProps } from "./PriceLine";
+
 export { FlowAreaChart, FlowBarChart } from "./FlowAreaChart";
 export type {
   FlowPoint,

@@ -11,7 +11,7 @@ type CGGlobal = {
     defi_market_cap?: number;
   };
 };
-type FngResp = { data: { value: string; value_classification: string }[] };
+type FngResp = { data: { value: string; value_classification: string; timestamp: string }[] };
 type DefiTvl = { totalLiquidityUSD?: number; tvl?: number }[];
 
 // ── Volume history rolling buffer ────────────────────────────────────────────
@@ -60,7 +60,7 @@ function deriveVolumeChange24h(currentVolume: number): number | undefined {
 export async function getOverview(): Promise<MarketOverview> {
   const [global, fng, tvlSeries] = await Promise.allSettled([
     fetchJson<CGGlobal>("https://api.coingecko.com/api/v3/global", { revalidate: 120 }),
-    fetchJson<FngResp>("https://api.alternative.me/fng/?limit=1", { revalidate: 600 }),
+    fetchJson<FngResp>("https://api.alternative.me/fng/?limit=7", { revalidate: 600 }),
     fetchJson<DefiTvl>("https://api.llama.fi/v2/historicalChainTvl", { revalidate: 600 }),
   ]);
 
@@ -103,9 +103,16 @@ export async function getOverview(): Promise<MarketOverview> {
   }
 
   if (fng.status === "fulfilled" && fng.value.data?.[0]) {
+    // alternative.me returns newest-first; we want oldest → newest for charting.
+    const series = [...fng.value.data].reverse();
     overview.fearGreedIndex = {
       value: parseInt(fng.value.data[0].value, 10),
       classification: fng.value.data[0].value_classification,
+      history: series.map((d) => ({
+        value: parseInt(d.value, 10),
+        classification: d.value_classification,
+        ts: parseInt(d.timestamp, 10) * 1000,
+      })),
     };
   }
 

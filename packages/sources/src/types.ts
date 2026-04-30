@@ -21,7 +21,12 @@ export interface MarketOverview {
   activeCryptocurrencies: number;
   defiMarketCap: number;
   defiTvl: number;
-  fearGreedIndex?: { value: number; classification: string };
+  fearGreedIndex?: {
+    value: number;
+    classification: string;
+    /** 7-day history, oldest → newest (last entry is today). */
+    history?: { value: number; classification: string; ts: number }[];
+  };
 }
 
 export interface StablecoinPoint {
