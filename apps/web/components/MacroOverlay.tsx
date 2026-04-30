@@ -100,15 +100,15 @@ function Row({ s }: { s: MacroSeries }) {
           {s.label}
         </span>
       </span>
-      <div style={{ height: "100%", minWidth: 0, display: "flex", alignItems: "stretch", padding: "4px 0" }}>
+      <div style={{ minWidth: 0, display: "flex", alignItems: "center" }}>
         <Sparkbar
           data={series}
           asLine
           fill
           color={color}
-          height={56}
+          height={46}
           width={600}
-          style={{ width: "100%", height: "100%" }}
+          style={{ width: "100%" }}
         />
       </div>
       <span
