@@ -31,8 +31,13 @@ export function SocialBuzz() {
           flexShrink: 0,
         }}
       >
-        <span>REDDIT · {data?.scanned ?? 0} POSTS · {data?.sources.ok.length ?? 0} SUB{data && data.sources.ok.length === 1 ? "" : "S"}</span>
-        <span>SCORE = UPVOTES × ln(COMMENTS+1)</span>
+        <span>
+          {data?.path === "coingecko-trending" ? "COINGECKO TRENDING" : "REDDIT"}
+          {" · "}{data?.scanned ?? 0} {data?.path === "coingecko-trending" ? "COINS" : "POSTS"}
+        </span>
+        <span>
+          {data?.path === "coingecko-trending" ? "TREND-WEIGHTED" : "SCORE = UPVOTES × ln(COMMENTS+1)"}
+        </span>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>

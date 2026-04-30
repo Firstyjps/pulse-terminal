@@ -106,9 +106,6 @@ export function NewsFeed() {
                   {it.tickers.slice(0, 5).map((t) => (
                     <SignalPill key={t} tone="FLOW" size="sm">{t}</SignalPill>
                   ))}
-                  {it.vote && it.vote.important > 0 && (
-                    <span style={{ color: colors.amber, fontWeight: 600 }}>★{it.vote.important}</span>
-                  )}
                 </div>
               </div>
               <span aria-hidden style={{ color: colors.txt4, fontSize: 12, paddingTop: 2 }}>↗</span>
