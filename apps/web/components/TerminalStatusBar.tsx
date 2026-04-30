@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { colors, fonts } from "@pulse/ui";
+import { fmtTimeICT, fmtTimeShortICT, fmtDateICT } from "../lib/time";
 
 type FeedStatus = "connecting" | "live" | "stale" | "offline";
-
-function fmtTime(d: Date) { return d.toISOString().slice(11, 19); }
-function fmtTimeShort(d: Date) { return d.toISOString().slice(11, 16); }
-function fmtDate(d: Date) { return d.toISOString().slice(0, 10).replace(/-/g, "·"); }
 
 interface Props {
   feedStatus?: FeedStatus;
@@ -36,10 +33,10 @@ const FEED_LABEL_SHORT: Record<FeedStatus, string> = {
  * TerminalStatusBar — top 22px status row.
  *
  * Desktop layout (full):
- *   ◆ CRYPTOPULSE · VER · USR · DESK | (right) feed dot · UTC · DATE · SESS
+ *   ◆ CRYPTOPULSE · VER · USR · DESK | (right) feed dot · ICT · DATE · SESS
  *
  * Mobile / `compact` layout:
- *   ◆ CRYPTOPULSE | feed dot · UTC HH:MM
+ *   ◆ CRYPTOPULSE | feed dot · ICT HH:MM
  */
 export function TerminalStatusBar({
   feedStatus = "live",
@@ -104,10 +101,10 @@ export function TerminalStatusBar({
           <span>{compact ? FEED_LABEL_SHORT[feedStatus] : FEED_LABEL_LONG[feedStatus]}</span>
         </span>
         <span style={segStyle}>
-          <span className="dim">UTC</span>{" "}
-          <span className="mono-num">{compact ? fmtTimeShort(now) : fmtTime(now)}</span>
+          <span className="dim">ICT</span>{" "}
+          <span className="mono-num">{compact ? fmtTimeShortICT(now) : fmtTimeICT(now)}</span>
         </span>
-        {!compact && <span style={segStyle}><span className="dim">DATE</span> <span className="mono-num">{fmtDate(now)}</span></span>}
+        {!compact && <span style={segStyle}><span className="dim">DATE</span> <span className="mono-num">{fmtDateICT(now)}</span></span>}
         {!compact && (
           <span style={{ ...segStyle, borderRight: "none" }}>
             <span className="dim">SESS</span> US·EU OVERLAP

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { colors, fonts } from "@pulse/ui";
+import { fmtDateICT, fmtTimeShortICT } from "../lib/time";
 
 interface NavItem {
   id: string;
@@ -168,7 +169,7 @@ export function TerminalNav() {
       >
         <div><span style={{ color: colors.green }}>●</span> SOCKET LIVE</div>
         <div><span style={{ color: colors.amber }}>●</span> MCP READY</div>
-        <div><span style={{ color: colors.txt3 }}>●</span> {new Date().toISOString().slice(0, 10).replace(/-/g, "·")}</div>
+        <div><span style={{ color: colors.txt3 }}>●</span> {fmtDateICT(new Date())}</div>
       </div>
     </nav>
   );
@@ -236,7 +237,7 @@ function StatusBlock() {
         { k: "ALERTS",  v: <span>12 ARMED</span> },
         { k: "STREAMS", v: <span>3</span> },
         { k: "UPLINK",  v: <span style={{ color: latency < 20 ? colors.green : colors.amber }}>{latency}ms</span> },
-        { k: "UTC",     v: <span>{now.toISOString().slice(11, 16)}</span> },
+        { k: "ICT",     v: <span>{fmtTimeShortICT(now)}</span> },
       ]}
     />
   );

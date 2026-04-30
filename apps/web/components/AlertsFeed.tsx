@@ -5,6 +5,7 @@ import { SignalPill, colors, fonts } from "@pulse/ui";
 import type { SignalTone } from "@pulse/ui";
 import type { AnomalyScan, AnomalyFinding } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
+import { fmtTimeICT } from "../lib/time";
 
 /**
  * Map our internal AnomalyCategory → handoff display tag.
@@ -45,8 +46,7 @@ export interface AlertsFeedProps {
 }
 
 function fmtTime(ts: string | Date) {
-  const d = typeof ts === "string" ? new Date(ts) : ts;
-  return d.toISOString().slice(11, 19);
+  return fmtTimeICT(ts);
 }
 
 export function AlertsFeed({ symbol = "BTCUSDT", embed = "panel" }: AlertsFeedProps) {
@@ -129,7 +129,7 @@ export function AlertsFeed({ symbol = "BTCUSDT", embed = "panel" }: AlertsFeedPr
           >
             <span className="blink">▒ MARKETS QUIET — NO ANOMALIES ▒</span>
             <div style={{ marginTop: 4, fontSize: 9, color: colors.txt4 }}>
-              last scan {data.generatedAt ? fmtTime(data.generatedAt) : "—"} UTC
+              last scan {data.generatedAt ? fmtTime(data.generatedAt) : "—"} ICT
             </div>
           </div>
         )}

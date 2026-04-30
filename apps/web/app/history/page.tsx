@@ -171,7 +171,7 @@ export default function HistoryPage() {
           badge={`SQLITE · 90D ROLLING · ${data?.stats.count ?? 0} ROWS`}
           actions={
             <span style={{ display: "flex", gap: 6 }}>
-              <button onClick={backfillNow} style={btnStyle()} title="Force collect today's snapshot now (instead of waiting for 00:05 UTC cron)">
+              <button onClick={backfillNow} style={btnStyle()} title="Force collect today's snapshot now (instead of waiting for 07:05 ICT cron)">
                 ▶ COLLECT NOW
               </button>
               <button onClick={exportJson} style={btnStyle()}>⬇ EXPORT JSON</button>
@@ -322,7 +322,7 @@ export default function HistoryPage() {
             {data && data.history.length === 0 && (
               <p style={{ padding: 14, fontSize: 11, color: colors.txt3, fontFamily: fonts.mono }}>
                 No snapshots yet. Click <strong>▶ COLLECT NOW</strong> to capture today's row, or wait for the
-                00:05 UTC cron tonight.
+                07:05 ICT cron tonight.
               </p>
             )}
           </div>
