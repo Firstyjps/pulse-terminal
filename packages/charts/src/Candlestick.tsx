@@ -7,6 +7,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { ictTickFormatter, ictTimeFormatter } from "./_ict-time.js";
 
 export interface Candle {
   time: number; // unix seconds
@@ -60,9 +61,11 @@ export function Candlestick({
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: ictTickFormatter,
       },
       rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
       crosshair: { mode: 1 },
+      localization: { timeFormatter: ictTimeFormatter },
     });
 
     const candle = chart.addCandlestickSeries({

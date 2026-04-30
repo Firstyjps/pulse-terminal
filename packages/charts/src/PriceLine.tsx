@@ -8,6 +8,7 @@ import {
   type UTCTimestamp,
   LineStyle,
 } from "lightweight-charts";
+import { ictTickFormatter, ictTimeFormatter } from "./_ict-time.js";
 
 export interface PriceLinePoint {
   time: number; // unix seconds
@@ -69,9 +70,10 @@ export function PriceLine({
         fontFamily: "JetBrains Mono, Courier New, monospace",
         fontSize: 11,
       },
-      ...(priceFormatter
-        ? { localization: { priceFormatter } }
-        : {}),
+      localization: {
+        timeFormatter: ictTimeFormatter,
+        ...(priceFormatter ? { priceFormatter } : {}),
+      },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.04)" },
         horzLines: { color: "rgba(255,255,255,0.05)" },
@@ -80,6 +82,7 @@ export function PriceLine({
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: ictTickFormatter,
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.08)",
