@@ -72,19 +72,20 @@ Firewall (ufw):
 
 ```
 apps/
-├── web/        Next.js 16 · 6 tabs · 12 API routes · uses --webpack (turbopack panics on Thai paths)
+├── web/        Next.js 16 · 6 tabs · 12 API routes · uses --webpack (turbopack panics on the historical Thai path; project still lives there)
 ├── realtime/   WS server + HTTP cache + native streams (binance/bybit/okx)
 ├── alerts/     cron · scanAnomalies → JSONL → optional Discord/Slack webhook
 └── mcp/        MCP server (.mjs ESM bundle, esbuild-bundled, 144KB .dxt)
 
 packages/
-├── ui/         Tokens + 9 components (Card, MetricCard, Pill, HeroTitle, NavBar, Loader, ThreeBackground, Bilingual i18n)
+├── ui/         Tokens + components (Card, MetricCard, Pill, HeroTitle, NavBar, Loader, ThreeBackground, Panel, StatBlock, WsRow, …)
 ├── sources/    DUAL ENTRY:
 │               · "@pulse/sources"        — browser-safe (types, format, helpers)
 │               · "@pulse/sources/server" — Node-only (fetchers, signed APIs, scrapers)
 │               (this split was Phase D — eliminated dynImport hacks; do NOT regress this)
-├── charts/     Sparkline (SVG) + Candlestick (LWC v4.2 — DO NOT upgrade) + FlowAreaChart/FlowBarChart/FlowChart/DepthChart
-└── i18n/       dict + LocaleProvider + Bilingual (ไทย / EN)
+└── charts/     Sparkline (SVG) + Candlestick (LWC v4.2 — DO NOT upgrade) + FlowAreaChart/FlowBarChart/FlowChart/DepthChart + IVSmile/GreeksHeatmap/OIByStrike
+
+(`packages/i18n/` was removed 2026-04-30 — product is English-only.)
 ```
 
 ### Apps details

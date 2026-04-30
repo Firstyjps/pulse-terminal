@@ -3,25 +3,22 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { colors, fonts } from "@pulse/ui";
-import { useT } from "@pulse/i18n";
-import type { DictKey } from "@pulse/i18n";
 
 interface TabDef {
   id: string;
-  /** i18n key for the on-screen label. */
-  labelKey: DictKey;
+  label: string;
   glyph: string;
   href: string;
   fkey: string;
 }
 
 const TABS: TabDef[] = [
-  { id: "overview",    labelKey: "nav.overview",    glyph: "◆", href: "/",            fkey: "F1" },
-  { id: "markets",     labelKey: "nav.markets",     glyph: "▦", href: "/markets",     fkey: "F2" },
-  { id: "fundflow",    labelKey: "nav.flow_short",  glyph: "≈", href: "/fundflow",    fkey: "F3" },
-  { id: "derivatives", labelKey: "nav.deriv_short", glyph: "Ξ", href: "/derivatives", fkey: "F4" },
-  { id: "options",     labelKey: "nav.options",     glyph: "Σ", href: "/options",     fkey: "F5" },
-  { id: "settings",    labelKey: "nav.settings",    glyph: "⚙", href: "/settings",    fkey: "F7" },
+  { id: "overview",    label: "OVERVIEW", glyph: "◆", href: "/",            fkey: "F1" },
+  { id: "markets",     label: "MARKETS",  glyph: "▦", href: "/markets",     fkey: "F2" },
+  { id: "fundflow",    label: "FLOW",     glyph: "≈", href: "/fundflow",    fkey: "F3" },
+  { id: "derivatives", label: "DERIV",    glyph: "Ξ", href: "/derivatives", fkey: "F4" },
+  { id: "options",     label: "OPTIONS",  glyph: "Σ", href: "/options",     fkey: "F5" },
+  { id: "settings",    label: "SETTINGS", glyph: "⚙", href: "/settings",    fkey: "F7" },
 ];
 
 /**
@@ -29,13 +26,10 @@ const TABS: TabDef[] = [
  *
  * Replaces the 140px left rail when the viewport is too narrow.
  * Each tap-target is 56×≥56px (exceeds the 44px iOS HIG minimum).
- * F-key keyboard nav still works because it's wired up here too —
- * keeps parity with desktop TerminalNav.
  */
 export function BottomTabNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const t = useT();
 
   useEffect(() => {
     const map: Record<string, string> = {};
@@ -113,7 +107,7 @@ export function BottomTabNav() {
                 letterSpacing: "0.06em",
               }}
             >
-              {t(tab.labelKey)}
+              {tab.label}
             </span>
           </button>
         );

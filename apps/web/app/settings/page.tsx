@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Panel, WsRow, Workspace, SignalPill, colors, fonts } from "@pulse/ui";
-import { useLocale } from "@pulse/i18n";
 import { useSettings } from "../../lib/use-settings";
 import { useWatchlist } from "../../lib/use-watchlist";
 import { useToast } from "../../components/ToastProvider";
@@ -49,37 +48,20 @@ function segButton(active: boolean): React.CSSProperties {
 /**
  * Settings — Bloomberg shell.
  *
- *   Row 1 (auto): LOCALE c-6 + DATA REFRESH c-6
+ *   Row 1 (auto): DATA REFRESH c-12
  *   Row 2 (auto): NOTIFICATIONS c-6 + WATCHLIST c-6
  *   Row 3 (auto): RESET c-12
  */
 export default function SettingsPage() {
   const { settings, update, reset } = useSettings();
   const { list: watchlist, set: setWatchlist, clear: clearWatchlist, toggle } = useWatchlist();
-  const [locale, setLocale] = useLocale();
   const [draftSymbol, setDraftSymbol] = useState("");
   const toast = useToast();
 
   return (
     <Workspace>
       <WsRow height="auto">
-        <Panel span={6} title="LOCALE" badge="LANGUAGE">
-          <div style={{ ...ROW, borderBottom: "none" }}>
-            <div>
-              <div style={LABEL}>Language</div>
-              <div style={HINT}>ไทย ↔ English (also toggleable from LANG in the bottom bar)</div>
-            </div>
-            <div style={{ display: "flex", gap: 1, background: colors.line }}>
-              {(["th", "en"] as const).map((l) => (
-                <button key={l} onClick={() => setLocale(l)} style={segButton(locale === l)}>
-                  {l.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Panel>
-
-        <Panel span={6} title="DATA REFRESH" badge="POLLING">
+        <Panel span={12} title="DATA REFRESH" badge="POLLING">
           <div style={ROW}>
             <div>
               <div style={LABEL}>Refresh interval</div>
@@ -133,7 +115,7 @@ export default function SettingsPage() {
                   toast.push({
                     tone: "success",
                     title: "Notifications enabled",
-                    body: "ลอง trigger ดูได้จาก /derivatives หรือรอ alerts cron tick ถัดไป",
+                    body: "Trigger from /derivatives or wait for the next alerts cron tick.",
                   });
                 }
               }}
@@ -246,7 +228,7 @@ export default function SettingsPage() {
                 } catch {
                   /* ignore */
                 }
-                toast.push({ tone: "info", title: "Reset complete", body: "ทุกอย่างกลับเป็น default แล้ว" });
+                toast.push({ tone: "info", title: "Reset complete", body: "All local state restored to defaults." });
               }}
               style={{ ...segButton(false), color: colors.red, borderColor: colors.red2 }}
             >

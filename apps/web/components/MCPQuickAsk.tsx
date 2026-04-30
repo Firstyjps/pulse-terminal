@@ -14,7 +14,7 @@ interface Props {
   suggestion?: string;
 }
 
-const DEFAULT_SUGGESTION = "วิเคราะห์ snapshot นี้แล้วบอกว่ามี signals อะไรน่าสนใจ + scenarios 1-2 สัปดาห์";
+const DEFAULT_SUGGESTION = "Analyze this snapshot — flag interesting signals and lay out 1–2 week scenarios.";
 
 export function MCPQuickAsk({
   endpoint = "/api/snapshot",
@@ -37,7 +37,7 @@ export function MCPQuickAsk({
       toast.push({
         tone: "success",
         title: "📋 Copied to clipboard",
-        body: "วาง (Ctrl/⌘+V) ใน Claude Desktop ได้เลย — หรือเปิด MCP tools ตรงๆ ก็ได้",
+        body: "Paste (Ctrl/⌘+V) into Claude Desktop, or invoke an MCP tool directly.",
         ttlMs: 6000,
       });
     } catch (err) {
@@ -89,12 +89,12 @@ function renderMarkdown(data: unknown, suggestion: string): string {
     const ts = String(s.generatedAt ?? new Date().toISOString());
     let out = `# Pulse Terminal Snapshot · ${ts}\n\n`;
     out += "```json\n" + JSON.stringify(data, null, 2).slice(0, 4000) + "\n```\n\n";
-    out += `---\n\n**คำถาม:** ${suggestion}\n`;
+    out += `---\n\n**Question:** ${suggestion}\n`;
     return out;
   }
   return (
     `# Pulse Terminal data\n\n` +
     "```json\n" + JSON.stringify(data, null, 2).slice(0, 4000) + "\n```\n\n" +
-    `---\n\n**คำถาม:** ${suggestion}\n`
+    `---\n\n**Question:** ${suggestion}\n`
   );
 }

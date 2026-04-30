@@ -21,10 +21,10 @@ export function generateHourlyReport(opts: {
 
   const fmt = (h: number) => `${String(h).padStart(2, "0")}:00`;
   const recommendation = best.length >= 2
-    ? `เข้า Dual Assets ช่วง ${fmt(best[0].hour_ict)}-${fmt(best[0].hour_ict + 1)} ICT ` +
-      `(APR เฉลี่ย ${best[0].avg_apr}%) หรือช่วง ${fmt(best[1].hour_ict)}-${fmt(best[1].hour_ict + 1)} ICT ` +
-      `(APR เฉลี่ย ${best[1].avg_apr}%)`
-    : "ข้อมูลยังไม่เพียงพอ เก็บเพิ่มอีก 2-3 วัน";
+    ? `Enter Dual Assets between ${fmt(best[0].hour_ict)}-${fmt(best[0].hour_ict + 1)} ICT ` +
+      `(avg APR ${best[0].avg_apr}%) or ${fmt(best[1].hour_ict)}-${fmt(best[1].hour_ict + 1)} ICT ` +
+      `(avg APR ${best[1].avg_apr}%)`
+    : "Insufficient data — collect another 2–3 days.";
 
   return {
     period_days: days,

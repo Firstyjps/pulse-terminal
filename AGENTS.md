@@ -113,28 +113,17 @@ All functions implement **fallback chains** (CoinGecko → CoinCap → cache pat
 
 ---
 
-## Role 5 — i18n Agent  (`packages/i18n/`)
-**Goal:** every label exists in Thai + English. Single dictionary, single component.
-**Owns:** `packages/i18n/src/**`
-**Public API:**
-```tsx
-t("nav.overview")  // returns current locale's string
-<Bilingual th="ตลาดรวม" en="TOTAL MARKET CAP" />
-useLocale()        // returns ['th'|'en', setLocale]
-```
-**Phase 1 tasks:**
-- [ ] Create `dict.ts` with every UI label keyed (start by scanning `Pulse Command` + `CryptoTerminal/index.html`)
-- [ ] Build `<Bilingual>` component (mimic CryptoTerminal's `.th-label` + `.en-label` stacked layout)
-- [ ] Add font fallback rule: Thai uses IBM Plex Sans Thai, EN uses Inter
-- [ ] Locale persisted to localStorage
-**Source of truth:** `CryptoTerminal/CLAUDE.md` (bilingual rule), `Pulse Command/`
+## Role 5 — i18n Agent  (REMOVED 2026-04-30)
+The product is English-only. The `packages/i18n/` package has been deleted; Thai
+strings, the `<Bilingual>` component, `LocaleProvider`, `useLocale`, and `t/useT`
+are gone. New labels go in EN as bare string literals at the call site.
 
 ---
 
 ## Role 6 — Web Agent  (`apps/web/`)
 **Goal:** Next.js 16 app — the user-facing terminal.
 **Owns:** `apps/web/**`
-**Depends on:** `packages/{ui, sources, charts, i18n}`
+**Depends on:** `packages/{ui, sources, charts}`
 **Layout:** 5 tabs in nav
 1. **Overview** — Pulse Command hero, key macro pulses, alerts feed
 2. **Markets** — Top-N coin table (CryptoTerminal style) + candlestick
@@ -202,7 +191,6 @@ get_oi_snapshot()                              // open interest — NEW
 | Role 2 (UI)         | Role 6 (Web)    | `@pulse/ui` exports listed above           |
 | Role 3 (Sources)    | Roles 6, 7, 8   | function signatures listed in Role 3       |
 | Role 4 (Charts)     | Role 6 (Web)    | `<Candlestick>`, `<FlowChart>`, `<Sparkline>` |
-| Role 5 (i18n)       | Role 6 (Web)    | `t()`, `<Bilingual>`, `useLocale()`        |
 | Role 7 (Realtime)   | Role 6 (Web)    | WS messages on `ws://localhost:8080`       |
 | Role 8 (MCP)        | Claude Desktop  | `.dxt` bundle in `apps/mcp/dist/`          |
 
@@ -240,7 +228,7 @@ get_oi_snapshot()                              // open interest — NEW
 | ✅ | `packages/charts/src/Candlestick.tsx`     | `CryptoTerminal/js/chart.js`                                      |
 | ✅ | `packages/charts/src/Sparkline.tsx`       | `CryptoTerminal/js/app.js` `buildSparkline()`                     |
 | ✅ | `packages/charts/src/{FlowChart,FlowAreaChart,FlowBarChart,DepthChart}.tsx` | `Crypto-Fundflow-Analyzer/components/{Stablecoin,ETF,TVL,Dex}Chart.tsx` |
-| ✅ | `packages/i18n/src/dict.ts`               | scanned from Pulse Command + CryptoTerminal                        |
+| ⛔ | ~~`packages/i18n/src/dict.ts`~~           | removed 2026-04-30 — product is English-only                       |
 | ✅ | `apps/web/app/page.tsx`                   | `Crypto-Fundflow-Analyzer/app/page.tsx` + Pulse Command hero      |
 | ✅ | `apps/web/components/Dashboard.tsx`       | `Crypto-Fundflow-Analyzer/components/Dashboard.tsx`               |
 | ⛔ | ~~`apps/web/components/AnalysisPanel.tsx`~~ | removed in Phase A — superseded by MCP via Claude Desktop       |
@@ -264,8 +252,8 @@ get_oi_snapshot()                              // open interest — NEW
 | 2 — UI         | Claude | Phase 1 done | tokens + Card + MetricCard + Pill + HeroTitle + NavBar + Loader + ThreeBackground |
 | 3 — Sources    | Claude | Phase 1 done | overview · stablecoins · etf+farside · futures · dex · tvl · funding (Binance/Bybit/OKX) · OI · `_helpers` · `format` · `snapshot`+`summarizeSnapshot` |
 | 4 — Charts     | Claude | Phase 1 done | Sparkline (SVG) · Candlestick (LWC v4.2) · FlowAreaChart · FlowBarChart with Cell coloring · FlowChart · DepthChart |
-| 5 — i18n       | Claude | Phase 1 done | dict + LocaleProvider + useLocale + Bilingual (stack/primary/secondary) + t/useT |
-| 6 — Web        | Claude | Phase 1 done | configs · 5 routes + `/design` showcase · 6 flow API routes + `/api/snapshot` + `/api/analyze` (streaming Anthropic) · `/api/markets` · MetricStrip · Dashboard · AnalysisPanel · MarketsTable · live derivatives · LocaleProvider + LocaleToggle wired |
+| 5 — i18n       | —      | REMOVED 2026-04-30 | package deleted; product is English-only |
+| 6 — Web        | Claude | Phase 1 done | configs · 5 routes + `/design` showcase · 6 flow API routes + `/api/snapshot` + `/api/analyze` (streaming Anthropic) · `/api/markets` · MetricStrip · Dashboard · AnalysisPanel · MarketsTable · live derivatives |
 | 7 — Realtime   | Claude | Phase 1+2 done | contracts (subscribe/unsubscribe/ack) · server with heartbeat + backpressure + per-client subscription filtering + channel matching · REST poller + native Binance/Bybit/OKX WS streams (reconnect/backoff, ping per venue, env-toggle via `PULSE_NATIVE_STREAMS`) |
 | 8 — MCP        | Claude | Phase 1+2 done | 10 tools (7 ported + 3 new: get_funding_summary, get_oi_snapshot, detect_anomalies) · `detect_anomalies` now backed by shared `scanAnomalies()` in `@pulse/sources` so MCP/alerts/web stay in sync · manifest.json · pack-dxt.mjs |
 
@@ -349,7 +337,6 @@ Remove Anthropic SDK + AI panel from web (user uses MCP via Claude Desktop inste
 - [ ] `rm apps/web/components/AnalysisPanel.tsx`
 - [ ] `apps/web/package.json` — drop `@anthropic-ai/sdk` dependency
 - [ ] `apps/web/components/AppShell.tsx` — drop `{ id: "analyst", … }` from `TABS`
-- [ ] Keep `nav.analyst` in `packages/i18n/src/dict.ts` (zero cost, useful if reverted)
 
 **Risk:** low. Anthropic dep is web-only, no other consumer.
 **Doesn't kill:** dynImport hack in `farside.ts`/`portfolio.ts` (those are still consumed by `/api/flows/etf` + `/api/portfolio`). That's Phase D's job.

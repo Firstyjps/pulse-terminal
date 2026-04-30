@@ -3,39 +3,36 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { colors, fonts } from "@pulse/ui";
-import { useT } from "@pulse/i18n";
-import type { DictKey } from "@pulse/i18n";
 
 interface NavItem {
   id: string;
-  /** i18n dict key for the visible label. */
-  labelKey: DictKey;
+  label: string;
   key: string;
   href: string;
 }
 
-const NAV: { sectionKey: DictKey; items: NavItem[] }[] = [
+const NAV: { section: string; items: NavItem[] }[] = [
   {
-    sectionKey: "nav.intel",
+    section: "INTEL",
     items: [
-      { id: "overview",  labelKey: "nav.overview",  key: "F1", href: "/" },
-      { id: "markets",   labelKey: "nav.markets",   key: "F2", href: "/markets" },
-      { id: "fundflow",  labelKey: "nav.fundflow",  key: "F3", href: "/fundflow" },
+      { id: "overview",  label: "OVERVIEW",  key: "F1", href: "/" },
+      { id: "markets",   label: "MARKETS",   key: "F2", href: "/markets" },
+      { id: "fundflow",  label: "FUNDFLOW",  key: "F3", href: "/fundflow" },
     ],
   },
   {
-    sectionKey: "nav.trading",
+    section: "TRADING",
     items: [
-      { id: "derivatives", labelKey: "nav.derivatives", key: "F4", href: "/derivatives" },
-      { id: "options",     labelKey: "nav.options",     key: "F5", href: "/options" },
-      { id: "backtest",    labelKey: "nav.backtest",    key: "F6", href: "/backtest" },
-      { id: "dual-assets", labelKey: "nav.dual_assets", key: "F8", href: "/dual-assets" },
+      { id: "derivatives", label: "DERIVATIVES", key: "F4", href: "/derivatives" },
+      { id: "options",     label: "OPTIONS",     key: "F5", href: "/options" },
+      { id: "backtest",    label: "BACKTEST",    key: "F6", href: "/backtest" },
+      { id: "dual-assets", label: "DUAL ASSETS", key: "F8", href: "/dual-assets" },
     ],
   },
   {
-    sectionKey: "nav.system",
+    section: "SYSTEM",
     items: [
-      { id: "settings", labelKey: "nav.settings", key: "F7", href: "/settings" },
+      { id: "settings", label: "SETTINGS", key: "F7", href: "/settings" },
     ],
   },
 ];
@@ -47,25 +44,11 @@ const KEY_TO_HREF = NAV.flatMap((g) => g.items).reduce<Record<string, string>>(
 
 /**
  * TerminalNav — 140px left rail with F-key shortcuts + STATUS block.
- *
- *   ─ INTEL ─                ─ TRADING ─               ─ SYSTEM ─
- *   F1 Overview              F4 Derivatives            F6 Alerts
- *   F2 Markets               F5 Backtest               F7 Settings
- *   F3 Fundflow                                        ┌─ STATUS ────┐
- *                                                      │ ALERTS  12  │
- *                                                      │ STREAMS  3  │
- *                                                      │ UPLINK 14ms │
- *                                                      └─────────────┘
- *
- * FEED + DERIV mini-blocks were removed per user request 2026-04-28
- * (top-of-page TerminalTicker covers the same data).
  */
 export function TerminalNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const t = useT();
 
-  // F1–F7 keyboard navigation (handoff feature)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (KEY_TO_HREF[e.key]) {
@@ -98,7 +81,7 @@ export function TerminalNav() {
       }}
     >
       {NAV.map((group, gi) => (
-        <div key={group.sectionKey}>
+        <div key={group.section}>
           <div
             style={{
               padding: "8px 10px 4px",
@@ -107,7 +90,7 @@ export function TerminalNav() {
               borderTop: gi === 0 ? "none" : `1px solid ${colors.line}`,
             }}
           >
-            — {t(group.sectionKey)} —
+            — {group.section} —
           </div>
           {group.items.map((it) => {
             const active = isActive(it.href);
@@ -156,13 +139,12 @@ export function TerminalNav() {
                 >
                   {it.key}
                 </span>
-                <span>{t(it.labelKey)}</span>
+                <span>{it.label}</span>
               </button>
             );
           })}
 
-          {/* SYSTEM keeps its STATUS block; FEED + DERIV blocks removed per user request 2026-04-28. */}
-          {group.sectionKey === "nav.system" && <StatusBlock />}
+          {group.section === "SYSTEM" && <StatusBlock />}
         </div>
       ))}
 
@@ -177,8 +159,8 @@ export function TerminalNav() {
           letterSpacing: "0.06em",
         }}
       >
-        <div><span style={{ color: colors.green }}>●</span> {t("status.socket_live")}</div>
-        <div><span style={{ color: colors.amber }}>●</span> {t("status.mcp_ready")}</div>
+        <div><span style={{ color: colors.green }}>●</span> SOCKET LIVE</div>
+        <div><span style={{ color: colors.amber }}>●</span> MCP READY</div>
         <div><span style={{ color: colors.txt3 }}>●</span> {new Date().toISOString().slice(0, 10).replace(/-/g, "·")}</div>
       </div>
     </nav>
@@ -229,14 +211,12 @@ function MiniBlock({ title, rows }: { title: string; rows: { k: string; v: React
 }
 
 function StatusBlock() {
-  const t = useT();
   const [latency, setLatency] = useState(14);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     const id = setInterval(() => {
       setNow(new Date());
-      // Random small drift around 14ms — purely ornamental until /api/health wired
       setLatency(12 + Math.floor(Math.random() * 8));
     }, 5000);
     return () => clearInterval(id);
@@ -244,11 +224,11 @@ function StatusBlock() {
 
   return (
     <MiniBlock
-      title={t("status.title")}
+      title="STATUS"
       rows={[
-        { k: t("status.alerts"),  v: <span>12 {t("status.armed")}</span> },
-        { k: t("status.streams"), v: <span>3</span> },
-        { k: t("status.uplink"),  v: <span style={{ color: latency < 20 ? colors.green : colors.amber }}>{latency}ms</span> },
+        { k: "ALERTS",  v: <span>12 ARMED</span> },
+        { k: "STREAMS", v: <span>3</span> },
+        { k: "UPLINK",  v: <span style={{ color: latency < 20 ? colors.green : colors.amber }}>{latency}ms</span> },
         { k: "UTC",     v: <span>{now.toISOString().slice(11, 16)}</span> },
       ]}
     />

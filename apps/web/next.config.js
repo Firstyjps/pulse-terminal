@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@pulse/ui", "@pulse/sources", "@pulse/charts", "@pulse/i18n"],
+  transpilePackages: ["@pulse/ui", "@pulse/sources", "@pulse/charts"],
   typedRoutes: false,
   // better-sqlite3 is a native module — must NOT be webpack-bundled.
   // It is only reached from server-side API routes that use @pulse/sources/server.

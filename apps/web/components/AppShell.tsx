@@ -1,6 +1,5 @@
 "use client";
 
-import { LocaleProvider } from "@pulse/i18n";
 import { ToastProvider } from "./ToastProvider";
 import { AlertWatcher } from "./AlertWatcher";
 import { TerminalStatusBar } from "./TerminalStatusBar";
@@ -28,19 +27,13 @@ import { useIsMobile } from "../lib/use-media";
  *   │ Workspace (full-width, no left rail)           1fr   │
  *   │ BottomTabNav (F1–F7 tap targets, 56px)         56px  │
  *   └──────────────────────────────────────────────────────┘
- *
- * The mobile flag flips on first `useEffect` flush. Server-rendered markup
- * shows the desktop layout — that's intentional, the brand asset is the
- * desktop terminal and we don't want CLS reflow on widescreen first paint.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <LocaleProvider>
-      <ToastProvider>
-        <AlertWatcher />
-        <Frame>{children}</Frame>
-      </ToastProvider>
-    </LocaleProvider>
+    <ToastProvider>
+      <AlertWatcher />
+      <Frame>{children}</Frame>
+    </ToastProvider>
   );
 }
 

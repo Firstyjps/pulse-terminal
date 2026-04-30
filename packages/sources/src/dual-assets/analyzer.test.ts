@@ -54,13 +54,13 @@ describe("generateHourlyReport", () => {
     expect(report).toEqual({ error: expect.stringMatching(/no data/i) });
   });
 
-  it("returns Thai recommendation when data exists", () => {
+  it("returns recommendation when data exists", () => {
     saveSnapshot(snap({ timestamp_ict: "2026-04-28T08:00:00.000+07:00", hour_ict: 8, apr_pct: 50 }));
     saveSnapshot(snap({ timestamp_ict: "2026-04-28T12:00:00.000+07:00", hour_ict: 12, apr_pct: 200 }));
     saveSnapshot(snap({ timestamp_ict: "2026-04-28T20:00:00.000+07:00", hour_ict: 20, apr_pct: 150 }));
     const report = generateHourlyReport({ coinPair: "SOL-USDT", targetPrice: 78, days: 365 });
     if ("error" in report) throw new Error("expected report, got error");
-    expect(report.recommendation).toMatch(/เข้า Dual Assets/);
+    expect(report.recommendation).toMatch(/Enter Dual Assets/);
     expect(report.best_hours[0].hour_ict).toBe(12);
     expect(report.coin_pair).toBe("SOL-USDT");
     expect(report.target_price).toBe(78);
@@ -82,6 +82,6 @@ describe("generateHourlyReport", () => {
     saveSnapshot(snap({ hour_ict: 12, apr_pct: 100 }));
     const report = generateHourlyReport({ coinPair: "SOL-USDT", targetPrice: 78, days: 365 });
     if ("error" in report) throw new Error("expected report");
-    expect(report.recommendation).toMatch(/ข้อมูลยังไม่เพียงพอ/);
+    expect(report.recommendation).toMatch(/Insufficient data/);
   });
 });

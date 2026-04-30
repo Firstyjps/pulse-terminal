@@ -41,6 +41,91 @@
 
 ## 📰 Activity log (newest at top)
 
+### 2026-04-30 · Code session (latest — i18n removal · ENGLISH-ONLY)
+**Hard pivot: product is now English-only. `packages/i18n/` deleted; bilingual infra retired.**
+
+- **Deleted** `packages/i18n/` (entire package — 5 files: dict.ts, t.ts, Bilingual.tsx, LocaleContext.tsx, index.ts).
+- **Rewired 5 web components to bare EN literals** (no more `useT(key)` lookups):
+  - [TerminalNav](apps/web/components/TerminalNav.tsx) — `NAV[].sectionKey: DictKey` → `section: string` ("INTEL"/"TRADING"/"SYSTEM"); `labelKey` → `label`.
+  - [TerminalStatusBar](apps/web/components/TerminalStatusBar.tsx) — feed-status lookup is now a plain `Record<FeedStatus, string>` constant. Killed the `\.replace(/^ฟีด/, "")` Thai-strip leftover.
+  - [TerminalBotBar](apps/web/components/TerminalBotBar.tsx) — **dropped the LANG button entirely**. F-bar is now: `READY · CMD · PROFILE · LATENCY ··· F1 Help · F8 Hotkeys · ⌘K CMD Palette · © CRYPTOPULSE INTEL`.
+  - [BottomTabNav](apps/web/components/BottomTabNav.tsx) — same dictKey→label substitution.
+  - [AppShell](apps/web/components/AppShell.tsx) — `LocaleProvider` import + wrapper removed.
+- **`/settings` page** [apps/web/app/settings/page.tsx](apps/web/app/settings/page.tsx) — entire LOCALE panel deleted (was Row 1 c-6). DATA REFRESH now spans c-12. Killed `useLocale` import. Translated 2 toast bodies (notifications-enabled · reset-complete) to EN.
+- **`MCPQuickAsk`** [apps/web/components/MCPQuickAsk.tsx](apps/web/components/MCPQuickAsk.tsx) — EN suggestion + clipboard hint + markdown header (`**Question:**` not `**คำถาม:**`).
+- **`FundingHeatmap`** comment translated.
+- **`packages/sources/dual-assets/analyzer.ts`** — `recommendation` string rewritten EN ("Enter Dual Assets between HH:MM-HH:MM ICT (avg APR X%) or…" / "Insufficient data — collect another 2–3 days.").
+- **`analyzer.test.ts`** — regex fixtures retargeted (`/Enter Dual Assets/` + `/Insufficient data/`). Test name renamed.
+- **Config drops:**
+  - `apps/web/package.json` — removed `@pulse/i18n` dep.
+  - `apps/web/next.config.js` — removed from `transpilePackages` array.
+- **Docs synced:**
+  - **CLAUDE.md** — bilingual rule replaced ("All user-facing labels are English only — package removed 2026-04-30"); Do-NOT list updated to forbid reintroducing Thai; IBM Plex Sans Thai dropped from font list.
+  - **README.md** — `i18n/` line removed from packages tree.
+  - **AGENTS.md** — Role 5 marked REMOVED with note; cross-cutting contracts row dropped; status board row marked REMOVED; migration map entry struck through; checkbox referencing `nav.analyst in dict.ts` removed.
+  - **HANDOFF.md** — packages/ tree updated (no i18n), components list refreshed, callout added.
+- **Verified:**
+  - `pnpm install` — workspace resolves to **7 packages** (was 8).
+  - `pnpm -r typecheck` — **all 7 clean** (web/ui/sources/charts/mcp/alerts/realtime).
+  - Zero Thai characters remain in `apps/` or `packages/` source (verified `[฀-๿]` regex sweep).
+  - Pre-existing 13 dual-assets SQLite native-binding test failures on Windows+Node24 unchanged — same baseline; **not caused by this change**, and Linux+Node20 passes.
+- **Behavioral side effects:**
+  - LANG button gone from bottom bar — users can no longer toggle TH ↔ EN.
+  - `localStorage` `pulse.locale` key becomes orphaned; harmless (nothing reads it).
+  - The EN-only labels collapse to the previous EN values exactly — no copy regressions.
+- **[doing]** nothing — handing back.
+- **[blocked]** None.
+- **[next]** Deploy to prod. The `apps/alerts` dual-assets cron change (DUAL_ASSETS_TARGETS=all) from previous session still pending restart — bundle that with this deploy.
+
+### 2026-04-29 evening · Code session — 19:06
+**3-hour sprint after round-3/4 deploy: dual-assets UI launch + ETF history + fundflow polish + chart fixes.** 14 commits, all on master, all live on prod.
+
+  **🆕 Major: `/dual-assets` UI page** (user request "A" — exposing Phase 5A data layer as a real tab)
+  - **NEW** [apps/web/app/dual-assets/page.tsx](apps/web/app/dual-assets/page.tsx) — 533-line Bloomberg-shell page, 3 ws-rows:
+    - Row 1 (h-stats): 4 KPIs (Current APR · Nd Avg APR · Best Hour · Snapshot count) + target picker.
+    - Row 2 (h-chart): 24-cell hour-of-day heatmap c-8 (amber saturation by avg APR, green border on best hour) + RECOMMENDATION c-4 with Thai recommendation from `analyzer.ts`, top-3 hours, cold hours. 7D/14D/30D window toggle.
+    - Row 3 (h-table): RECENT SNAPSHOTS c-7 (last 30 rows for active target) + DAILY SUMMARY c-5.
+  - Wired three Code-owned endpoints: `/api/dual-assets/{best-hour,snapshots,summary}`.
+  - Nav grew F8 = "DUAL ASSETS" under TRADING. Keyboard nav + i18n key (`nav.dual_assets`) wired.
+  - Commits: `1074742` (initial UI) → `7beaefc` (all strikes + dynamic picker) → `2c7ae90` (8H+1D focus).
+
+  **Dual-assets tracker rewrite** (root-cause fix on coverage)
+  - User flagged: Bybit web showed SOL-USDT BuyLow @ 84.85/84/83 strikes (~spot 84.84) at **696% / 347% / 13.75% APR on 8H** — but our tracker only captured ~17%. Root cause: hardcoded `DUAL_ASSETS_TARGETS=78,80` (~7-8% below spot, near-zero auto-call risk = low APR). Bybit doesn't even serve those exact strikes via V5 advance-product API; high-APR products live within ±1% of spot.
+  - [tracker.ts](packages/sources/src/dual-assets/tracker.ts) — `DUAL_ASSETS_TARGETS` default → `"all"` (save every strike Bybit returns). `DUAL_ASSETS_DIRECTIONS` default expanded `BuyLow` → `BuyLow,SellHigh`. New `DUAL_ASSETS_DURATIONS="8h,1d"` filter (server-set; default `"all"` for back-compat) — focuses on rolling-yield products since 3d/8d/29d sit at lower APR.
+  - [store.ts](packages/sources/src/dual-assets/store.ts) — `getHourlyAvg` + `getBestHours` accept optional `duration` param. SQL clause scopes analysis to one duration at a time (8H APR scale ≠ 1D APR scale; mixing = noise).
+  - [analyzer.ts](packages/sources/src/dual-assets/analyzer.ts) + [api/dual-assets/best-hour](apps/web/app/api/dual-assets/best-hour/route.ts) — pass-through `?duration=8h|1d`.
+  - Page: `[8H][1D]` toggle pills before strike picker (default 8H). Switching auto-reselects nearest-to-spot strike. Available targets re-derived per duration.
+  - Hover tooltip on each target chip shows distance from spot. Strikes within ±0.5% of spot → bright-amber.
+
+  **🆕 ETF flow history extended to since-inception**
+  - [packages/sources/src/farside.ts](packages/sources/src/farside.ts) — bypass Cloudflare on Farside via `curl-impersonate` (Chrome TLS fingerprint). Switched to Farside archive URLs for full since-inception history (BTC: Jan 2024 onward, ETH: Jul 2024 onward).
+  - **NEW** [docs/ETF-FLOWS.md](docs/ETF-FLOWS.md) — install steps + failure-mode runbook for `curl-impersonate` dep.
+  - Commits: `d0bacd1` (curl-impersonate) → `a6e81b7` (archive URLs).
+
+  **Fundflow page polish** (response to user UX feedback on /fundflow row 3-4)
+  - [apps/web/app/fundflow/page.tsx](apps/web/app/fundflow/page.tsx) — ETF flow chart capped to last 28 days (was full history; user said "ดูยาก, อยากเห็นเทรนด์ recent"). Cumulative line now shows 28-day delta + tight Y-axis (zooms to actual range, not zero-baseline).
+  - TOP CHAINS rows expand to fill panel height (no more dead space at bottom).
+  - Commits: `2200b45` (28d cap) → `4a1db57` (cumulative tight Y) → `06f3aaa` (rows expand).
+
+  **Chart fixes** (Recharts 2.15 + React 19 interop)
+  - [packages/charts/src/IVSmile.tsx](packages/charts/src/IVSmile.tsx) — `isAnimationActive={false}` on Call+Put Lines. Recharts 2.15.0 path-generation has known interop bug with React 19 concurrent renderer when used with `type="number"` XAxis + monotone Line. Symptom: 188 POINTS badge + axes + ATM ref line rendered, but no curve drawn. Also bumped `strokeWidth` 1.5→1.75 + `dot r` 2→2.5 for c-5 narrow panel visibility. (`487eae1`)
+  - Tooltip redesign across charts — clearer date format + signed/colored values. (`924a15f`)
+
+  **Overview MARKET PULSE fit**
+  - [apps/web/app/page.tsx](apps/web/app/page.tsx) + [MetricStrip](apps/web/components/MetricStrip.tsx) — sub-lines ("24h Δ", "vs total mcap", "alternative.me · 24h") were clipping. Fixed row sizing so all 6 StatBlocks render fully without scroll.
+  - 3-session live SESSION cell — Asia/EU/US session indicator with active-now ring. (`60b80e3`)
+
+  **Whale-flow bug fix**
+  - [packages/sources/src/whale-flow.ts](packages/sources/src/whale-flow.ts) — `mempool.space /blocks/tip/hash` returns plain text (not JSON). `fetchJson<string>` was running JSON.parse on raw hash → "Unexpected number in JSON at position 1". Switched to raw `fetch+text()` for that call; `/block/<hash>/txs` still returns JSON so `fetchJson` stays for second hop. (`41d6dad`)
+
+  **Cleanup / Docs**
+  - `77ebfba` — removed all "Ported from X" provenance comments across `packages/sources/src/{dual-assets,options}/**` + `packages/charts/**` + `packages/i18n/**` (7 prior reference projects already removed from disk). Updated README/AGENTS/HANDOFF/SECURITY/ADRs to reflect current state. **No code behavior change. All 8 typechecks remain clean.**
+
+- **[verified live]** All routes 200 on https://cryptopulse.buzz including new `/dual-assets` page. ETF history now shows full since-inception cumulative.
+- **[doing]** nothing — handing back to user.
+- **[blocked]** None. Tracker change requires `pulse-alerts` restart on prod to pick up new `DUAL_ASSETS_TARGETS=all` + `DUAL_ASSETS_DURATIONS=8h,1d` env (server already updated, restart pending verification).
+- **[next]** Soak test pulse-realtime depth-stream stability post-round-4 (1s→30s exponential reconnect). Optional: wire `/options` ARBITRAGE HITS to deep-link click → strike row in Options Chain.
+
 ### 2026-04-29 · Desktop session (latest)
 - **[done]** Round 3 — Mobile UX/UI + Bloomberg polish across remaining tabs + new Options Chain + i18n coverage. **Workspace typecheck clean across all 8 packages** (`pnpm -r typecheck`). Files staged but **not committed** — user to review and commit.
 
@@ -102,7 +187,7 @@
   - FundingHeatmap COMPACT vs MATRIX toggle
 - **[blocked]** None.
 
-### 2026-04-29 · Code session (latest — 22:50)
+### 2026-04-29 · Code session — 22:50 (round-3 deploy review)
 - **[done 22:50]** Reviewed + committed + deployed Desktop's round-3 work. Commit `81fee21` (22 files, +2554/-708) live on https://cryptopulse.buzz.
   - **Verified:** `pnpm -r typecheck` clean across 8/8 packages · `next build` clean · all 7 pages return 200 (`/`, `/markets`, `/derivatives`, **`/options`** (NEW), `/backtest`, `/fundflow`, `/settings`) · all 6 key APIs return 200 (depth, whale-flow, options/aggregate, options/iv-smile, dual-assets/snapshots, funding).
   - **Server drift cleaned:** auto-generated `apps/web/next-env.d.ts` was modifying repeatedly across builds — stashed + dropped. Also removed orphan `apps/alerts/apps/` artifact dir.

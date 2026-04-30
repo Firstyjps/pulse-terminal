@@ -1,6 +1,5 @@
 "use client";
 
-import { useLocale, useT } from "@pulse/i18n";
 import { colors, fonts } from "@pulse/ui";
 
 /**
@@ -16,9 +15,6 @@ export function TerminalBotBar({
   profile?: string;
   latencyMs?: number;
 }) {
-  const [locale, setLocale] = useLocale();
-  const t = useT();
-
   const segStyle: React.CSSProperties = {
     padding: "0 10px",
     height: "100%",
@@ -45,37 +41,18 @@ export function TerminalBotBar({
     >
       <span style={segStyle}>
         <span className="live-dot" />
-        {t("shell.ready")}
+        READY
       </span>
-      <span style={segStyle}><span className="dim">{t("shell.cmd")}</span> {cmd}</span>
-      <span style={segStyle}><span className="dim">{t("shell.profile")}</span> {profile}</span>
+      <span style={segStyle}><span className="dim">CMD</span> {cmd}</span>
+      <span style={segStyle}><span className="dim">PROFILE</span> {profile}</span>
       <span style={segStyle}>
-        <span className="dim">{t("shell.latency")}</span>{" "}
+        <span className="dim">LATENCY</span>{" "}
         <span className="mono-num" style={{ color: colors.txt2 }}>{latencyMs}MS</span>
       </span>
       <span style={{ marginLeft: "auto", display: "flex", height: "100%" }}>
-        <span style={segStyle}><span className="dim">F1</span> {t("shell.help")}</span>
-        <span style={segStyle}><span className="dim">F8</span> {t("shell.hotkeys")}</span>
-        <span style={segStyle}><span className="dim">⌘K</span> {t("shell.cmd_palette")}</span>
-        <button
-          type="button"
-          onClick={() => setLocale(locale === "th" ? "en" : "th")}
-          style={{
-            ...segStyle,
-            background: "transparent",
-            border: "none",
-            borderRight: `1px solid ${colors.line}`,
-            color: colors.txt3,
-            fontFamily: "inherit",
-            fontSize: 9,
-            letterSpacing: "0.08em",
-            cursor: "pointer",
-            textTransform: "uppercase",
-          }}
-          aria-label="Toggle language"
-        >
-          <span className="dim">{t("shell.lang")}</span> {locale}
-        </button>
+        <span style={segStyle}><span className="dim">F1</span> Help</span>
+        <span style={segStyle}><span className="dim">F8</span> Hotkeys</span>
+        <span style={segStyle}><span className="dim">⌘K</span> CMD Palette</span>
         <span style={{ ...segStyle, color: colors.amber, borderRight: "none" }}>
           © CRYPTOPULSE INTEL
         </span>

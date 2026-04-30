@@ -63,8 +63,7 @@ packages/
 ├── sources/    Data adapters — every external API + format helpers + anomaly scanner
 │               · "@pulse/sources" — browser-safe (types, format, helpers, anomaly types)
 │               · "@pulse/sources/server" — Node-only (farside, portfolio, signed adapters)
-├── charts/     6 chart components (LWC v4.2 · recharts · SVG)
-└── i18n/       Bilingual ไทย/EN — dict, LocaleProvider, Bilingual, t/useT
+└── charts/     6 chart components (LWC v4.2 · recharts · SVG)
 ```
 
 ## MCP setup (Claude Desktop)

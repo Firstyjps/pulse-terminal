@@ -64,7 +64,7 @@ function fgFor(intensity: number): string {
 }
 
 /**
- * FundingHeatmap — redesigned (round-3) per user feedback "อ่านยาก, cells หน้าตาเหมือนกันหมด".
+ * FundingHeatmap — redesigned (round-3) per user feedback "hard to read, cells all look the same".
  *
  * Two view modes:
  *   COMPACT — top hot longs (top half) + top hot shorts (bottom half).

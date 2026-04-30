@@ -86,9 +86,6 @@ importers:
       '@pulse/charts':
         specifier: workspace:*
         version: link:../../packages/charts
-      '@pulse/i18n':
-        specifier: workspace:*
-        version: link:../../packages/i18n
       '@pulse/sources':
         specifier: workspace:*
         version: link:../../packages/sources
@@ -169,19 +166,6 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.17)
-
-  packages/i18n:
-    dependencies:
-      react:
-        specifier: ^19.2.5
-        version: 19.2.5
-    devDependencies:
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.14
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
 
   packages/sources:
     dependencies:

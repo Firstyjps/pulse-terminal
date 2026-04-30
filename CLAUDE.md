@@ -26,7 +26,7 @@ pnpm dev          # boots web + realtime together via turbo
 ## Conventions
 - Internal packages namespaced `@pulse/*`
 - All API calls go through `@pulse/sources` — never `fetch()` in components or apps directly
-- All user-facing labels must be bilingual via `@pulse/i18n` (`<Bilingual th="..." en="..." />` or `t(key)`)
+- All user-facing labels are English only — the `@pulse/i18n` package was removed 2026-04-30
 - Design tokens come from `@pulse/ui/tokens` — never hard-code colors, fonts, or shadows
 - Use `clsx` for conditional classes
 - Strict TypeScript everywhere
@@ -35,12 +35,12 @@ pnpm dev          # boots web + realtime together via turbo
 Purple/cyan glassmorphism (Pulse Command aesthetic).
 - Background: `#04050a`
 - Accents: `#7c5cff` (purple) + `#22d3ee` (cyan)
-- Fonts: Space Grotesk (display), Inter (body), JetBrains Mono (numbers), IBM Plex Sans Thai (Thai)
+- Fonts: Space Grotesk (display), Inter (body), JetBrains Mono (numbers)
 
 ## Do NOT
 - Touch files outside your assigned role's directory (see AGENTS.md)
 - Hardcode colors, fonts, or labels
-- Skip the bilingual requirement
+- Reintroduce bilingual / Thai strings — product is English-only as of 2026-04-30
 - Upgrade Lightweight Charts past v4.2 (v5 removed `addCandlestickSeries` / `addHistogramSeries`)
 - Add new top-level dependencies without coordinating — prefer workspace packages
 - Fetch data outside `packages/sources`

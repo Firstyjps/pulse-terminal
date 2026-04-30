@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { colors, fonts } from "@pulse/ui";
-import { useT } from "@pulse/i18n";
 
 type FeedStatus = "connecting" | "live" | "stale" | "offline";
 
@@ -18,6 +17,20 @@ interface Props {
   /** Mobile-style: drop VER/USR/DESK + DATE/SESS, keep brand + feed dot + UTC. */
   compact?: boolean;
 }
+
+const FEED_LABEL_LONG: Record<FeedStatus, string> = {
+  live: "FEED LIVE",
+  stale: "FEED STALE",
+  offline: "FEED OFFLINE",
+  connecting: "CONNECTING…",
+};
+
+const FEED_LABEL_SHORT: Record<FeedStatus, string> = {
+  live: "LIVE",
+  stale: "STALE",
+  offline: "OFFLINE",
+  connecting: "CONNECTING…",
+};
 
 /**
  * TerminalStatusBar — top 22px status row.
@@ -35,20 +48,12 @@ export function TerminalStatusBar({
   desk = "MACRO·INTEL",
   compact = false,
 }: Props) {
-  const t = useT();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const feedLabelLong =
-    feedStatus === "live" ? t("shell.feed_live") :
-    feedStatus === "stale" ? t("shell.feed_stale") :
-    feedStatus === "offline" ? t("shell.feed_offline") :
-    t("shell.feed_connecting");
-  // For compact mode strip the "FEED " prefix where present (works in both langs)
-  const feedLabel = feedLabelLong.replace(/^FEED\s+/i, "").replace(/^ฟีด/, "");
   const dotClass = feedStatus === "live" ? "" : feedStatus === "stale" ? "amber" : "red";
 
   const segStyle: React.CSSProperties = {
@@ -86,7 +91,7 @@ export function TerminalStatusBar({
           letterSpacing: compact ? "0.10em" : "0.14em",
         }}
       >
-        ◆ {compact ? "CRYPTOPULSE" : "CRYPTOPULSE"}
+        ◆ CRYPTOPULSE
       </span>
 
       {!compact && <span style={segStyle}><span className="dim">VER</span> {version}</span>}
@@ -96,7 +101,7 @@ export function TerminalStatusBar({
       <span style={{ marginLeft: "auto", display: "flex", height: "100%" }}>
         <span style={segStyle}>
           <span className={`live-dot ${dotClass}`} />
-          <span>{compact ? feedLabel : feedLabelLong}</span>
+          <span>{compact ? FEED_LABEL_SHORT[feedStatus] : FEED_LABEL_LONG[feedStatus]}</span>
         </span>
         <span style={segStyle}>
           <span className="dim">UTC</span>{" "}
@@ -105,7 +110,7 @@ export function TerminalStatusBar({
         {!compact && <span style={segStyle}><span className="dim">DATE</span> <span className="mono-num">{fmtDate(now)}</span></span>}
         {!compact && (
           <span style={{ ...segStyle, borderRight: "none" }}>
-            <span className="dim">{t("shell.session")}</span> {t("shell.session_us_eu")}
+            <span className="dim">SESS</span> US·EU OVERLAP
           </span>
         )}
       </span>
