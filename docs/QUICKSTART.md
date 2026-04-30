@@ -35,7 +35,7 @@ cd pulse-terminal
 
 If from a local copy (current setup):
 ```bash
-cd "c:/Users/Firsty/OneDrive/เอกสาร/เดสก์ท็อป/Terminal"
+cd C:/dev/pulse-terminal
 ```
 
 ---
