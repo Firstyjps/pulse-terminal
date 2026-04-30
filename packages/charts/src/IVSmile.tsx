@@ -26,6 +26,10 @@ export interface IVSmileProps {
   spot?: number;
   /** Split call/put into two lines. Defaults to true when sides are present. */
   splitSides?: boolean;
+  /** User-selected strike — drawn as a brighter vertical reference line. */
+  selectedStrike?: number;
+  /** Side of the user-selected option. */
+  selectedSide?: "call" | "put";
   height?: number;
   callColor?: string;
   putColor?: string;
@@ -50,6 +54,8 @@ export function IVSmile({
   data,
   spot,
   splitSides,
+  selectedStrike,
+  selectedSide,
   height = 280,
   callColor = "#41ff8b",
   putColor = "#ff3355",
@@ -119,6 +125,19 @@ export function IVSmile({
               stroke="#ffb340"
               strokeDasharray="3 3"
               label={{ value: "ATM", fill: "#ffb340", fontSize: 10, position: "top" }}
+            />
+          )}
+          {selectedStrike !== undefined && (
+            <ReferenceLine
+              x={selectedStrike}
+              stroke={selectedSide === "put" ? putColor : callColor}
+              strokeWidth={1.5}
+              label={{
+                value: `K ${selectedStrike}`,
+                fill: selectedSide === "put" ? putColor : callColor,
+                fontSize: 10,
+                position: "insideTopLeft",
+              }}
             />
           )}
           {split ? (

@@ -50,9 +50,17 @@ const ASSETS: OptionAsset[] = ["BTC", "ETH", "SOL"];
  *   Row 3 (h-table, 340px): GREEKS HEATMAP c-8 + ARBITRAGE c-4
  *   Row 4 (h-chart, 320px): IV TERM STRUCTURE c-7 + OI BY EXPIRY c-5
  */
+type Side = "call" | "put";
+
+interface Selected {
+  strike: number;
+  side: Side;
+}
+
 export default function OptionsPage() {
   const [asset, setAsset] = useState<OptionAsset>("BTC");
   const [expiry, setExpiry] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Selected | null>(null);
 
   const aggregate = useFlow<AggregateWithArb>(`/api/options/aggregate?asset=${asset}&arbitrage=1`);
   const ivSmile = useFlow<IVSmileResp>(
@@ -66,6 +74,9 @@ export default function OptionsPage() {
       setExpiry(aggregate.data.expiries[0]);
     }
   }, [aggregate.data, expiry]);
+
+  // Reset selection when asset/expiry changes
+  useEffect(() => { setSelected(null); }, [asset, expiry]);
 
   const opts = aggregate.data?.options ?? [];
   const expiries = aggregate.data?.expiries ?? [];
@@ -176,7 +187,16 @@ export default function OptionsPage() {
           actions={expiryActions}
           flush
         >
-          <StrikeLadder rows={ladderRows} spot={spot} />
+          <StrikeLadder
+            rows={ladderRows}
+            spot={spot}
+            selected={selected}
+            onPick={(strike, side) =>
+              setSelected((cur) =>
+                cur && cur.strike === strike && cur.side === side ? null : { strike, side },
+              )
+            }
+          />
         </Panel>
         <Panel
           span={5}
@@ -184,7 +204,14 @@ export default function OptionsPage() {
           badge={ivSmile.data ? `${ivPoints.length} POINTS` : "LOADING"}
         >
           {ivSmile.data && ivPoints.length > 0 ? (
-            <IVSmile data={ivPoints} spot={spot} splitSides height={380} />
+            <IVSmile
+              data={ivPoints}
+              spot={spot}
+              splitSides
+              selectedStrike={selected?.strike}
+              selectedSide={selected?.side}
+              height={380}
+            />
           ) : (
             <p style={{ color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
               {ivSmile.loading ? "Loading IV smile…" : ivSmile.error ?? "No IV data for this expiry"}
@@ -212,11 +239,25 @@ export default function OptionsPage() {
         </Panel>
         <Panel
           span={4}
-          title="ARBITRAGE HITS"
-          badge={`${arbitrage.length} OPP`}
+          title={selected ? "POSITION SIMULATOR" : "ARBITRAGE HITS"}
+          badge={
+            selected
+              ? `${selected.side.toUpperCase()} ${compact(selected.strike)}`
+              : `${arbitrage.length} OPP`
+          }
           flush
         >
-          <ArbitrageList items={arbitrage} />
+          {selected ? (
+            <PositionSimulator
+              selected={selected}
+              row={ladderRows.find((r) => r.strike === selected.strike) ?? null}
+              spot={spot}
+              expiry={expiry}
+              onClose={() => setSelected(null)}
+            />
+          ) : (
+            <ArbitrageList items={arbitrage} />
+          )}
         </Panel>
       </WsRow>
 
@@ -461,9 +502,11 @@ function buildIvPoints(s: IVSmileResp | null): IVPoint[] {
   // Multiple exchanges quote the same (strike, side) — average their IVs
   // so the smile chart sees one clean point per (strike, side) instead of
   // arbitrary last-writer-wins overwrites in the chart's pivoter.
+  // Drop deep ITM/OTM outliers (IV > 200% or < 5%) — those are stale or
+  // illiquid quotes that compress the actual smile against the y-axis.
   const sums = new Map<string, { strike: number; side: "call" | "put"; ivSum: number; n: number }>();
   const acc = (strike: number, iv: number, side: "call" | "put") => {
-    if (!Number.isFinite(iv) || iv <= 0) return;
+    if (!Number.isFinite(iv) || iv < 5 || iv > 200) return;
     const key = `${strike}-${side}`;
     const cur = sums.get(key);
     if (cur) { cur.ivSum += iv; cur.n += 1; }
@@ -544,7 +587,17 @@ function buildStats(opts: OptionData[], expiry: string | null, spot: number) {
 
 // ───────────── presentational ─────────────
 
-function StrikeLadder({ rows, spot }: { rows: LadderRow[]; spot: number }) {
+function StrikeLadder({
+  rows,
+  spot,
+  selected,
+  onPick,
+}: {
+  rows: LadderRow[];
+  spot: number;
+  selected: Selected | null;
+  onPick: (strike: number, side: Side) => void;
+}) {
   if (rows.length === 0) {
     return (
       <p style={{ padding: 16, color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
@@ -583,29 +636,45 @@ function StrikeLadder({ rows, spot }: { rows: LadderRow[]; spot: number }) {
         <tbody>
           {rows.map((r) => {
             const tint = r.isATM ? "rgba(255,176,0,0.10)" : "transparent";
-            const intMoney = (side: "call" | "put") =>
+            const intMoney = (side: Side) =>
               side === "call" ? r.strike < spot : r.strike > spot;
+            const callSelected = selected?.strike === r.strike && selected.side === "call";
+            const putSelected = selected?.strike === r.strike && selected.side === "put";
+            const callBg = callSelected
+              ? "rgba(52,211,153,0.18)"
+              : r.call && intMoney("call")
+              ? "rgba(25,210,122,0.05)"
+              : undefined;
+            const putBg = putSelected
+              ? "rgba(248,113,113,0.18)"
+              : r.put && intMoney("put")
+              ? "rgba(255,77,94,0.05)"
+              : undefined;
+            const callPickable = !!r.call;
+            const putPickable = !!r.put;
+            const onCallClick = () => callPickable && onPick(r.strike, "call");
+            const onPutClick = () => putPickable && onPick(r.strike, "put");
             return (
               <tr key={r.strike} style={{ borderBottom: `1px solid ${colors.line}`, background: tint }}>
-                <td style={{ ...tdRight, color: r.call ? colors.txt2 : colors.txt4 }}>
+                <td onClick={onCallClick} style={{ ...tdRight, color: r.call ? colors.txt2 : colors.txt4, background: callBg, cursor: callPickable ? "pointer" : "default" }}>
                   {r.call ? `${r.call.iv.toFixed(0)}%` : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.call ? colors.txt3 : colors.txt4 }}>
+                <td onClick={onCallClick} style={{ ...tdRight, color: r.call ? colors.txt3 : colors.txt4, background: callBg, cursor: callPickable ? "pointer" : "default" }}>
                   {r.call ? compact(r.call.oi) : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.call ? colors.green : colors.txt4, background: r.call && intMoney("call") ? "rgba(25,210,122,0.05)" : undefined }}>
+                <td onClick={onCallClick} style={{ ...tdRight, color: r.call ? colors.green : colors.txt4, background: callBg, cursor: callPickable ? "pointer" : "default" }}>
                   {r.call ? r.call.bid.toFixed(2) : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.call ? colors.txt1 : colors.txt4, fontWeight: 600 }}>
+                <td onClick={onCallClick} style={{ ...tdRight, color: r.call ? colors.txt1 : colors.txt4, fontWeight: 600, background: callBg, cursor: callPickable ? "pointer" : "default" }}>
                   {r.call ? r.call.mark.toFixed(2) : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.call ? colors.red : colors.txt4 }}>
+                <td onClick={onCallClick} style={{ ...tdRight, color: r.call ? colors.red : colors.txt4, background: callBg, cursor: callPickable ? "pointer" : "default" }}>
                   {r.call ? r.call.ask.toFixed(2) : "—"}
                 </td>
                 <td
                   style={{
                     ...tdCenter,
-                    color: r.isATM ? colors.amber : colors.amber,
+                    color: colors.amber,
                     fontWeight: r.isATM ? 700 : 600,
                     background: r.isATM ? colors.bg2 : colors.bg3,
                   }}
@@ -613,19 +682,19 @@ function StrikeLadder({ rows, spot }: { rows: LadderRow[]; spot: number }) {
                   {compact(r.strike)}
                   {r.isATM && <span style={{ marginLeft: 4, color: colors.amberBright, fontSize: 8 }}>◆</span>}
                 </td>
-                <td style={{ ...tdRight, color: r.put ? colors.green : colors.txt4 }}>
+                <td onClick={onPutClick} style={{ ...tdRight, color: r.put ? colors.green : colors.txt4, background: putBg, cursor: putPickable ? "pointer" : "default" }}>
                   {r.put ? r.put.bid.toFixed(2) : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.put ? colors.txt1 : colors.txt4, fontWeight: 600 }}>
+                <td onClick={onPutClick} style={{ ...tdRight, color: r.put ? colors.txt1 : colors.txt4, fontWeight: 600, background: putBg, cursor: putPickable ? "pointer" : "default" }}>
                   {r.put ? r.put.mark.toFixed(2) : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.put ? colors.red : colors.txt4, background: r.put && intMoney("put") ? "rgba(255,77,94,0.05)" : undefined }}>
+                <td onClick={onPutClick} style={{ ...tdRight, color: r.put ? colors.red : colors.txt4, background: putBg, cursor: putPickable ? "pointer" : "default" }}>
                   {r.put ? r.put.ask.toFixed(2) : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.put ? colors.txt3 : colors.txt4 }}>
+                <td onClick={onPutClick} style={{ ...tdRight, color: r.put ? colors.txt3 : colors.txt4, background: putBg, cursor: putPickable ? "pointer" : "default" }}>
                   {r.put ? compact(r.put.oi) : "—"}
                 </td>
-                <td style={{ ...tdRight, color: r.put ? colors.txt2 : colors.txt4 }}>
+                <td onClick={onPutClick} style={{ ...tdRight, color: r.put ? colors.txt2 : colors.txt4, background: putBg, cursor: putPickable ? "pointer" : "default" }}>
                   {r.put ? `${r.put.iv.toFixed(0)}%` : "—"}
                 </td>
               </tr>
@@ -636,6 +705,211 @@ function StrikeLadder({ rows, spot }: { rows: LadderRow[]; spot: number }) {
     </div>
   );
 }
+
+/**
+ * PositionSimulator — quick "what if I buy this option" panel.
+ *
+ * Plain expiry P&L (intrinsic value − premium paid) across a range of spot
+ * outcomes. Skips a real Black-Scholes pricer because the user only needs
+ * to eyeball whether the trade has reasonable risk/reward, not to mark a
+ * position to model. Premium uses the ask (buy) by default.
+ */
+function PositionSimulator({
+  selected,
+  row,
+  spot,
+  expiry,
+  onClose,
+}: {
+  selected: Selected;
+  row: LadderRow | null;
+  spot: number;
+  expiry: string | null;
+  onClose: () => void;
+}) {
+  const quote = selected.side === "call" ? row?.call : row?.put;
+  if (!quote || !spot) {
+    return (
+      <p style={{ padding: 14, color: colors.txt3, fontFamily: fonts.mono, fontSize: 11 }}>
+        No quote for this strike yet — pick another row in the ladder.
+      </p>
+    );
+  }
+
+  const premium = quote.ask > 0 ? quote.ask : quote.mark;
+  const isCall = selected.side === "call";
+  const breakeven = isCall ? selected.strike + premium : selected.strike - premium;
+  const dte = expiry ? daysToExpiry(expiry) : null;
+
+  const offsets = [-0.2, -0.1, -0.05, 0, 0.05, 0.1, 0.2];
+  const scenarios = offsets.map((o) => {
+    const target = spot * (1 + o);
+    const intrinsic = isCall
+      ? Math.max(0, target - selected.strike)
+      : Math.max(0, selected.strike - target);
+    const pnl = intrinsic - premium;
+    const roi = premium > 0 ? (pnl / premium) * 100 : 0;
+    return { o, target, pnl, roi };
+  });
+
+  const accent = isCall ? colors.green : colors.red;
+
+  return (
+    <div style={{ height: "100%", overflow: "auto", fontFamily: fonts.mono, fontSize: 11 }}>
+      {/* Header with key stats */}
+      <div style={{ padding: "10px 12px", borderBottom: `1px solid ${colors.line}` }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+          <span style={{ color: accent, fontWeight: 700, fontSize: 13 }}>
+            BUY {selected.side.toUpperCase()}
+          </span>
+          <span style={{ color: colors.amber, fontWeight: 600 }}>
+            K {compact(selected.strike)}
+          </span>
+          <span style={{ color: colors.txt4 }}>· {quote.exchange}</span>
+          <button
+            onClick={onClose}
+            title="Clear selection"
+            style={{
+              marginLeft: "auto",
+              background: "transparent",
+              border: `1px solid ${colors.line2}`,
+              color: colors.txt3,
+              fontFamily: "inherit",
+              fontSize: 9,
+              padding: "1px 6px",
+              cursor: "pointer",
+              letterSpacing: "0.08em",
+            }}
+          >
+            ✕ CLEAR
+          </button>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 6,
+            color: colors.txt3,
+            fontSize: 10,
+            lineHeight: 1.5,
+          }}
+        >
+          <span>
+            <span style={{ color: colors.txt4 }}>premium </span>
+            <span style={{ color: colors.txt1, fontWeight: 600 }}>
+              ${premium.toFixed(2)}
+            </span>
+          </span>
+          <span>
+            <span style={{ color: colors.txt4 }}>breakeven </span>
+            <span style={{ color: colors.amber, fontWeight: 600 }}>
+              ${breakeven.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </span>
+          </span>
+          <span>
+            <span style={{ color: colors.txt4 }}>iv </span>
+            <span style={{ color: colors.txt2 }}>{quote.iv.toFixed(0)}%</span>
+          </span>
+          <span>
+            <span style={{ color: colors.txt4 }}>dte </span>
+            <span style={{ color: colors.txt2 }}>{dte ?? "—"}d</span>
+          </span>
+          <span>
+            <span style={{ color: colors.txt4 }}>spot </span>
+            <span style={{ color: colors.txt2 }}>${spot.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+          </span>
+          <span>
+            <span style={{ color: colors.txt4 }}>oi </span>
+            <span style={{ color: colors.txt2 }}>{compact(quote.oi)}</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Scenarios at expiry */}
+      <div style={{ padding: "8px 12px 6px" }}>
+        <div
+          style={{
+            color: colors.txt4,
+            fontSize: 9,
+            letterSpacing: "0.10em",
+            marginBottom: 6,
+            textTransform: "uppercase",
+          }}
+        >
+          ▸ P/L at expiry
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+          <thead>
+            <tr style={{ color: colors.txt4 }}>
+              <th style={{ ...thSim }}>Spot Δ</th>
+              <th style={{ ...thSim, textAlign: "right" }}>Spot $</th>
+              <th style={{ ...thSim, textAlign: "right" }}>P/L</th>
+              <th style={{ ...thSim, textAlign: "right" }}>ROI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scenarios.map((s) => {
+              const isCenter = s.o === 0;
+              const c = s.pnl >= 0 ? colors.green : colors.red;
+              return (
+                <tr
+                  key={s.o}
+                  style={{
+                    borderBottom: `1px dashed ${colors.line}`,
+                    background: isCenter ? "rgba(255,176,0,0.06)" : undefined,
+                  }}
+                >
+                  <td style={{ ...tdSim, color: colors.txt3 }}>
+                    {s.o > 0 ? "+" : ""}{(s.o * 100).toFixed(0)}%
+                  </td>
+                  <td style={{ ...tdSim, textAlign: "right", color: colors.txt2 }}>
+                    {s.target.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </td>
+                  <td style={{ ...tdSim, textAlign: "right", color: c, fontWeight: 600 }}>
+                    {s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(0)}
+                  </td>
+                  <td style={{ ...tdSim, textAlign: "right", color: c, fontWeight: 600 }}>
+                    {s.roi >= 0 ? "+" : ""}{s.roi.toFixed(0)}%
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div style={{ marginTop: 6, color: colors.txt4, fontSize: 9 }}>
+          Max loss locked at premium (${premium.toFixed(2)}). {isCall ? "Upside unbounded." : "Max profit at $0 = $" + (selected.strike - premium).toFixed(0)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function daysToExpiry(yyyymmdd: string): number | null {
+  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(yyyymmdd);
+  if (!m) return null;
+  const exp = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  const now = Date.now();
+  const days = Math.round((exp - now) / 86_400_000);
+  return Math.max(0, days);
+}
+
+const thSim: React.CSSProperties = {
+  padding: "4px 6px",
+  textAlign: "left",
+  fontSize: 9,
+  fontWeight: 500,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  color: colors.txt4,
+  borderBottom: `1px solid ${colors.line}`,
+  whiteSpace: "nowrap",
+};
+
+const tdSim: React.CSSProperties = {
+  padding: "4px 6px",
+  fontVariantNumeric: "tabular-nums",
+  whiteSpace: "nowrap",
+};
 
 function ArbitrageList({ items }: { items: OptionsArbitrage[] }) {
   if (items.length === 0) {
