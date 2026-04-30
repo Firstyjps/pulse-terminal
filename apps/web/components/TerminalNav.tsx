@@ -16,26 +16,26 @@ const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "INTEL",
     items: [
-      { id: "overview",  label: "OVERVIEW",  key: "F1",  href: "/" },
-      { id: "markets",   label: "MARKETS",   key: "F2",  href: "/markets" },
-      { id: "fundflow",  label: "FUNDFLOW",  key: "F3",  href: "/fundflow" },
-      { id: "intel",     label: "INTEL",     key: "F9",  href: "/intel" },
-      { id: "history",   label: "HISTORY",   key: "F10", href: "/history" },
+      { id: "overview",  label: "OVERVIEW",  key: "F1", href: "/" },
+      { id: "markets",   label: "MARKETS",   key: "F2", href: "/markets" },
+      { id: "fundflow",  label: "FUNDFLOW",  key: "F3", href: "/fundflow" },
+      { id: "intel",     label: "INTEL",     key: "F4", href: "/intel" },
+      { id: "history",   label: "HISTORY",   key: "F5", href: "/history" },
     ],
   },
   {
     section: "TRADING",
     items: [
-      { id: "derivatives", label: "DERIVATIVES", key: "F4", href: "/derivatives" },
-      { id: "options",     label: "OPTIONS",     key: "F5", href: "/options" },
-      { id: "backtest",    label: "BACKTEST",    key: "F6", href: "/backtest" },
-      { id: "dual-assets", label: "DUAL ASSETS", key: "F8", href: "/dual-assets" },
+      { id: "derivatives", label: "DERIVATIVES", key: "F6", href: "/derivatives" },
+      { id: "options",     label: "OPTIONS",     key: "F7", href: "/options" },
+      { id: "backtest",    label: "BACKTEST",    key: "F8", href: "/backtest" },
+      { id: "dual-assets", label: "DUAL ASSETS", key: "F9", href: "/dual-assets" },
     ],
   },
   {
     section: "SYSTEM",
     items: [
-      { id: "settings", label: "SETTINGS", key: "F7", href: "/settings" },
+      { id: "settings", label: "SETTINGS", key: "F10", href: "/settings" },
     ],
   },
 ];

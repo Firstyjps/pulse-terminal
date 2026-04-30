@@ -28,7 +28,7 @@ const SHELL_BYPASS_ROUTES = ["/chart-popup"];
  *   │ TerminalStatusBar (compact)                    22px  │
  *   │ TerminalTicker                                 26px  │
  *   │ Workspace (full-width, no left rail)           1fr   │
- *   │ BottomTabNav (F1–F7 tap targets, 56px)         56px  │
+ *   │ BottomTabNav (F1–F10 tap targets, 56px)        56px  │
  *   └──────────────────────────────────────────────────────┘
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
