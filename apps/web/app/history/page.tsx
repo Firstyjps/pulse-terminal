@@ -171,7 +171,7 @@ export default function HistoryPage() {
           badge={`SQLITE · 90D ROLLING · ${data?.stats.count ?? 0} ROWS`}
           actions={
             <span style={{ display: "flex", gap: 6 }}>
-              <button onClick={backfillNow} style={btnStyle()} title="Force collect today's snapshot now (instead of waiting for 00:05 UTC cron)">
+              <button onClick={backfillNow} style={btnStyle()} title="Force collect today's snapshot now (instead of waiting for 07:05 ICT cron)">
                 ▶ COLLECT NOW
               </button>
               <button onClick={exportJson} style={btnStyle()}>⬇ EXPORT JSON</button>
@@ -272,6 +272,7 @@ export default function HistoryPage() {
             loading={loading && !data}
             error={error}
             count={data?.stats.count ?? 0}
+            priceFormatter={tab === "market" ? formatterFor(metric) : formatterPrice}
           />
         </Panel>
       </WsRow>
@@ -321,7 +322,7 @@ export default function HistoryPage() {
             {data && data.history.length === 0 && (
               <p style={{ padding: 14, fontSize: 11, color: colors.txt3, fontFamily: fonts.mono }}>
                 No snapshots yet. Click <strong>▶ COLLECT NOW</strong> to capture today's row, or wait for the
-                00:05 UTC cron tonight.
+                07:05 ICT cron tonight.
               </p>
             )}
           </div>
@@ -337,12 +338,14 @@ function ChartBody({
   loading,
   error,
   count,
+  priceFormatter,
 }: {
   data: PriceLinePoint[];
   color: string;
   loading: boolean;
   error: string | null;
   count: number;
+  priceFormatter?: (v: number) => string;
 }) {
   if (loading) {
     return (
@@ -367,10 +370,31 @@ function ChartBody({
   }
   return (
     <div style={{ height: "100%", padding: "8px 0" }}>
-      <PriceLine data={data} height={340} color={color} filled showVolume={false} />
+      <PriceLine
+        data={data}
+        height={340}
+        color={color}
+        filled
+        showVolume={false}
+        priceFormatter={priceFormatter}
+      />
     </div>
   );
 }
+
+function formatterFor(metric: MarketMetric): (v: number) => string {
+  switch (metric) {
+    case "totalMcap":
+    case "totalVolume":
+      return (v) => formatUSD(v, { compact: true, decimals: 2 });
+    case "btcDominance":
+      return (v) => `${v.toFixed(2)}%`;
+    case "fgValue":
+      return (v) => v.toFixed(0);
+  }
+}
+
+const formatterPrice = (v: number) => formatUSD(v, { compact: v >= 1000, decimals: v >= 1000 ? 2 : 4 });
 
 function readMetric(s: MarketSnapshot, m: MarketMetric): number | null {
   switch (m) {

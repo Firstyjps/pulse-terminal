@@ -4,16 +4,16 @@
   "version": "1.0.0",
   "identifier": "com.cryptopulse.terminal",
   "build": {
-    "frontendDist": "../apps/web/.next/standalone",
+    "frontendDist": "dist",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "pnpm --filter @pulse/web dev",
-    "beforeBuildCommand": "pnpm --filter @pulse/web build"
+    "beforeDevCommand": "pnpm --filter @pulse/web dev"
   },
   "app": {
     "windows": [
       {
         "label": "main",
         "title": "◆ Pulse Terminal",
+        "url": "https://cryptopulse.buzz",
         "width": 1400,
         "height": 900,
         "minWidth": 1024,

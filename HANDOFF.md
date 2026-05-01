@@ -20,7 +20,7 @@ User direction (loose): pro multi-pane (TradingView Pro vibe) but the `frontend-
 
 ## 📦 What this product is
 
-**Pulse Terminal** — personal crypto macro intelligence dashboard for one user (project owner). Replaces 4 prior projects (archived under `_legacy/`).
+**Pulse Terminal** — personal crypto macro intelligence dashboard for one user (project owner). Replaces 4 prior projects (since fully ported and deleted from disk).
 
 ### Core value prop
 - Real-time crypto market data (CoinGecko, DefiLlama, Binance/Bybit/OKX, Yahoo)
@@ -173,7 +173,7 @@ pnpm pulse:status              # color status + body health
 curl http://localhost:3000/api/health
 
 # Deploy update from laptop
-cd "c:/Users/Firsty/OneDrive/เอกสาร/เดสก์ท็อป/Terminal"
+cd C:/dev/pulse-terminal
 tar -czf /tmp/pulse.tar.gz \
   --exclude=node_modules --exclude=.next --exclude=_legacy \
   --exclude=.pm2 --exclude=logs --exclude=.git --exclude=dist \

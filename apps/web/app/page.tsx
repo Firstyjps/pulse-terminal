@@ -15,10 +15,13 @@ import { MCPQuickAsk } from "../components/MCPQuickAsk";
 /**
  * Overview — 5 ws-rows stacked vertically.
  *
+ * All split rows use c-8 + c-4 so the right column aligns vertically
+ * across rows 2-4 (FEAR & GREED · ASSET INSPECTOR · FUNDING RATES).
+ *
  *   Row 1 (h-stats, ≥96px):  MARKET PULSE — c-12 stats grid (6 tiles)
  *   Row 2 (h-chart, 360px):  PRICE CHART c-8 · FEAR & GREED c-4
  *   Row 3 (h-table, 340px):  TOP MOVERS c-8 · ASSET INSPECTOR c-4
- *   Row 4 (h-feed, 280px):   MACRO OVERLAY c-7 · FUNDING RATES c-5
+ *   Row 4 (h-feed, 280px):   MACRO OVERLAY c-8 · FUNDING RATES c-4
  *   Row 5 (auto, 220px):     LIVE ANOMALY FEED c-12 (full-width strip at bottom)
  */
 export default function OverviewPage() {
@@ -66,12 +69,13 @@ export default function OverviewPage() {
         </Panel>
       </WsRow>
 
-      {/* Row 4 — Macro + Funding (bigger Macro, narrower Funding) */}
+      {/* Row 4 — Macro + Funding (matches c-8 + c-4 so right column aligns
+          with FEAR & GREED and ASSET INSPECTOR above) */}
       <WsRow height="feed">
-        <Panel span={7} title="MACRO OVERLAY" badge="DXY·SPX·GLD" flush>
+        <Panel span={8} title="MACRO OVERLAY" badge="DXY·SPX·GLD" flush>
           <MacroOverlay />
         </Panel>
-        <Panel span={5} title="FUNDING RATES" badge="PERP · 4 VENUES" flush>
+        <Panel span={4} title="FUNDING RATES" badge="PERP · 4 VENUES" flush>
           <FundingHeatmapMini />
         </Panel>
       </WsRow>

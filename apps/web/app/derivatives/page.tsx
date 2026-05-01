@@ -5,6 +5,7 @@ import { Panel, WsRow, Workspace, colors, fonts } from "@pulse/ui";
 import { PulseClient, type ServerMessage } from "../../lib/ws-client";
 import { FundingHeatmap } from "../../components/FundingHeatmap";
 import { MCPQuickAsk } from "../../components/MCPQuickAsk";
+import { fmtTimeICT } from "../../lib/time";
 
 interface FundingRow {
   exchange: string;
@@ -109,7 +110,7 @@ export default function DerivativesPage() {
                         {r.ratePercent.toFixed(4)}%
                       </td>
                       <td style={{ ...cellBody, textAlign: "right", color: colors.txt4 }}>
-                        {new Date(r.ts).toISOString().slice(11, 19)}
+                        {fmtTimeICT(r.ts)}
                       </td>
                     </tr>
                   ))}

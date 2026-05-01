@@ -236,7 +236,7 @@ get_oi_snapshot()                              // open interest — NEW
 | ✅ | `apps/mcp/src/index.ts`                   | `Crypto-Fundflow-Analyzer/mcp-server/src/index.ts` + 3 new tools  |
 | ✅ | `apps/alerts/`                            | NEW — cron worker + JSONL + webhook                               |
 
-`_legacy/` is retained for cross-check until project owner confirms no further salvage needed (see [README.md](./README.md#reference-projects)).
+All originals fully ported and deleted from disk — no `_legacy/` retained.
 
 ---
 

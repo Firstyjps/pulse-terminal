@@ -2,11 +2,22 @@
 
 import { useState } from "react";
 import { Panel, WsRow, Workspace, SignalPill, colors, fonts } from "@pulse/ui";
-import { useSettings } from "../../lib/use-settings";
+import { useSettings, type UiScale } from "../../lib/use-settings";
+import { autoUiScale } from "../../lib/use-media";
 import { useWatchlist } from "../../lib/use-watchlist";
 import { useToast } from "../../components/ToastProvider";
 
 const REFRESH_PRESETS = [30_000, 60_000, 120_000, 300_000];
+
+const SCALE_PRESETS: { value: UiScale; label: string; hint: string }[] = [
+  { value: "auto", label: "AUTO", hint: "viewport" },
+  { value: 1, label: "1×", hint: "100%" },
+  { value: 1.25, label: "1.25×", hint: "125%" },
+  { value: 1.5, label: "1.5×", hint: "150%" },
+  { value: 1.75, label: "1.75×", hint: "175%" },
+  { value: 2, label: "2×", hint: "200%" },
+  { value: 2.5, label: "2.5×", hint: "250%" },
+];
 
 const ROW: React.CSSProperties = {
   display: "flex",
@@ -111,6 +122,35 @@ export default function SettingsPage() {
               }
               style={{ ...INPUT, width: 140 }}
             />
+          </div>
+        </Panel>
+      </WsRow>
+
+      <WsRow height="auto">
+        <Panel span={12} title="DISPLAY" badge="UI SCALE">
+          <div style={{ ...ROW, borderBottom: "none" }}>
+            <div>
+              <div style={LABEL}>Whole-app zoom</div>
+              <div style={HINT}>
+                {settings.uiScale === "auto"
+                  ? `auto · viewport-driven · currently ${typeof window !== "undefined" ? autoUiScale(window.innerWidth).toFixed(2) : "1.00"}×`
+                  : `manual override · ${settings.uiScale}×`}
+                {" · "}
+                lift on 4K monitors / shrink for laptops if anything looks oversized
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 1, background: colors.line }}>
+              {SCALE_PRESETS.map((p) => (
+                <button
+                  key={String(p.value)}
+                  onClick={() => update({ uiScale: p.value })}
+                  style={segButton(settings.uiScale === p.value)}
+                  title={p.hint}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
         </Panel>
       </WsRow>

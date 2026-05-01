@@ -6,6 +6,7 @@ import { formatUSD, formatPercent } from "@pulse/sources";
 import type { MarketOverview } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
 import { useViewport } from "../lib/use-media";
+import { fmtTimeShortICT } from "../lib/time";
 
 interface Props {
   refreshKey?: number;
@@ -136,9 +137,7 @@ function SessionStrip() {
   }
 
   const openCount = sessions.filter((s) => h >= s.startH && h < s.endH).length;
-  const utcStr = now
-    ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")} UTC`
-    : "—";
+  const ictStr = now ? fmtTimeShortICT(now) : "—";
 
   // Progress through the active session (0..1) — used as a thin bottom bar.
   const progress = active
@@ -233,7 +232,7 @@ function SessionStrip() {
         </div>
       </div>
 
-      {/* Footer — UTC clock */}
+      {/* Footer — ICT clock (session windows above remain UTC since that's how they're defined) */}
       <div
         style={{
           display: "flex",
@@ -245,8 +244,8 @@ function SessionStrip() {
           marginTop: 4,
         }}
       >
-        <span style={{ letterSpacing: "0.08em" }}>UTC</span>
-        <span className="mono-num" style={{ color: colors.txt2, fontWeight: 500 }}>{utcStr.replace(" UTC", "")}</span>
+        <span style={{ letterSpacing: "0.08em" }}>ICT</span>
+        <span className="mono-num" style={{ color: colors.txt2, fontWeight: 500 }}>{ictStr}</span>
       </div>
 
       {/* Progress bar — thin line at bottom showing % through active window */}

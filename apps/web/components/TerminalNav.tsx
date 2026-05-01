@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { colors, fonts } from "@pulse/ui";
+import { fmtDateICT, fmtTimeShortICT } from "../lib/time";
 
 interface NavItem {
   id: string;
@@ -19,23 +20,23 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { id: "overview",  label: "OVERVIEW",  key: "F1",  href: "/" },
       { id: "markets",   label: "MARKETS",   key: "F2",  href: "/markets" },
       { id: "fundflow",  label: "FUNDFLOW",  key: "F3",  href: "/fundflow" },
-      { id: "intel",     label: "INTEL",     key: "F9",  href: "/intel" },
-      { id: "history",   label: "HISTORY",   key: "F10", href: "/history" },
+      { id: "intel",     label: "INTEL",     key: "F4",  href: "/intel" },
+      { id: "history",   label: "HISTORY",   key: "F5",  href: "/history" },
     ],
   },
   {
     section: "TRADING",
     items: [
-      { id: "derivatives", label: "DERIVATIVES", key: "F4", href: "/derivatives" },
-      { id: "options",     label: "OPTIONS",     key: "F5", href: "/options" },
-      { id: "backtest",    label: "BACKTEST",    key: "F6", href: "/backtest" },
-      { id: "dual-assets", label: "DUAL ASSETS", key: "F8", href: "/dual-assets" },
+      { id: "derivatives", label: "DERIVATIVES", key: "F6", href: "/derivatives" },
+      { id: "options",     label: "OPTIONS",     key: "F7", href: "/options" },
+      { id: "backtest",    label: "BACKTEST",    key: "F8", href: "/backtest" },
+      { id: "dual-assets", label: "DUAL ASSETS", key: "F9", href: "/dual-assets" },
     ],
   },
   {
     section: "SYSTEM",
     items: [
-      { id: "settings", label: "SETTINGS", key: "F7", href: "/settings" },
+      { id: "settings", label: "SETTINGS", key: "F10", href: "/settings" },
     ],
   },
 ];
@@ -213,7 +214,7 @@ export function TerminalNav() {
       >
         <div><span style={{ color: colors.green }}>●</span> SOCKET LIVE</div>
         <div><span style={{ color: colors.amber }}>●</span> MCP READY</div>
-        <div><span style={{ color: colors.txt3 }}>●</span> {new Date().toISOString().slice(0, 10).replace(/-/g, "·")}</div>
+        <div><span style={{ color: colors.txt3 }}>●</span> {fmtDateICT(new Date())}</div>
       </div>
     </nav>
   );
@@ -281,7 +282,7 @@ function StatusBlock() {
         { k: "ALERTS",  v: <span>12 ARMED</span> },
         { k: "STREAMS", v: <span>3</span> },
         { k: "UPLINK",  v: <span style={{ color: latency < 20 ? colors.green : colors.amber }}>{latency}ms</span> },
-        { k: "UTC",     v: <span>{now.toISOString().slice(11, 16)}</span> },
+        { k: "ICT",     v: <span>{fmtTimeShortICT(now)}</span> },
       ]}
     />
   );

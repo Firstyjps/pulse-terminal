@@ -9,6 +9,7 @@ import { TerminalNav } from "./TerminalNav";
 import { TerminalBotBar } from "./TerminalBotBar";
 import { BottomTabNav } from "./BottomTabNav";
 import { useIsMobile } from "../lib/use-media";
+import { useUiScale } from "../lib/use-ui-scale";
 
 const SHELL_BYPASS_ROUTES = ["/chart-popup"];
 
@@ -28,7 +29,7 @@ const SHELL_BYPASS_ROUTES = ["/chart-popup"];
  *   │ TerminalStatusBar (compact)                    22px  │
  *   │ TerminalTicker                                 26px  │
  *   │ Workspace (full-width, no left rail)           1fr   │
- *   │ BottomTabNav (F1–F7 tap targets, 56px)         56px  │
+ *   │ BottomTabNav (F1–F10 tap targets, 56px)        56px  │
  *   └──────────────────────────────────────────────────────┘
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function Frame({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
+  useUiScale();
 
   if (isMobile) {
     return (
@@ -55,8 +57,8 @@ function Frame({ children }: { children: React.ReactNode }) {
         style={{
           display: "grid",
           gridTemplateRows: "22px 26px 1fr 56px",
-          height: "100vh",
-          width: "100vw",
+          height: "100%",
+          width: "100%",
           background: "var(--bg)",
           color: "var(--fg)",
           overflow: "hidden",
@@ -85,8 +87,8 @@ function Frame({ children }: { children: React.ReactNode }) {
       style={{
         display: "grid",
         gridTemplateRows: "22px 26px 1fr 22px",
-        height: "100vh",
-        width: "100vw",
+        height: "100%",
+        width: "100%",
         background: "var(--bg)",
         color: "var(--fg)",
         overflow: "hidden",

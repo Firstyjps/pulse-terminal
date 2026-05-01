@@ -50,8 +50,7 @@ export function TerminalBotBar({
         <span className="mono-num" style={{ color: colors.txt2 }}>{latencyMs}MS</span>
       </span>
       <span style={{ marginLeft: "auto", display: "flex", height: "100%" }}>
-        <span style={segStyle}><span className="dim">F1</span> Help</span>
-        <span style={segStyle}><span className="dim">F8</span> Hotkeys</span>
+        <span style={segStyle}><span className="dim">F1–F10</span> Tabs</span>
         <span style={segStyle}><span className="dim">⌘K</span> CMD Palette</span>
         <span style={{ ...segStyle, color: colors.amber, borderRight: "none" }}>
           © CRYPTOPULSE INTEL

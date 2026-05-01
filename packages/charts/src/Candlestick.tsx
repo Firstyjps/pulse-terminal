@@ -7,7 +7,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { colors, fonts, withAlpha } from "@pulse/ui";
+import { ictTickFormatter, ictTimeFormatter } from "./_ict-time.js";
 
 export interface Candle {
   time: number; // unix seconds
@@ -50,8 +50,8 @@ export function Candlestick({
       height,
       layout: {
         background: { color: "transparent" },
-        textColor: colors.txt3,
-        fontFamily: fonts.mono,
+        textColor: "#9ca3af",
+        fontFamily: "JetBrains Mono, Courier New, monospace",
       },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.04)" },
@@ -61,16 +61,18 @@ export function Candlestick({
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: ictTickFormatter,
       },
       rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
       crosshair: { mode: 1 },
+      localization: { timeFormatter: ictTimeFormatter },
     });
 
     const candle = chart.addCandlestickSeries({
-      upColor: colors.green,
-      downColor: colors.red,
-      wickUpColor: colors.green,
-      wickDownColor: colors.red,
+      upColor: "#34d399",
+      downColor: "#f87171",
+      wickUpColor: "#34d399",
+      wickDownColor: "#f87171",
       borderVisible: false,
     });
 
@@ -79,7 +81,7 @@ export function Candlestick({
       vol = chart.addHistogramSeries({
         priceFormat: { type: "volume" },
         priceScaleId: "vol",
-        color: withAlpha(colors.amber, 0.5),
+        color: "rgba(124,92,255,0.5)",
       });
       chart.priceScale("vol").applyOptions({
         scaleMargins: { top: 0.78, bottom: 0 },
@@ -120,7 +122,7 @@ export function Candlestick({
         data.map((d) => ({
           time: d.time as UTCTimestamp,
           value: d.volume ?? 0,
-          color: d.close >= d.open ? withAlpha(colors.green, 0.5) : withAlpha(colors.red, 0.5),
+          color: d.close >= d.open ? "rgba(52,211,153,0.5)" : "rgba(248,113,113,0.5)",
         })),
       );
     }
@@ -130,7 +132,7 @@ export function Candlestick({
   return (
     <div>
       {symbol && (
-        <div style={{ fontSize: 12, color: colors.txt3, marginBottom: 8, fontFamily: fonts.mono }}>
+        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8, fontFamily: "JetBrains Mono, monospace" }}>
           {symbol}
         </div>
       )}

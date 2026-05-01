@@ -154,8 +154,8 @@ function ChartPopupBody() {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100vh",
-        width: "100vw",
+        height: "100%",
+        width: "100%",
         background: colors.bg0,
         color: colors.txt1,
         overflow: "hidden",

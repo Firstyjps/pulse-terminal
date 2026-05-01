@@ -32,8 +32,12 @@ interface YahooResp {
   };
 }
 
-async function fetchYahoo(symbol: string, label: string): Promise<MacroSeries | null> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=6mo&interval=1d`;
+async function fetchYahoo(
+  displaySymbol: string,
+  yahooSymbol: string,
+  label: string,
+): Promise<MacroSeries | null> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=6mo&interval=1d`;
   try {
     const res = await fetch(url, {
       next: { revalidate: 600 },
@@ -61,7 +65,7 @@ async function fetchYahoo(symbol: string, label: string): Promise<MacroSeries | 
     const prev = result.meta.chartPreviousClose;
     const change24h = prev > 0 ? ((current - prev) / prev) * 100 : 0;
 
-    return { symbol, label, current, change24h, history };
+    return { symbol: displaySymbol, label, current, change24h, history };
   } catch {
     return null;
   }
@@ -69,9 +73,9 @@ async function fetchYahoo(symbol: string, label: string): Promise<MacroSeries | 
 
 export async function getMacro(): Promise<MacroResponse> {
   const [dxy, spx, gold] = await Promise.all([
-    fetchYahoo("DX-Y.NYB", "US Dollar Index"),
-    fetchYahoo("^GSPC", "S&P 500"),
-    fetchYahoo("GC=F", "Gold (COMEX)"),
+    fetchYahoo("DXY", "DX-Y.NYB", "US Dollar Index"),
+    fetchYahoo("SPX", "^GSPC", "S&P 500"),
+    fetchYahoo("GLD", "GC=F", "Gold (COMEX)"),
   ]);
   return { dxy, spx, gold, generatedAt: new Date().toISOString() };
 }

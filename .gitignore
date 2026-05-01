@@ -40,3 +40,6 @@ src-tauri/target/
 src-tauri/gen/
 src-tauri/icons/
 src-tauri/Cargo.lock
+# stub frontendDist (required by Tauri config) — keep tracked
+!src-tauri/dist/
+!src-tauri/dist/**

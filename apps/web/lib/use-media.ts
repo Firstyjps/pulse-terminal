@@ -54,3 +54,19 @@ export function useIsCompact(): boolean {
   const vp = useViewport();
   return vp === "mobile" || vp === "tablet";
 }
+
+/**
+ * Auto scale-factor based on viewport width.
+ *   < 2400px  → 1     (laptop / standard desktop / iPad / phone)
+ *   < 3000px  → 1.25  (QHD ultrawide 3440×1440, 27" 1440p at 100%)
+ *   ≥ 3000px  → 1.4   (4K 3840×2160 at native scaling)
+ *
+ * Used by `useUiScale` when the user picks "auto" in Settings. Intentionally
+ * does not scale phones/tablets — those already get viewport-based layouts.
+ */
+export function autoUiScale(width: number): number {
+  if (!Number.isFinite(width) || width <= 0) return 1;
+  if (width >= 3000) return 1.4;
+  if (width >= 2400) return 1.25;
+  return 1;
+}

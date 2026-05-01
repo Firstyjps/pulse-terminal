@@ -8,7 +8,7 @@ import {
   type UTCTimestamp,
   LineStyle,
 } from "lightweight-charts";
-import { colors, fonts, withAlpha } from "@pulse/ui";
+import { ictTickFormatter, ictTimeFormatter } from "./_ict-time.js";
 
 export interface PriceLinePoint {
   time: number; // unix seconds
@@ -29,6 +29,8 @@ export interface PriceLineProps {
   filled?: boolean;
   /** Render a horizontal price-line marker at the latest close. */
   showLastMarker?: boolean;
+  /** Custom y-axis label formatter (e.g. compact "$2.63T" for market cap). */
+  priceFormatter?: (value: number) => string;
 }
 
 /**
@@ -44,10 +46,11 @@ export function PriceLine({
   data,
   height = 360,
   symbol,
-  color = colors.amber,
+  color = "#ffb000",
   showVolume = true,
   filled = true,
   showLastMarker = true,
+  priceFormatter,
 }: PriceLineProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
@@ -63,9 +66,13 @@ export function PriceLine({
       height,
       layout: {
         background: { color: "transparent" },
-        textColor: colors.txt3,
-        fontFamily: fonts.mono,
+        textColor: "#9ca3af",
+        fontFamily: "JetBrains Mono, Courier New, monospace",
         fontSize: 11,
+      },
+      localization: {
+        timeFormatter: ictTimeFormatter,
+        ...(priceFormatter ? { priceFormatter } : {}),
       },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.04)" },
@@ -75,6 +82,7 @@ export function PriceLine({
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: ictTickFormatter,
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.08)",
@@ -83,16 +91,16 @@ export function PriceLine({
       crosshair: {
         mode: 1,
         vertLine: {
-          color: withAlpha(colors.amber, 0.4),
+          color: "rgba(255,176,0,0.4)",
           style: LineStyle.Dashed,
           width: 1,
-          labelBackgroundColor: colors.amber,
+          labelBackgroundColor: "#ffb000",
         },
         horzLine: {
-          color: withAlpha(colors.amber, 0.4),
+          color: "rgba(255,176,0,0.4)",
           style: LineStyle.Dashed,
           width: 1,
-          labelBackgroundColor: colors.amber,
+          labelBackgroundColor: "#ffb000",
         },
       },
     });
@@ -101,8 +109,8 @@ export function PriceLine({
       ? chart.addAreaSeries({
           lineColor: color,
           lineWidth: 2,
-          topColor: withAlpha(color, 0.32),
-          bottomColor: withAlpha(color, 0.02),
+          topColor: hexA(color, 0.32),
+          bottomColor: hexA(color, 0.02),
           priceLineVisible: showLastMarker,
           priceLineColor: color,
           priceLineWidth: 1,
@@ -124,7 +132,7 @@ export function PriceLine({
       vol = chart.addHistogramSeries({
         priceFormat: { type: "volume" },
         priceScaleId: "vol",
-        color: withAlpha(color, 0.35),
+        color: hexA(color, 0.35),
       });
       chart.priceScale("vol").applyOptions({
         scaleMargins: { top: 0.82, bottom: 0 },
@@ -147,7 +155,7 @@ export function PriceLine({
       lineRef.current = null;
       volRef.current = null;
     };
-  }, [height, color, filled, showVolume, showLastMarker]);
+  }, [height, color, filled, showVolume, showLastMarker, priceFormatter]);
 
   React.useEffect(() => {
     if (!lineRef.current) return;
@@ -165,7 +173,7 @@ export function PriceLine({
           return {
             time: d.time as UTCTimestamp,
             value: d.volume ?? 0,
-            color: up ? withAlpha(colors.green, 0.45) : withAlpha(colors.red, 0.45),
+            color: up ? "rgba(52,211,153,0.45)" : "rgba(248,113,113,0.45)",
           };
         }),
       );
@@ -176,7 +184,7 @@ export function PriceLine({
   return (
     <div>
       {symbol && (
-        <div style={{ fontSize: 12, color: colors.txt3, marginBottom: 8, fontFamily: fonts.mono }}>
+        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8, fontFamily: "JetBrains Mono, monospace" }}>
           {symbol}
         </div>
       )}
@@ -185,3 +193,13 @@ export function PriceLine({
   );
 }
 
+/** "#ffb000" + alpha → "rgba(255,176,0,alpha)". Falls back to original on parse failure. */
+function hexA(hex: string, a: number): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  return `rgba(${r},${g},${b},${a})`;
+}
