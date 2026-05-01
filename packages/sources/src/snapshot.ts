@@ -44,7 +44,7 @@ export function summarizeSnapshot(
   if (snapshot.etf) {
     const e = snapshot.etf.summary;
     const proxy = snapshot.etf._isProxy;
-    parts.push("\n## ETF Flows" + (proxy ? " (Proxy data — no Coinglass key)" : ""));
+    parts.push("\n## ETF Flows" + (proxy ? " (Proxy data — Farside scrape unavailable)" : ""));
     parts.push(`- BTC ETF Latest: $${(e.btcLast / 1e6).toFixed(2)}M · 7d $${(e.btc7dSum / 1e6).toFixed(2)}M · 30d $${(e.btc30dSum / 1e6).toFixed(2)}M · cum $${(e.btcCumulative / 1e9).toFixed(2)}B`);
     parts.push(`- ETH ETF Latest: $${(e.ethLast / 1e6).toFixed(2)}M · 7d $${(e.eth7dSum / 1e6).toFixed(2)}M · 30d $${(e.eth30dSum / 1e6).toFixed(2)}M · cum $${(e.ethCumulative / 1e9).toFixed(2)}B`);
   }

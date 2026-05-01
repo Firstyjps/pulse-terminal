@@ -85,7 +85,7 @@ describe("summarizeSnapshot", () => {
       },
     };
     const md = summarizeSnapshot(snap);
-    expect(md).toContain("## ETF Flows (Proxy data — no Coinglass key)");
+    expect(md).toContain("## ETF Flows (Proxy data — Farside scrape unavailable)");
   });
 
   it("does not flag proxy when _isProxy is absent", () => {

@@ -1,54 +1,7 @@
+// ETF flows — Farside scrape primary, synthesized proxy as last-resort fallback.
+// Coinglass was removed 2026-05-01 (user decision: free sources only).
 import type { ETFFallbackReason, ETFFlow, ETFFlowResponse, ETFSource } from "./types.js";
 import { fetchFarsideEtf } from "./farside.js";
-
-type CoinglassETFFlow = {
-  date: number | string;
-  flow_usd?: number;
-  flowUsd?: number;
-  netFlow?: number;
-};
-type CoinglassResp<T> = { code: string; msg?: string; data: T };
-
-interface CoinglassResult {
-  flows: ETFFlow[] | null;
-  reason?: ETFFallbackReason;
-}
-
-async function fetchCoinglass(symbol: "btc" | "eth"): Promise<CoinglassResult> {
-  const path = symbol === "btc" ? "bitcoin" : "ethereum";
-  const url = `https://open-api-v4.coinglass.com/api/etf/${path}/flow-history`;
-  const apiKey = process.env.COINGLASS_API_KEY;
-  if (!apiKey) return { flows: null, reason: "no_api_key" };
-
-  try {
-    const res = await fetch(url, {
-      next: { revalidate: 1800 },
-      headers: { "CG-API-KEY": apiKey, Accept: "application/json" },
-    } as RequestInit);
-    if (!res.ok) return { flows: null, reason: "coinglass_http_error" };
-    const json = (await res.json()) as CoinglassResp<CoinglassETFFlow[]>;
-    if (json.code !== "0" && json.code !== "00000") {
-      return { flows: null, reason: "coinglass_invalid_code" };
-    }
-    const flows = json.data
-      .map((p) => ({
-        date: new Date(typeof p.date === "string" ? parseInt(p.date, 10) : p.date)
-          .toISOString()
-          .slice(0, 10),
-        _flow: p.flow_usd ?? p.flowUsd ?? p.netFlow ?? 0,
-      }))
-      .map(({ date, _flow }) => ({
-        date,
-        btc: symbol === "btc" ? _flow : 0,
-        eth: symbol === "eth" ? _flow : 0,
-        btcCumulative: 0,
-        ethCumulative: 0,
-      }));
-    return { flows };
-  } catch {
-    return { flows: null, reason: "coinglass_threw" };
-  }
-}
 
 function generateProxyData(): ETFFlow[] {
   const days = 60;
@@ -88,58 +41,16 @@ export async function getETFFlows(): Promise<ETFFlowResponse> {
   let source: ETFSource = "proxy";
   let fallbackReason: ETFFallbackReason | undefined;
 
-  // Treat both `undefined` and `""` as "no key configured". The empty-string
-  // case has bitten us in production before — `.env.local` shipped with
-  // `COINGLASS_API_KEY=` (placeholder) and the dashboard silently fell
-  // through to the Farside scrape for weeks before anyone noticed.
-  if (process.env.COINGLASS_API_KEY) {
-    const [btcResult, ethResult] = await Promise.all([
-      fetchCoinglass("btc"),
-      fetchCoinglass("eth"),
-    ]);
-    if (btcResult.flows && ethResult.flows) {
-      const map = new Map<string, ETFFlow>();
-      for (const f of btcResult.flows) map.set(f.date, { ...f });
-      for (const f of ethResult.flows) {
-        const existing = map.get(f.date);
-        if (existing) existing.eth = f.eth;
-        else map.set(f.date, f);
-      }
-      flows = Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-      let btcCum = 0;
-      let ethCum = 0;
-      for (const f of flows) {
-        btcCum += f.btc;
-        ethCum += f.eth;
-        f.btcCumulative = btcCum;
-        f.ethCumulative = ethCum;
-      }
-      source = "coinglass";
+  try {
+    const farside = await fetchFarsideEtf();
+    if (farside && farside.length > 5) {
+      flows = farside;
+      source = "farside";
     } else {
-      fallbackReason = btcResult.reason ?? ethResult.reason ?? "coinglass_empty_data";
+      fallbackReason = "farside_empty";
     }
-  } else {
-    fallbackReason = "no_api_key";
-    if (process.env.COINGLASS_API_KEY === "") {
-      console.warn(
-        "[etf] COINGLASS_API_KEY is set to an empty string — treating as missing. " +
-          "Set the actual key in .env.local or unset the variable.",
-      );
-    }
-  }
-
-  if (!flows) {
-    try {
-      const farside = await fetchFarsideEtf();
-      if (farside && farside.length > 5) {
-        flows = farside;
-        source = "farside";
-      } else {
-        fallbackReason = fallbackReason ?? "farside_empty";
-      }
-    } catch {
-      fallbackReason = fallbackReason ?? "farside_threw";
-    }
+  } catch {
+    fallbackReason = "farside_threw";
   }
 
   if (!flows) {
@@ -165,6 +76,6 @@ export async function getETFFlows(): Promise<ETFFlowResponse> {
     },
     _source: source,
     _isProxy: source === "proxy",
-    ...(source !== "coinglass" && fallbackReason ? { _fallbackReason: fallbackReason } : {}),
+    ...(fallbackReason ? { _fallbackReason: fallbackReason } : {}),
   };
 }

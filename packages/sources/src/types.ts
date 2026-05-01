@@ -58,15 +58,10 @@ export interface ETFFlow {
   ethCumulative: number;
 }
 
-export type ETFSource = "coinglass" | "farside" | "proxy";
+export type ETFSource = "farside" | "proxy";
 
-/** Why Coinglass was skipped or failed — surfaces silent operational drift. */
+/** Why Farside was skipped or failed — surfaces silent operational drift. */
 export type ETFFallbackReason =
-  | "no_api_key"               // env var unset OR set to empty string
-  | "coinglass_http_error"     // fetch returned non-2xx
-  | "coinglass_invalid_code"   // body code !== "0"/"00000"
-  | "coinglass_empty_data"     // both BTC and ETH branches returned no data
-  | "coinglass_threw"          // network exception inside fetchCoinglass
   | "farside_threw"            // farside scrape exception
   | "farside_empty";           // farside scrape returned <6 rows
 
@@ -84,7 +79,7 @@ export interface ETFFlowResponse {
   };
   _source?: ETFSource;
   _isProxy?: boolean;
-  /** Populated when `_source !== "coinglass"` so dashboards/alerts can detect drift. */
+  /** Populated when `_source === "proxy"` so dashboards/alerts can detect Farside drift. */
   _fallbackReason?: ETFFallbackReason;
 }
 
