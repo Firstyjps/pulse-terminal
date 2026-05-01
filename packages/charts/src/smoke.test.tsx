@@ -13,6 +13,9 @@ import { OIByStrike } from "./OIByStrike";
 import { GreeksHeatmap } from "./GreeksHeatmap";
 import { FundingHistory } from "./FundingHistory";
 
+import { RegimeChip } from "./RegimeChip";
+import { PortfolioSparkline } from "./PortfolioSparkline";
+
 import {
   SAMPLE_FUNDING_HISTORY,
   SAMPLE_GREEKS_ROWS,
@@ -201,5 +204,102 @@ describe("FundingHistory", () => {
 
   it("renders for sample APR history with threshold", () => {
     renders(<FundingHistory data={SAMPLE_FUNDING_HISTORY} threshold={10} />);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Morning Brief components — added 2026-05-01
+// ────────────────────────────────────────────────────────────────────────
+
+describe("RegimeChip", () => {
+  it("renders the uppercased label + the reason text", () => {
+    const html = renders(
+      <RegimeChip regime="risk-on" reason="BTC > 200d MA, ETF inflows positive" />,
+    );
+    expect(html).toContain("RISK-ON");
+    expect(html).toContain("ETF inflows positive");
+  });
+
+  it("truncates reasons longer than maxReasonLength with an ellipsis", () => {
+    const long = "x".repeat(200);
+    const html = renders(<RegimeChip regime="range" reason={long} maxReasonLength={40} />);
+    expect(html).toContain("…");
+    // The visible body (after the last "…</span>") should not contain the full
+    // long string. The full reason still appears in the `title` attribute for
+    // hover tooltips, so we extract just the visible span body.
+    const visibleMatch = html.match(/>([x]+)…<\/span>/);
+    expect(visibleMatch).not.toBeNull();
+    expect(visibleMatch![1].length).toBeLessThan(40);
+  });
+
+  it("renders the asOf suffix when provided", () => {
+    const html = renders(
+      <RegimeChip regime="risk-off" reason="VIX > 25" asOf="2026-05-01 09:00" />,
+    );
+    expect(html).toContain("2026-05-01 09:00");
+  });
+
+  it("uses a distinct label per regime", () => {
+    expect(renders(<RegimeChip regime="risk-on" reason="" />)).toContain("RISK-ON");
+    expect(renders(<RegimeChip regime="risk-off" reason="" />)).toContain("RISK-OFF");
+    expect(renders(<RegimeChip regime="range" reason="" />)).toContain("RANGE");
+  });
+});
+
+describe("PortfolioSparkline", () => {
+  it("renders sparkline svg + signed USD + percent + window label for non-trivial data", () => {
+    const html = renders(
+      <PortfolioSparkline
+        points={[100, 110, 105, 120, 115, 130]}
+        window="24h"
+        deltaUsd={3000}
+        deltaPct={3.0}
+      />,
+    );
+    expect(html).toContain("<svg");
+    expect(html).toContain("polyline");
+    // Window text is lowercase in the DOM; visual uppercasing is via CSS text-transform.
+    expect(html).toContain(">24h<");
+    expect(html).toContain("$3.0K");
+    expect(html).toContain("3.00%");
+  });
+
+  it("delegates to Sparkline empty-state when fewer than 2 points are provided", () => {
+    const html = renders(
+      <PortfolioSparkline points={[1]} window="7d" deltaUsd={0} deltaPct={0} />,
+    );
+    expect(html).toContain("N/A");
+    // labels are suppressed in empty state to avoid showing fake deltas
+    expect(html).not.toContain("$");
+    expect(html).not.toContain(">7d<");
+  });
+
+  it("compact mode hides the inline delta + window labels", () => {
+    const html = renders(
+      <PortfolioSparkline
+        points={[100, 110, 105]}
+        window="30d"
+        deltaUsd={500}
+        deltaPct={1.5}
+        compact
+      />,
+    );
+    expect(html).toContain("polyline");
+    expect(html).not.toContain(">30d<");
+    expect(html).not.toContain("$");
+  });
+
+  it("formats negative deltas with a unicode minus", () => {
+    const html = renders(
+      <PortfolioSparkline
+        points={[100, 95, 90]}
+        window="7d"
+        deltaUsd={-500}
+        deltaPct={-5}
+      />,
+    );
+    expect(html).toContain("polyline");
+    expect(html).toContain("−$500");
+    expect(html).toContain("−5.00%");
   });
 });

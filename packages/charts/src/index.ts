@@ -3,6 +3,15 @@
 export { Sparkline } from "./Sparkline";
 export type { SparklineProps } from "./Sparkline";
 
+export { PortfolioSparkline } from "./PortfolioSparkline";
+export type {
+  PortfolioSparklineProps,
+  PortfolioWindow,
+} from "./PortfolioSparkline";
+
+export { RegimeChip } from "./RegimeChip";
+export type { RegimeChipProps, Regime } from "./RegimeChip";
+
 export { Candlestick } from "./Candlestick";
 export type { Candle, CandlestickProps } from "./Candlestick";
 
