@@ -15,6 +15,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "INTEL",
     items: [
+      { id: "morning",   label: "MORNING",   key: "F11", href: "/morning" },
       { id: "overview",  label: "OVERVIEW",  key: "F1",  href: "/" },
       { id: "markets",   label: "MARKETS",   key: "F2",  href: "/markets" },
       { id: "fundflow",  label: "FUNDFLOW",  key: "F3",  href: "/fundflow" },
@@ -52,14 +53,58 @@ export function TerminalNav() {
   const router = useRouter();
 
   useEffect(() => {
+    let chordPrefix: string | null = null;
+    let chordTimer: number | null = null;
+
+    const isTypingTarget = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+    };
+
+    const clearChord = () => {
+      chordPrefix = null;
+      if (chordTimer != null) {
+        window.clearTimeout(chordTimer);
+        chordTimer = null;
+      }
+    };
+
     const onKey = (e: KeyboardEvent) => {
+      // F-key shortcuts (always intercept, even in inputs — they're not text keys)
       if (KEY_TO_HREF[e.key]) {
         e.preventDefault();
         router.push(KEY_TO_HREF[e.key]);
+        return;
       }
+
+      // Chord shortcuts (skip when typing, skip with modifiers)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+
+      if (chordPrefix === "g" && e.key === "m") {
+        e.preventDefault();
+        clearChord();
+        router.push("/morning");
+        return;
+      }
+
+      if (e.key === "g") {
+        chordPrefix = "g";
+        if (chordTimer != null) window.clearTimeout(chordTimer);
+        chordTimer = window.setTimeout(clearChord, 1000);
+        return;
+      }
+
+      if (chordPrefix) clearChord();
     };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (chordTimer != null) window.clearTimeout(chordTimer);
+    };
   }, [router]);
 
   const isActive = (href: string) =>
