@@ -24,7 +24,7 @@ export function Sparkline({
   if (!data || data.length < 2) {
     return (
       <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
-        <text x="2" y={height / 2 + 4} fill="#444" fontSize="8">
+        <text x="2" y={height / 2 + 4} fill={colors.txt4} fontSize="8">
           N/A
         </text>
       </svg>

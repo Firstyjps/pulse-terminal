@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { colors, withAlpha } from "@pulse/ui";
+import { colors, fonts, withAlpha } from "@pulse/ui";
 
 export interface FlowPoint {
   date: string;
@@ -33,9 +33,6 @@ export interface FlowAreaChartProps {
   /** Legend label inside the tooltip. */
   label?: string;
 }
-
-const AXIS = "rgba(255,255,255,0.35)";
-const GRID = "rgba(255,255,255,0.05)";
 
 const defaultFmt = (n: number) => {
   const abs = Math.abs(n);
@@ -66,11 +63,11 @@ export function FlowAreaChart({
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridFaint} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="date"
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={(v: string | number) => String(v).slice(5)}
             interval="preserveStartEnd"
             minTickGap={50}
@@ -78,8 +75,8 @@ export function FlowAreaChart({
             tickLine={false}
           />
           <YAxis
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={formatY}
             axisLine={false}
             tickLine={false}
@@ -104,7 +101,7 @@ export function FlowAreaChart({
                     border: "1px solid rgba(255,255,255,0.12)",
                     borderRadius: 4,
                     padding: "8px 12px",
-                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontFamily: fonts.mono,
                     fontSize: 11,
                     minWidth: 140,
                     boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
@@ -112,7 +109,7 @@ export function FlowAreaChart({
                 >
                   <div
                     style={{
-                      color: "#a0a0a0",
+                      color: colors.txt3,
                       fontSize: 10,
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
@@ -124,8 +121,8 @@ export function FlowAreaChart({
                     {dateStr}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span style={{ color: "#7d8a99", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
-                    <span style={{ color: color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmt(v)}</span>
+                    <span style={{ color: colors.txt3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+                    <span style={{ color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmt(v)}</span>
                   </div>
                 </div>
               );
@@ -172,24 +169,24 @@ export function FlowBarChart({
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-          <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridFaint} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="date"
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={(v: string | number) => String(v).slice(5)}
             interval="preserveStartEnd"
             minTickGap={40}
             axisLine={false}
             tickLine={false}
           />
-          <YAxis stroke={AXIS} tick={{ fill: AXIS, fontSize: 10 }} tickFormatter={formatY} axisLine={false} tickLine={false} />
+          <YAxis stroke={colors.axis} tick={{ fill: colors.axis, fontSize: 10 }} tickFormatter={formatY} axisLine={false} tickLine={false} />
           {hasCumulative && (
             <YAxis
               yAxisId="cum"
               orientation="right"
-              stroke={AXIS}
-              tick={{ fill: AXIS, fontSize: 10 }}
+              stroke={colors.axis}
+              tick={{ fill: colors.axis, fontSize: 10 }}
               tickFormatter={formatY}
               axisLine={false}
               tickLine={false}
@@ -227,7 +224,7 @@ export function FlowBarChart({
                     border: "1px solid rgba(255,255,255,0.12)",
                     borderRadius: 4,
                     padding: "8px 12px",
-                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontFamily: fonts.mono,
                     fontSize: 11,
                     minWidth: 160,
                     boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
@@ -235,7 +232,7 @@ export function FlowBarChart({
                 >
                   <div
                     style={{
-                      color: "#a0a0a0",
+                      color: colors.txt3,
                       fontSize: 10,
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
@@ -247,15 +244,15 @@ export function FlowBarChart({
                     {dateStr}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 4 }}>
-                    <span style={{ color: "#7d8a99" }}>DAILY</span>
+                    <span style={{ color: colors.txt3 }}>DAILY</span>
                     <span style={{ color: dailyColor, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                       {formatSigned(daily)}
                     </span>
                   </div>
                   {cumulative !== undefined && (
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                      <span style={{ color: "#7d8a99" }}>{cumulativeLabel}</span>
-                      <span style={{ color: "#c8d1dc", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                      <span style={{ color: colors.txt3 }}>{cumulativeLabel}</span>
+                      <span style={{ color: colors.txt2, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
                         {formatY(cumulative)}
                       </span>
                     </div>

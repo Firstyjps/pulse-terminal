@@ -7,7 +7,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { colors, withAlpha } from "@pulse/ui";
+import { colors, fonts, withAlpha } from "@pulse/ui";
 
 export interface Candle {
   time: number; // unix seconds
@@ -50,8 +50,8 @@ export function Candlestick({
       height,
       layout: {
         background: { color: "transparent" },
-        textColor: "#9ca3af",
-        fontFamily: "JetBrains Mono, Courier New, monospace",
+        textColor: colors.txt3,
+        fontFamily: fonts.mono,
       },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.04)" },
@@ -130,7 +130,7 @@ export function Candlestick({
   return (
     <div>
       {symbol && (
-        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8, fontFamily: "JetBrains Mono, monospace" }}>
+        <div style={{ fontSize: 12, color: colors.txt3, marginBottom: 8, fontFamily: fonts.mono }}>
           {symbol}
         </div>
       )}

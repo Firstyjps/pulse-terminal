@@ -31,9 +31,6 @@ export interface FundingHistoryProps {
   label?: string;
 }
 
-const AXIS = "rgba(255,255,255,0.35)";
-const GRID = "rgba(255,255,255,0.05)";
-
 const fmtApr = (n: number) => `${n.toFixed(1)}%`;
 const fmtTs = (v: string | number) => {
   if (typeof v === "number") {
@@ -59,7 +56,7 @@ export function FundingHistory({
 }: FundingHistoryProps) {
   if (data.length === 0) {
     return (
-      <div style={{ width: "100%", height, display: "grid", placeItems: "center", color: AXIS, fontSize: 12 }}>
+      <div style={{ width: "100%", height, display: "grid", placeItems: "center", color: colors.axis, fontSize: 12 }}>
         No APR history
       </div>
     );
@@ -75,11 +72,11 @@ export function FundingHistory({
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridFaint} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="ts"
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={fmtTs}
             interval="preserveStartEnd"
             minTickGap={48}
@@ -87,8 +84,8 @@ export function FundingHistory({
             tickLine={false}
           />
           <YAxis
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={fmtApr}
             axisLine={false}
             tickLine={false}

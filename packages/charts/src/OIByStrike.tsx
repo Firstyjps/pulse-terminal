@@ -31,9 +31,6 @@ export interface OIByStrikeProps {
   putColor?: string;
 }
 
-const AXIS = "rgba(255,255,255,0.35)";
-const GRID = "rgba(255,255,255,0.05)";
-
 const fmtOI = (n: number) => {
   const abs = Math.abs(n);
   if (abs >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
@@ -66,7 +63,7 @@ export function OIByStrike({
 
   if (rendered.length === 0) {
     return (
-      <div style={{ width: "100%", height, display: "grid", placeItems: "center", color: AXIS, fontSize: 12 }}>
+      <div style={{ width: "100%", height, display: "grid", placeItems: "center", color: colors.axis, fontSize: 12 }}>
         No OI data
       </div>
     );
@@ -76,18 +73,18 @@ export function OIByStrike({
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <BarChart data={rendered} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-          <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridFaint} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="strike"
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={fmtStrike}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={fmtOI}
             axisLine={false}
             tickLine={false}
@@ -114,7 +111,7 @@ export function OIByStrike({
           )}
           <Bar dataKey="callOi" name="Call OI" fill={callColor} radius={[2, 2, 0, 0]} />
           <Bar dataKey="putOi" name="Put OI" fill={putColor} radius={mirror ? [0, 0, 2, 2] : [2, 2, 0, 0]} />
-          <Legend wrapperStyle={{ fontSize: 10, color: AXIS }} />
+          <Legend wrapperStyle={{ fontSize: 10, color: colors.axis }} />
         </BarChart>
       </ResponsiveContainer>
     </div>

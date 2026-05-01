@@ -8,7 +8,7 @@ import {
   type UTCTimestamp,
   LineStyle,
 } from "lightweight-charts";
-import { colors, withAlpha } from "@pulse/ui";
+import { colors, fonts, withAlpha } from "@pulse/ui";
 
 export interface PriceLinePoint {
   time: number; // unix seconds
@@ -63,8 +63,8 @@ export function PriceLine({
       height,
       layout: {
         background: { color: "transparent" },
-        textColor: "#9ca3af",
-        fontFamily: "JetBrains Mono, Courier New, monospace",
+        textColor: colors.txt3,
+        fontFamily: fonts.mono,
         fontSize: 11,
       },
       grid: {
@@ -176,7 +176,7 @@ export function PriceLine({
   return (
     <div>
       {symbol && (
-        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8, fontFamily: "JetBrains Mono, monospace" }}>
+        <div style={{ fontSize: 12, color: colors.txt3, marginBottom: 8, fontFamily: fonts.mono }}>
           {symbol}
         </div>
       )}

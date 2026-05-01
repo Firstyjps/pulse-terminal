@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { colors, withAlpha } from "@pulse/ui";
+import { colors, fonts, withAlpha } from "@pulse/ui";
 
 export type Greek = "delta" | "gamma" | "theta" | "vega";
 
@@ -94,7 +94,7 @@ export function GreeksHeatmap({
 
   if (rows.length === 0) {
     return (
-      <div style={{ padding: 24, color: "rgba(255,255,255,0.35)", fontSize: 12, textAlign: "center" }}>
+      <div style={{ padding: 24, color: colors.txt3, fontSize: 12, textAlign: "center" }}>
         No Greeks data
       </div>
     );
@@ -111,7 +111,7 @@ export function GreeksHeatmap({
       style={{
         display: "grid",
         gridTemplateColumns: gridTemplate,
-        fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+        fontFamily: fonts.mono,
         fontSize: 11,
       }}
     >
@@ -121,7 +121,7 @@ export function GreeksHeatmap({
           key={`h-${c}`}
           style={{
             padding: "6px 8px",
-            color: "rgba(255,255,255,0.5)",
+            color: colors.txt3,
             borderBottom: "1px solid rgba(255,255,255,0.13)",
             textTransform: "uppercase",
             letterSpacing: "0.05em",
@@ -145,7 +145,7 @@ export function GreeksHeatmap({
         };
         return (
           <React.Fragment key={`${r.strike}-${r.side}`}>
-            <div style={{ ...baseRowStyle, color: "rgba(240,243,249,0.95)" }}>{fmtStrike(r.strike)}</div>
+            <div style={{ ...baseRowStyle, color: colors.txt1 }}>{fmtStrike(r.strike)}</div>
             {side === "both" && (
               <div
                 style={{
@@ -167,7 +167,7 @@ export function GreeksHeatmap({
                   background: isSpot
                     ? withAlpha(colors.amber, 0.08)
                     : colorFor(r[g], maxes[g]),
-                  color: "rgba(240,243,249,0.95)",
+                  color: colors.txt1,
                   justifyContent: "flex-end",
                 }}
               >

@@ -32,9 +32,6 @@ export interface IVSmileProps {
   putColor?: string;
 }
 
-const AXIS = "rgba(255,255,255,0.35)";
-const GRID = "rgba(255,255,255,0.05)";
-
 const fmtIv = (n: number) => `${n.toFixed(0)}%`;
 const fmtStrike = (n: number) => {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -75,7 +72,7 @@ export function IVSmile({
 
   if (rendered.length === 0) {
     return (
-      <div style={{ width: "100%", height, display: "grid", placeItems: "center", color: AXIS, fontSize: 12 }}>
+      <div style={{ width: "100%", height, display: "grid", placeItems: "center", color: colors.axis, fontSize: 12 }}>
         No IV data
       </div>
     );
@@ -85,20 +82,20 @@ export function IVSmile({
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <LineChart data={rendered} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-          <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridFaint} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="strike"
             type="number"
             domain={["dataMin", "dataMax"]}
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={fmtStrike}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={fmtIv}
             axisLine={false}
             tickLine={false}
@@ -144,7 +141,7 @@ export function IVSmile({
                 connectNulls
                 isAnimationActive={false}
               />
-              <Legend wrapperStyle={{ fontSize: 10, color: AXIS }} />
+              <Legend wrapperStyle={{ fontSize: 10, color: colors.axis }} />
             </>
           ) : (
             <Line

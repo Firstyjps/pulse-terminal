@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { colors } from "@pulse/ui";
+import { colors, fonts } from "@pulse/ui";
 
 export interface DepthLevel {
   /** Price level. */
@@ -36,9 +36,6 @@ interface MergedPoint {
   bidsCum?: number;
   asksCum?: number;
 }
-
-const AXIS = "rgba(255,255,255,0.35)";
-const GRID = "rgba(255,255,255,0.05)";
 
 export function DepthChart({
   bids,
@@ -72,9 +69,9 @@ export function DepthChart({
           height,
           display: "grid",
           placeItems: "center",
-          color: "rgba(255,255,255,0.3)",
+          color: colors.txt3,
           fontSize: 12,
-          fontFamily: "JetBrains Mono, monospace",
+          fontFamily: fonts.mono,
         }}
       >
         no order book data
@@ -86,13 +83,13 @@ export function DepthChart({
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-          <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridFaint} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="price"
             type="number"
             domain={["dataMin", "dataMax"]}
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             tickFormatter={(v: number) =>
               v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(2)
             }
@@ -100,8 +97,8 @@ export function DepthChart({
             tickLine={false}
           />
           <YAxis
-            stroke={AXIS}
-            tick={{ fill: AXIS, fontSize: 10 }}
+            stroke={colors.axis}
+            tick={{ fill: colors.axis, fontSize: 10 }}
             axisLine={false}
             tickLine={false}
           />
@@ -111,9 +108,9 @@ export function DepthChart({
               border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: 8,
               fontSize: 12,
-              color: "#f2f4f8",
+              color: colors.txt1,
             }}
-            labelStyle={{ color: "#9ca3af" }}
+            labelStyle={{ color: colors.txt3 }}
             formatter={(v: number, name: string) => [v.toFixed(4), name === "bidsCum" ? "Bids" : "Asks"]}
             labelFormatter={(v: number) => `Price ${v.toFixed(2)}`}
           />
