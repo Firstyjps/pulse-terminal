@@ -42,11 +42,23 @@ export interface ActionCandidatesOpts {
   cacheBust?: boolean;
 }
 
+// Note on language: the user is a Thai-speaking trader who wants the action
+// candidates body in Thai prose with crypto/trading terms kept in English
+// (BTC, ETH, SOL, ETF, funding, perp, spot, OI, regime, leverage, …). This is
+// a deliberate exception to the project's English-only label policy — those
+// labels are Telegram section headers, this is dynamic LLM output addressed
+// to one user. Do NOT generalize this to the rest of the brief.
 const SYSTEM_PROMPT =
-  "You are a quant trading analyst. Given the following morning data, suggest " +
-  "2-3 ACTION CANDIDATES (not trade advice — exploratory ideas only). Be terse, " +
-  "1 line each, prefix with bullet (•). Cite specific numbers from the data. " +
-  "Avoid hedging language. End with a 1-line risk caveat starting with 'Risk: '.";
+  "You are a quant trading analyst writing for a Thai-speaking trader. Given " +
+  "the following morning data, suggest 2-3 ACTION CANDIDATES (exploratory " +
+  "ideas only — not trade advice). " +
+  "Output in Thai natural language, but keep crypto/trading terms in English: " +
+  "BTC, ETH, SOL, ETF, funding, perp, spot, OI, regime, leverage, inflow, " +
+  "outflow, cumulative, ann (annualized), bullish, bearish. " +
+  "Be terse: 1 line per idea, prefix with bullet (•). Cite specific numbers " +
+  "from the data verbatim. Avoid hedging language. " +
+  "End with a 1-line risk caveat starting with 'Risk: ' (the word 'Risk' stays " +
+  "English; the rest of the caveat is Thai).";
 
 // In-memory cache: key = `${bkkDate}:${regimeLabel}` → string output. Daemon
 // restart drops the cache, which is fine (cron fires once/day so the next
@@ -149,6 +161,10 @@ function pct(n: number): string {
 // Rules fallback
 // ─────────────────────────────────────────────────────────────────────────
 
+// Rules fallback strings are Thai prose with English technical terms retained
+// (BTC, ETH, ETF, funding, perp, spot, regime, leverage, …) — same convention
+// the LLM follows. Keep the bullet prefix `•` and the leading `Risk: ` on the
+// caveat line so downstream UI/parsers don't have to special-case the locale.
 function rulesFallback(input: ActionCandidatesInput, now: number): string {
   const ideas: string[] = [];
 
@@ -158,7 +174,7 @@ function rulesFallback(input: ActionCandidatesInput, now: number): string {
     input.regime?.regime === "Risk-Off"
   ) {
     ideas.push(
-      `• Funding harvest candidate: long spot, short perp (cluster lean ${input.funding.lean}).`,
+      `• พิจารณา funding harvest: long spot, short perp (cluster lean ${input.funding.lean}).`,
     );
   }
 
@@ -168,21 +184,23 @@ function rulesFallback(input: ActionCandidatesInput, now: number): string {
     input.regime?.regime === "Risk-Off"
   ) {
     ideas.push(
-      `• Mean-revert watch on ETH: 7d ETF flow +${(input.etf.summary.eth7dSum / 1e6).toFixed(1)}M despite Risk-Off regime.`,
+      `• ETH mean-revert watch: 7d ETF flow +${(input.etf.summary.eth7dSum / 1e6).toFixed(1)}M สวนทาง regime Risk-Off.`,
     );
   }
 
   // 3. Catalyst de-risk
   const upcoming = upcomingCatalystWithin(input.catalysts, now, 6);
   if (upcoming) {
-    ideas.push(`• Reduce leverage before ${upcoming}.`);
+    ideas.push(`• ลด leverage ก่อน ${upcoming}.`);
   }
 
   if (!ideas.length) {
-    ideas.push("• No clear setup — observe.");
+    ideas.push("• ไม่มีสัญญาณชัดเจน — รอดู.");
   }
 
-  ideas.push("Risk: rules-based fallback (LLM unavailable). Numbers may not reflect intraday moves.");
+  ideas.push(
+    "Risk: rules-based fallback (LLM ไม่พร้อมใช้งาน) ตัวเลขอาจไม่สะท้อนการเคลื่อนไหวระหว่างวัน.",
+  );
   return ideas.join("\n");
 }
 

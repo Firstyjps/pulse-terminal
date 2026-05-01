@@ -41,15 +41,24 @@ beforeEach(() => clearActionCandidatesCache());
 afterEach(() => clearActionCandidatesCache());
 
 describe("generateActionCandidates — LLM path", () => {
-  it("calls injected LLM with system + serialized data + caches result", async () => {
-    const llm: LlmComplete = vi.fn().mockResolvedValue("• Buy the dip\n• Short funding\nRisk: high vol");
+  it("calls injected LLM with Thai-instructing system prompt + serialized data + caches result", async () => {
+    // Mock LLM returns Thai sample (LLM is instructed to output Thai with English tech terms)
+    const thaiSample =
+      "• พิจารณา BTC ETF เนื่องจาก 24h inflow $245.3M สวนทางกับ funding negative\n" +
+      "• ETH mean-revert watch: 7d flow +$65.0M แม้ regime Risk-Off\n" +
+      "Risk: ตลาดอาจกลับตัวเร็วถ้า DXY แข็งค่ารุนแรง";
+    const llm: LlmComplete = vi.fn().mockResolvedValue(thaiSample);
     const out = await generateActionCandidates(input(), { complete: llm, now: NOW });
 
-    expect(out).toContain("• Buy the dip");
+    expect(out).toBe(thaiSample);
     expect(llm).toHaveBeenCalledTimes(1);
     const [system, user] = (llm as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Prompt instructs Thai output but keeps "quant trading analyst" framing
     expect(system).toContain("quant trading analyst");
     expect(system).toContain("ACTION CANDIDATES");
+    expect(system).toContain("Thai");
+    expect(system).toContain("BTC, ETH, SOL, ETF, funding"); // tech-term whitelist
+    // User payload stays English (it's structured data — only the LLM reply is Thai)
     expect(user).toContain("Regime: Risk-Off");
     expect(user).toContain("BTC ETF: 24h +$245.3M");
     expect(user).toContain("Funding 8h: BTC -0.012%");
@@ -61,18 +70,20 @@ describe("generateActionCandidates — LLM path", () => {
     expect(llm).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to rules when LLM throws", async () => {
+  it("falls back to rules when LLM throws — output is Thai with English tech terms", async () => {
     const llm: LlmComplete = vi.fn().mockRejectedValue(new Error("API down"));
     const out = await generateActionCandidates(input(), { complete: llm, now: NOW });
-    // Rules detect: negative funding + Risk-Off → harvest setup
-    expect(out).toContain("Funding harvest candidate");
+    // Rules detect: negative funding + Risk-Off → harvest setup (Thai prose, English terms)
+    expect(out).toContain("พิจารณา funding harvest");
+    expect(out).toContain("long spot, short perp"); // tech terms stay English
     expect(out).toContain("Risk: rules-based fallback");
+    expect(out).toContain("ไม่พร้อมใช้งาน"); // Thai risk caveat
   });
 
   it("falls back to rules when LLM returns empty string", async () => {
     const llm: LlmComplete = vi.fn().mockResolvedValue("   ");
     const out = await generateActionCandidates(input(), { complete: llm, now: NOW });
-    expect(out).toContain("Funding harvest candidate");
+    expect(out).toContain("พิจารณา funding harvest");
   });
 
   it("falls back when no LLM provider configured and no completer injected", async () => {
@@ -94,25 +105,28 @@ describe("generateActionCandidates — LLM path", () => {
   });
 });
 
-describe("generateActionCandidates — rules fallback", () => {
-  it("emits funding harvest when funding negative + regime Risk-Off", async () => {
+describe("generateActionCandidates — rules fallback (Thai)", () => {
+  it("emits funding harvest in Thai when funding negative + regime Risk-Off", async () => {
     const out = await generateActionCandidates(input(), { now: NOW });
-    expect(out).toContain("Funding harvest candidate: long spot, short perp");
+    expect(out).toContain("พิจารณา funding harvest: long spot, short perp");
+    expect(out).toContain("cluster lean negative");
   });
 
-  it("emits ETH mean-revert watch when 7d ETH ETF positive in Risk-Off", async () => {
+  it("emits ETH mean-revert watch in Thai when 7d ETH ETF positive in Risk-Off", async () => {
     const out = await generateActionCandidates(input(), { now: NOW });
-    expect(out).toContain("Mean-revert watch on ETH");
-    expect(out).toContain("+65.0M"); // 65_000_000 / 1e6
+    expect(out).toContain("ETH mean-revert watch");
+    expect(out).toContain("+65.0M"); // 65_000_000 / 1e6 — number kept verbatim
+    expect(out).toContain("regime Risk-Off");
+    expect(out).toContain("สวนทาง"); // Thai
   });
 
-  it("emits leverage-reduction when catalyst within 6h", async () => {
+  it("emits leverage-reduction (Thai) when catalyst within 6h", async () => {
     // 09:00 BKK now, 14:00 BKK catalyst = 5h away → triggers
     const out = await generateActionCandidates(
       input({ catalysts: ["14:00 BKK — FOMC minutes"] }),
       { now: NOW },
     );
-    expect(out).toContain("Reduce leverage before");
+    expect(out).toContain("ลด leverage ก่อน");
     expect(out).toContain("FOMC minutes");
   });
 
@@ -122,7 +136,7 @@ describe("generateActionCandidates — rules fallback", () => {
       input({ catalysts: ["04:00 BKK — already happened"] }),
       { now: NOW, cacheBust: true },
     );
-    expect(past).not.toContain("Reduce leverage before 04:00");
+    expect(past).not.toContain("ลด leverage ก่อน 04:00");
 
     clearActionCandidatesCache();
 
@@ -131,10 +145,10 @@ describe("generateActionCandidates — rules fallback", () => {
       input({ catalysts: ["18:00 BKK — too far"] }),
       { now: NOW, cacheBust: true },
     );
-    expect(far).not.toContain("Reduce leverage before 18:00");
+    expect(far).not.toContain("ลด leverage ก่อน 18:00");
   });
 
-  it("emits 'No clear setup' when no rules trigger", async () => {
+  it("emits Thai 'no clear setup' when no rules trigger", async () => {
     const out = await generateActionCandidates(
       {
         regime: { regime: "Range", score: 0, reason: "neutral" },
@@ -144,6 +158,7 @@ describe("generateActionCandidates — rules fallback", () => {
       },
       { now: NOW },
     );
-    expect(out).toContain("No clear setup — observe");
+    expect(out).toContain("ไม่มีสัญญาณชัดเจน");
+    expect(out).toContain("รอดู");
   });
 });

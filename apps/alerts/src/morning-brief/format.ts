@@ -185,13 +185,7 @@ export function formatMorningBrief(input: FormatInput): string {
   } else {
     lines.push("_no candidates generated_");
   }
-  lines.push("");
-
-  // ── Footer
-  const stampUtc = asOf.toISOString().slice(0, 16).replace("T", " ") + "Z";
-  lines.push(
-    `⏱ Sources: Farside · Binance · Yahoo · ${escapeMarkdownV2(stampUtc)}`,
-  );
+  // No footer — Telegram renders its own send timestamp on every message.
 
   return lines.join("\n");
 }

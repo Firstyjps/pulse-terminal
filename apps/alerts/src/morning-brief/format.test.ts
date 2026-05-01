@@ -99,6 +99,13 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
     }
   });
 
+  it("does NOT render a Sources footer line (dropped per user decision)", () => {
+    const out = formatMorningBrief(makeInput());
+    expect(out).not.toContain("⏱");
+    expect(out).not.toContain("Sources:");
+    expect(out).not.toContain("Farside · Binance · Yahoo");
+  });
+
   it("header has BKK date + day + time", () => {
     const out = formatMorningBrief(makeInput());
     expect(out).toContain("2026\\-05\\-04");
@@ -185,12 +192,6 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
     const out = formatMorningBrief(makeInput({ regime: null }));
     expect(out).toContain("🎯 *Macro Regime*");
     expect(out).toContain("_unavailable_");
-  });
-
-  it("footer lists all 3 sources + UTC timestamp", () => {
-    const out = formatMorningBrief(makeInput());
-    expect(out).toContain("⏱ Sources: Farside · Binance · Yahoo");
-    expect(out).toContain("2026\\-05\\-04 02:00Z");
   });
 
   it("output stays under Telegram's 4096-char limit for typical payload", () => {
