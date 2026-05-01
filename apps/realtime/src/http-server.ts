@@ -9,6 +9,7 @@ import {
   type OptionsReader,
 } from "./hub-health.js";
 import { getDepth, listDepthSymbols } from "./binance-depth-stream.js";
+import type { RegimeStore } from "./regime/index.js";
 
 interface Routes {
   cache: HubCache;
@@ -16,6 +17,8 @@ interface Routes {
   apr?: AprReader;
   /** Optional options-cache reader. Omit to suppress the `options` block. */
   options?: OptionsReader;
+  /** Optional regime store. Omit to disable `/regime` (returns 404). */
+  regime?: RegimeStore;
 }
 
 const JSON_HEADERS = {
@@ -71,6 +74,14 @@ function handle(req: IncomingMessage, res: ServerResponse, routes: Routes) {
   if (url.pathname === "/snapshot") {
     if (!cache.snapshot) return send(res, 503, { error: "snapshot not ready yet" });
     return sendCached(res, cache.snapshot, cache.snapshotAgeMs());
+  }
+
+  // GET /regime — latest macro regime snapshot (computed every 5min by the scheduler)
+  if (url.pathname === "/regime") {
+    if (!routes.regime) return send(res, 404, { error: "regime store not wired" });
+    const snap = routes.regime.get();
+    if (!snap) return send(res, 503, { error: "regime not computed yet" });
+    return sendCached(res, snap, Date.now() - snap.ts);
   }
 
   // GET /funding[?exchange=X&symbol=Y]

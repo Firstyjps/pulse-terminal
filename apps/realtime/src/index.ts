@@ -8,6 +8,8 @@ import { startHttpServer } from "./http-server.js";
 import { cache } from "./cache.js";
 import { createAprReader, preloadAprDriver } from "./apr-reader.js";
 import { startBinanceDepthStream } from "./binance-depth-stream.js";
+import { RegimeStore, startRegimeLoop, type RegimeReading } from "./regime/index.js";
+import { getMacro } from "@pulse/sources/server";
 
 const WS_PORT = Number(process.env.WS_PORT ?? 8080);
 const HTTP_PORT = Number(process.env.HUB_HTTP_PORT ?? 8081);
@@ -24,7 +26,38 @@ stoppers.push(startSnapshotPoller(cache));
 
 // Preload SQLite driver for APR /health block (graceful if unavailable).
 void preloadAprDriver();
-stoppers.push(startHttpServer(HTTP_PORT, { cache, apr: createAprReader() }));
+
+// Macro regime indicator — computes Risk-On/Off/Range every 5min from cached
+// data. Returns null when any required input is missing so the loop simply
+// skips that tick instead of polluting the store with partial readings.
+const regimeStore = new RegimeStore();
+stoppers.push(
+  startRegimeLoop({
+    store: regimeStore,
+    read: async (): Promise<RegimeReading | null> => {
+      const overview = cache.snapshot?.overview;
+      if (!overview?.btcDominance) return null;
+      const btc = cache.fundingList({ exchange: "binance", symbol: "BTCUSDT" })[0];
+      const eth = cache.fundingList({ exchange: "binance", symbol: "ETHUSDT" })[0];
+      const sol = cache.fundingList({ exchange: "binance", symbol: "SOLUSDT" })[0];
+      if (!btc || !eth || !sol) return null;
+      const macro = await getMacro();
+      const dxy = macro.dxy?.current;
+      if (typeof dxy !== "number") return null;
+      return {
+        dominance: overview.btcDominance,
+        dxy,
+        btcFunding: btc.ratePercent,
+        ethFunding: eth.ratePercent,
+        solFunding: sol.ratePercent,
+      };
+    },
+  }),
+);
+
+stoppers.push(
+  startHttpServer(HTTP_PORT, { cache, apr: createAprReader(), regime: regimeStore }),
+);
 
 if (NATIVE_STREAMS.includes("binance")) stoppers.push(startBinanceStream(server));
 if (NATIVE_STREAMS.includes("bybit")) stoppers.push(startBybitStream(server));
