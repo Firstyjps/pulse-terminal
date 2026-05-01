@@ -5,6 +5,7 @@ vi.mock("./meteora-positions.js", () => ({ getMeteoraPositions: vi.fn() }));
 vi.mock("./pendle-positions.js", () => ({ getPendlePositions: vi.fn() }));
 vi.mock("./orca-positions.js", () => ({ getOrcaPositions: vi.fn() }));
 vi.mock("./aave-positions.js", () => ({ getAavePositions: vi.fn() }));
+vi.mock("./coinstats.js", () => ({ getCoinStatsPortfolio: vi.fn() }));
 
 import { getAggregatePortfolio } from "./portfolio-aggregate.js";
 import { getMultiPortfolio } from "./portfolio-multi.js";
@@ -12,12 +13,14 @@ import { getMeteoraPositions } from "./meteora-positions.js";
 import { getPendlePositions } from "./pendle-positions.js";
 import { getOrcaPositions } from "./orca-positions.js";
 import { getAavePositions } from "./aave-positions.js";
+import { getCoinStatsPortfolio } from "./coinstats.js";
 
 const mockMulti = vi.mocked(getMultiPortfolio);
 const mockMeteora = vi.mocked(getMeteoraPositions);
 const mockPendle = vi.mocked(getPendlePositions);
 const mockOrca = vi.mocked(getOrcaPositions);
 const mockAave = vi.mocked(getAavePositions);
+const mockCoinStats = vi.mocked(getCoinStatsPortfolio);
 
 beforeEach(() => {
   mockMulti.mockReset();
@@ -25,6 +28,10 @@ beforeEach(() => {
   mockPendle.mockReset();
   mockOrca.mockReset();
   mockAave.mockReset();
+  mockCoinStats.mockReset();
+  // Default: CoinStats absent → tests below are about CEX/DeFi fallback.
+  // Tests that exercise CoinStats override via mockCoinStats.mockResolvedValue(...).
+  mockCoinStats.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -48,6 +55,7 @@ describe("getAggregatePortfolio — totals", () => {
     expect(snap.byAsset).toEqual([]);
     expect(snap.lp).toEqual([]);
     expect(snap.errors).toBeUndefined();
+    expect(snap._source).toBe("none");
   });
 
   it("sums totalUsd across CEX + DeFi", async () => {
@@ -342,5 +350,118 @@ describe("getAggregatePortfolio — concurrency + asOf", () => {
     const after = Date.now();
     expect(snap.asOf).toBeGreaterThanOrEqual(before);
     expect(snap.asOf).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("getAggregatePortfolio — _source dispatch", () => {
+  it("uses CoinStats path when populated, skipping CEX adapters", async () => {
+    mockCoinStats.mockResolvedValue({
+      totalUsd: 32000,
+      change24hUsd: 320,
+      change24hPct: 1.0,
+      assets: [
+        { symbol: "ETH", amount: 5.38, priceUsd: 3000, usdValue: 16140, change24h: 1.2 },
+        { symbol: "USDC", amount: 8000, priceUsd: 1, usdValue: 8000, change24h: 0 },
+        { symbol: "SOL", amount: 50, priceUsd: 156, usdValue: 7860, change24h: 3.5 },
+      ],
+      asOf: new Date().toISOString(),
+      _source: "coinstats",
+      populated: true,
+    });
+    emptyDefaults();
+
+    const snap = await getAggregatePortfolio();
+    expect(snap._source).toBe("coinstats");
+    expect(snap.totalUsd).toBe(32000);
+    expect(snap.byVenue).toHaveLength(1);
+    expect(snap.byVenue[0].name).toBe("coinstats");
+    expect(snap.byAsset.map((a) => a.ticker)).toEqual(["ETH", "USDC", "SOL"]);
+    // CEX/DeFi fallback should NOT have been called
+    expect(mockMulti).not.toHaveBeenCalled();
+    expect(mockMeteora).not.toHaveBeenCalled();
+  });
+
+  it("falls back to multi-CEX when CoinStats key is unset (returns null)", async () => {
+    mockCoinStats.mockResolvedValue(null);
+    mockMulti.mockResolvedValue({
+      sources: [
+        {
+          source: "binance",
+          totalUsd: 1780,
+          balances: [{ asset: "USDT", free: 1780, locked: 0, total: 1780, usdValue: 1780 }],
+          ts: 1,
+        },
+      ],
+      totalUsd: 1780,
+      status: [{ source: "binance", configured: true }],
+      ts: 1,
+    });
+    mockMeteora.mockResolvedValue({ positions: [] });
+    mockPendle.mockResolvedValue({ positions: [] });
+    mockOrca.mockResolvedValue({ positions: [] });
+    mockAave.mockResolvedValue({ positions: [] });
+
+    const snap = await getAggregatePortfolio();
+    expect(snap._source).toBe("multi-cex");
+    expect(snap.totalUsd).toBe(1780);
+    expect(mockMulti).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to multi-CEX when CoinStats is configured but populated:false", async () => {
+    mockCoinStats.mockResolvedValue({
+      totalUsd: 0,
+      change24hUsd: 0,
+      change24hPct: 0,
+      assets: [],
+      asOf: new Date().toISOString(),
+      _source: "coinstats",
+      populated: false,
+    });
+    mockMulti.mockResolvedValue({
+      sources: [
+        { source: "okx", totalUsd: 500, balances: [{ asset: "USDT", free: 500, locked: 0, total: 500, usdValue: 500 }], ts: 1 },
+      ],
+      totalUsd: 500,
+      status: [],
+      ts: 1,
+    });
+    mockMeteora.mockResolvedValue({ positions: [] });
+    mockPendle.mockResolvedValue({ positions: [] });
+    mockOrca.mockResolvedValue({ positions: [] });
+    mockAave.mockResolvedValue({ positions: [] });
+
+    const snap = await getAggregatePortfolio();
+    expect(snap._source).toBe("multi-cex");
+    expect(snap.totalUsd).toBe(500);
+  });
+
+  it("returns _source:'none' when both CoinStats and CEX/DeFi paths are empty", async () => {
+    mockCoinStats.mockResolvedValue(null);
+    emptyDefaults();
+    const snap = await getAggregatePortfolio();
+    expect(snap._source).toBe("none");
+    expect(snap.totalUsd).toBe(0);
+  });
+
+  it("falls back to multi-CEX when CoinStats throws, surfacing error line", async () => {
+    mockCoinStats.mockRejectedValue(new Error("coinstats /portfolio/coins → 401 (key …ABCD): unauthorized"));
+    mockMulti.mockResolvedValue({
+      sources: [
+        { source: "bybit", totalUsd: 200, balances: [{ asset: "USDT", free: 200, locked: 0, total: 200, usdValue: 200 }], ts: 1 },
+      ],
+      totalUsd: 200,
+      status: [],
+      ts: 1,
+    });
+    mockMeteora.mockResolvedValue({ positions: [] });
+    mockPendle.mockResolvedValue({ positions: [] });
+    mockOrca.mockResolvedValue({ positions: [] });
+    mockAave.mockResolvedValue({ positions: [] });
+
+    const snap = await getAggregatePortfolio();
+    expect(snap.totalUsd).toBe(200);
+    expect(snap.errors?.some((e) => e.startsWith("coinstats:") && e.includes("…ABCD"))).toBe(true);
+    // Error message must NOT contain raw key
+    expect(snap.errors?.join("\n")).not.toMatch(/test-key-1234/);
   });
 });

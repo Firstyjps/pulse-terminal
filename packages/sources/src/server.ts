@@ -25,6 +25,8 @@ export { getBybitPortfolio } from "./portfolio-bybit.js";
 export { getOkxPortfolio } from "./portfolio-okx.js";
 export { getMultiPortfolio } from "./portfolio-multi.js";
 export type { MultiPortfolioSnapshot } from "./portfolio-multi.js";
+export { getCoinStatsPortfolio } from "./coinstats.js";
+export type { CoinStatsPortfolio, CoinStatsAsset } from "./coinstats.js";
 
 // Phase 6 W1-2 — DeFi position adapters + unified aggregator
 export { getMeteoraPositions } from "./meteora-positions.js";

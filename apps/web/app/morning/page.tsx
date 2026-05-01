@@ -55,6 +55,7 @@ interface AggregateResp {
   byAsset: { ticker: string; totalUsd: number; venues: string[] }[];
   lp: unknown[];
   asOf: number;
+  _source?: "coinstats" | "multi-cex" | "none";
   errors?: string[];
   message?: string;
 }
@@ -74,14 +75,19 @@ function PortfolioBadge() {
   if (!data?.configured) {
     return (
       <span>
-        <span style={{ color: colors.amber }}>●</span> NO KEYS SET
+        <span style={{ color: colors.amber }}>●</span> NO DATA
       </span>
     );
   }
   const ago = Math.max(0, Math.floor((Date.now() - data.asOf) / 1000));
+  const sourceLabel =
+    data._source === "coinstats" ? "COINSTATS LIVE"
+    : data._source === "multi-cex" ? "MULTI-CEX FALLBACK"
+    : "LIVE";
+  const dotColor = data._source === "coinstats" ? colors.green : data._source === "multi-cex" ? colors.amber : colors.green;
   return (
     <span>
-      <span style={{ color: colors.green }}>●</span> LIVE · {ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)}m`} ago
+      <span style={{ color: dotColor }}>●</span> {sourceLabel} · {ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)}m`} ago
     </span>
   );
 }

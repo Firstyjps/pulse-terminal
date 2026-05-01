@@ -1,6 +1,12 @@
-// Unified portfolio aggregator — CEX (Binance/Bybit/OKX via portfolio-multi) +
-// DeFi (Meteora/Pendle/Orca/Aave). Returns a snapshot suitable for the
-// dashboard top-strip + drill-down panels.
+// Unified portfolio aggregator with priority dispatch:
+//   1. CoinStats Premium API (if COINSTATS_API_KEY set + populated) → canonical
+//   2. Multi-CEX (Binance/Bybit/OKX) + DeFi (Meteora/Pendle/Orca/Aave) → fallback
+//
+// CoinStats is preferred because the user's full portfolio (~$32K+ across
+// 10+ assets and many wallets) lives there. The CEX/DeFi adapters only see
+// each individual exchange/wallet API key and miss anything not connected.
+import { getCoinStatsPortfolio } from "./coinstats.js";
+import type { CoinStatsPortfolio } from "./coinstats.js";
 import { getMultiPortfolio } from "./portfolio-multi.js";
 import { getMeteoraPositions } from "./meteora-positions.js";
 import { getPendlePositions } from "./pendle-positions.js";
@@ -30,6 +36,8 @@ export interface AssetSummary {
   venues: string[];
 }
 
+export type PortfolioSourceTag = "coinstats" | "multi-cex" | "none";
+
 export interface AggregateSnapshot {
   totalUsd: number;
   byVenue: VenueSummary[];
@@ -37,6 +45,8 @@ export interface AggregateSnapshot {
   /** LP positions kept separate — pair tickers don't slot into single-asset buckets. */
   lp: Position[];
   asOf: number;
+  /** Which upstream produced the data. */
+  _source: PortfolioSourceTag;
   /** Per-source failures collected from CEX status + DeFi error arrays. */
   errors?: string[];
 }
@@ -54,13 +64,70 @@ function cexBalancesToPositions(snap: PortfolioSnapshot): Position[] {
 }
 
 /**
- * Aggregate every configured CEX + DeFi source into one snapshot.
+ * Map a CoinStats portfolio into the AggregateSnapshot shape. CoinStats
+ * already aggregates across every connected wallet/exchange, so we expose it
+ * as a single virtual venue named "coinstats" and let the per-asset bucket
+ * fan out from there.
+ */
+function coinStatsToAggregate(p: CoinStatsPortfolio): AggregateSnapshot {
+  const balances: VenueBalance[] = p.assets.map((a) => ({
+    asset: a.symbol,
+    type: "spot",
+    units: a.amount,
+    usdValue: a.usdValue,
+  }));
+  const byVenue: VenueSummary[] = balances.length
+    ? [{ name: "coinstats", totalUsd: p.totalUsd, balances }]
+    : [];
+  const byAsset: AssetSummary[] = p.assets
+    .map((a) => ({
+      ticker: a.symbol,
+      totalUnits: a.amount,
+      totalUsd: a.usdValue,
+      venues: ["coinstats"],
+    }))
+    .sort((a, b) => b.totalUsd - a.totalUsd);
+  return {
+    totalUsd: p.totalUsd,
+    byVenue,
+    byAsset,
+    lp: [],
+    asOf: Date.parse(p.asOf) || Date.now(),
+    _source: "coinstats",
+  };
+}
+
+/**
+ * Aggregate the user's portfolio with priority dispatch.
+ *
+ *   1. CoinStats Premium API → canonical (set COINSTATS_API_KEY)
+ *   2. Multi-CEX + DeFi adapters → fallback for when no CoinStats key exists
+ *      OR the CoinStats key has zero connected wallets (populated:false).
  *
  * Failure isolation: each underlying source is fetched via Promise.allSettled,
  * so a failing adapter contributes zero positions and a single line in
  * `errors[]` rather than throwing the whole aggregation.
  */
 export async function getAggregatePortfolio(): Promise<AggregateSnapshot> {
+  // ── CoinStats first ──────────────────────────────────────────────────────
+  try {
+    const cs = await getCoinStatsPortfolio();
+    if (cs && cs.populated) return coinStatsToAggregate(cs);
+    // key set but empty → still fall through to CEX/DeFi so the user sees
+    // at least their connected exchanges while they wire up CoinStats.
+  } catch (err) {
+    // surface as an error line but keep going to the fallback chain
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      ...(await fallbackAggregate()),
+      errors: [`coinstats: ${msg}`],
+    } as AggregateSnapshot;
+  }
+
+  return fallbackAggregate();
+}
+
+async function fallbackAggregate(): Promise<AggregateSnapshot> {
   const settled = await Promise.allSettled([
     getMultiPortfolio(),
     getMeteoraPositions(),
@@ -143,14 +210,17 @@ export async function getAggregatePortfolio(): Promise<AggregateSnapshot> {
     }))
     .sort((a, b) => b.totalUsd - a.totalUsd);
 
+  const _source: PortfolioSourceTag = totalUsd === 0 && byVenue.length === 0 ? "none" : "multi-cex";
+
   return {
     totalUsd,
     byVenue,
     byAsset,
     lp,
     asOf: Date.now(),
+    _source,
     ...(errors.length ? { errors } : {}),
   };
 }
 
-export const _internal = { CEX_SOURCES, cexBalancesToPositions };
+export const _internal = { CEX_SOURCES, cexBalancesToPositions, coinStatsToAggregate, fallbackAggregate };

@@ -40,7 +40,9 @@ export type {
   VenueSummary,
   VenueBalance,
   AssetSummary,
+  PortfolioSourceTag,
 } from "./portfolio-aggregate.js";
+export type { CoinStatsPortfolio, CoinStatsAsset } from "./coinstats.js";
 export type { ParsedWallet, WalletChain } from "./_wallets.js";
 
 // Phase 5 — Intelligence & Analytics types (browser-safe)
