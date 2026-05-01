@@ -33,6 +33,16 @@ export type { MacroPoint, MacroSeries, MacroResponse } from "./macro.js";
 export type { PortfolioBalance, PortfolioSnapshot, PortfolioSource } from "./portfolio.js";
 export type { MultiPortfolioSnapshot } from "./portfolio-multi.js";
 
+// Phase 6 W1-2 — position adapter shared types (browser-safe; pure types)
+export type { Position, PositionType, PositionResult, PositionFetcher } from "./position-types.js";
+export type {
+  AggregateSnapshot,
+  VenueSummary,
+  VenueBalance,
+  AssetSummary,
+} from "./portfolio-aggregate.js";
+export type { ParsedWallet, WalletChain } from "./_wallets.js";
+
 // Phase 5 — Intelligence & Analytics types (browser-safe)
 export type { NewsItem, NewsFilter } from "./news.js";
 export type { OnChainMetrics } from "./on-chain.js";

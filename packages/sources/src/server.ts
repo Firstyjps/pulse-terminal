@@ -25,6 +25,21 @@ export { getBybitPortfolio } from "./portfolio-bybit.js";
 export { getOkxPortfolio } from "./portfolio-okx.js";
 export { getMultiPortfolio } from "./portfolio-multi.js";
 export type { MultiPortfolioSnapshot } from "./portfolio-multi.js";
+
+// Phase 6 W1-2 — DeFi position adapters + unified aggregator
+export { getMeteoraPositions } from "./meteora-positions.js";
+export { getPendlePositions } from "./pendle-positions.js";
+export { getOrcaPositions } from "./orca-positions.js";
+export { getAavePositions } from "./aave-positions.js";
+export { getAggregatePortfolio } from "./portfolio-aggregate.js";
+export type {
+  AggregateSnapshot,
+  VenueSummary,
+  VenueBalance,
+  AssetSummary,
+} from "./portfolio-aggregate.js";
+export { parseWallets, getEvmWallets, getSolanaWallets } from "./_wallets.js";
+export type { ParsedWallet, WalletChain } from "./_wallets.js";
 export { getDepth } from "./depth.js";
 export type { DepthBook } from "./depth.js";
 export { getWhaleFlow } from "./whale-flow.js";
