@@ -81,6 +81,16 @@ export interface ETFFlowResponse {
   _isProxy?: boolean;
   /** Populated when `_source === "proxy"` so dashboards/alerts can detect Farside drift. */
   _fallbackReason?: ETFFallbackReason;
+  /**
+   * True when the most recent flow row is dated today (UTC) AND has both
+   * btc===0 and eth===0 — i.e. Farside has stubbed the row but US ETF flows
+   * for the day haven't been finalized yet (US market closes 4pm ET = 20:00
+   * UTC, Farside publishes the real number after that). When true, summary
+   * fields (`btcLast`, `ethLast`, cumulatives) are pulled from the previous
+   * row so UIs don't show a misleading $0 during the trading day. UIs can
+   * render a "(today still trading)" hint when this flag is set.
+   */
+  _todayPending?: boolean;
 }
 
 export interface FuturesData {

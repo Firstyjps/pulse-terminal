@@ -205,4 +205,50 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
     expect(out.toLowerCase()).not.toContain("open interest");
     expect(out.toLowerCase()).not.toContain("news");
   });
+
+  it("appends '(today still trading)' to 24h lines when _todayPending=true", () => {
+    const out = formatMorningBrief(
+      makeInput({
+        etf: {
+          ...ETF_FIXTURE,
+          _todayPending: true,
+        },
+      }),
+    );
+    // Both BTC and ETH 24h lines carry the hint
+    const btc24h = out.split("\n").find((l) => l.includes("💰") === false && l.startsWith("24h:"));
+    expect(out).toContain("today still trading");
+    // Hint count: appears twice (once for BTC, once for ETH)
+    const occurrences = out.match(/today still trading/g)?.length ?? 0;
+    expect(occurrences).toBe(2);
+    // Sanity — original 24h value preserved
+    expect(out).toContain("\\+$245\\.3M");
+    void btc24h;
+  });
+
+  it("shifts Δ vs yesterday calculation by one row when _todayPending=true", () => {
+    // 3 rows: [day-2] day-1, today(stub).
+    // With pendingOffset=1, delta = day-1 - day-2 (not today - day-1).
+    const out = formatMorningBrief(
+      makeInput({
+        etf: {
+          ...ETF_FIXTURE,
+          flows: [
+            { date: "2026-05-01", btc: 100_000_000, eth: 5_000_000, btcCumulative: 30_000_000_000, ethCumulative: 4_000_000_000 },
+            { date: "2026-05-02", btc: 245_300_000, eth: 12_400_000, btcCumulative: 30_245_300_000, ethCumulative: 4_012_400_000 },
+            { date: "2026-05-03", btc: 0, eth: 0, btcCumulative: 30_245_300_000, ethCumulative: 4_012_400_000 },
+          ],
+          summary: {
+            ...ETF_FIXTURE.summary,
+            btcLast: 245_300_000,
+            ethLast: 12_400_000,
+          },
+          _todayPending: true,
+        },
+      }),
+    );
+    // Δ = 245.3M - 100M = +145.3M (NOT 0 - 245.3M = -245.3M)
+    expect(out).toContain("Δ vs yesterday: \\+$145\\.3M");
+    expect(out).not.toContain("Δ vs yesterday: \\-$245\\.3M");
+  });
 });

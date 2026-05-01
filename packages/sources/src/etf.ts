@@ -58,7 +58,11 @@ export async function getETFFlows(): Promise<ETFFlowResponse> {
     source = "proxy";
   }
 
-  const last = flows[flows.length - 1];
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const { last, pending } = pickFinalizedLast(flows, todayUtc);
+  // 7d / 30d sums are unaffected — leaving today's stub at 0 in the rolling
+  // sum is correct (no flow occurred yet). Only the "latest finalized day"
+  // pointer needs to skip past the stub.
   const last7 = flows.slice(-7);
   const last30 = flows.slice(-30);
 
@@ -77,5 +81,25 @@ export async function getETFFlows(): Promise<ETFFlowResponse> {
     _source: source,
     _isProxy: source === "proxy",
     ...(fallbackReason ? { _fallbackReason: fallbackReason } : {}),
+    ...(pending ? { _todayPending: true } : {}),
   };
+}
+
+/**
+ * Pick the most recent *finalized* day for summary fields. If the tail row is
+ * dated today (UTC) AND has zero flows on both BTC + ETH, treat it as Farside's
+ * "stub before US close" and shift back one row. Pure helper exported for tests.
+ */
+export function pickFinalizedLast(
+  flows: ETFFlow[],
+  todayUtc: string,
+): { last: ETFFlow | undefined; pending: boolean } {
+  if (flows.length === 0) return { last: undefined, pending: false };
+  const tail = flows[flows.length - 1];
+  const isStubbedToday =
+    tail.date === todayUtc && tail.btc === 0 && tail.eth === 0;
+  if (isStubbedToday && flows.length >= 2) {
+    return { last: flows[flows.length - 2], pending: true };
+  }
+  return { last: tail, pending: false };
 }

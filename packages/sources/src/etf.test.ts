@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./farside.js", () => ({ fetchFarsideEtf: vi.fn() }));
-import { getETFFlows } from "./etf.js";
+import { getETFFlows, pickFinalizedLast } from "./etf.js";
 import { fetchFarsideEtf } from "./farside.js";
 import type { ETFFlow } from "./types.js";
 
@@ -131,5 +131,103 @@ describe("getETFFlows — response shape", () => {
     const r = await getETFFlows();
     expect(r._source).not.toBe("coinglass" as never);
     expect(JSON.stringify(r)).not.toMatch(/coinglass/i);
+  });
+
+  it("omits _todayPending when the tail row has real flow data", async () => {
+    mockFarside.mockResolvedValue(FARSIDE_FIXTURE);
+    const r = await getETFFlows();
+    expect(r._todayPending).toBeUndefined();
+  });
+});
+
+describe("pickFinalizedLast — pure helper", () => {
+  it("returns the actual tail when it is not today + zero", () => {
+    const r = pickFinalizedLast(FARSIDE_FIXTURE, "2026-05-04");
+    expect(r.last?.date).toBe("2026-04-30");
+    expect(r.pending).toBe(false);
+  });
+
+  it("shifts to previous row when tail is today AND btc=0 AND eth=0", () => {
+    const flows: ETFFlow[] = [
+      ...FARSIDE_FIXTURE,
+      farsideRow("2026-05-01", 0, 0, 57_492_400_000, 11_551_700_000),
+    ];
+    const r = pickFinalizedLast(flows, "2026-05-01");
+    expect(r.last?.date).toBe("2026-04-30");
+    expect(r.pending).toBe(true);
+  });
+
+  it("does NOT shift when tail is today but has nonzero btc", () => {
+    const flows: ETFFlow[] = [
+      ...FARSIDE_FIXTURE,
+      farsideRow("2026-05-01", 100_000, 0, 57_492_500_000, 11_551_700_000),
+    ];
+    const r = pickFinalizedLast(flows, "2026-05-01");
+    expect(r.last?.date).toBe("2026-05-01");
+    expect(r.pending).toBe(false);
+  });
+
+  it("does NOT shift when tail is yesterday with zeros (legitimate $0 day)", () => {
+    const flows: ETFFlow[] = [
+      ...FARSIDE_FIXTURE,
+      farsideRow("2026-05-01", 0, 0, 57_492_400_000, 11_551_700_000),
+    ];
+    const r = pickFinalizedLast(flows, "2026-05-04"); // today is later
+    expect(r.last?.date).toBe("2026-05-01");
+    expect(r.pending).toBe(false);
+  });
+
+  it("returns undefined + pending=false on empty array", () => {
+    const r = pickFinalizedLast([], "2026-05-01");
+    expect(r.last).toBeUndefined();
+    expect(r.pending).toBe(false);
+  });
+
+  it("does NOT shift when only one row exists (can't go back further)", () => {
+    const flows: ETFFlow[] = [farsideRow("2026-05-01", 0, 0, 1, 1)];
+    const r = pickFinalizedLast(flows, "2026-05-01");
+    expect(r.last?.date).toBe("2026-05-01");
+    expect(r.pending).toBe(false);
+  });
+});
+
+describe("getETFFlows — today-pending shift (US trading day)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shifts btcLast/ethLast to previous row when today is stubbed at 0", async () => {
+    // Pin "now" to 2026-05-01 14:00 UTC (US still trading until 20:00 UTC)
+    vi.setSystemTime(new Date("2026-05-01T14:00:00.000Z"));
+
+    const flows: ETFFlow[] = [
+      ...FARSIDE_FIXTURE,
+      // Farside stubs today's row before US close — both flows zero
+      farsideRow("2026-05-01", 0, 0, 57_492_400_000, 11_551_700_000),
+    ];
+    mockFarside.mockResolvedValue(flows);
+
+    const r = await getETFFlows();
+    expect(r._todayPending).toBe(true);
+    // btcLast comes from 2026-04-30 (the last finalized day), not today's zero
+    expect(r.summary.btcLast).toBe(23_500_000);
+    expect(r.summary.ethLast).toBe(-23_700_000);
+  });
+
+  it("leaves summary untouched when today's row already has real data", async () => {
+    vi.setSystemTime(new Date("2026-05-01T22:00:00.000Z")); // after US close
+    const flows: ETFFlow[] = [
+      ...FARSIDE_FIXTURE,
+      farsideRow("2026-05-01", 180_000_000, 12_000_000, 57_672_400_000, 11_563_700_000),
+    ];
+    mockFarside.mockResolvedValue(flows);
+
+    const r = await getETFFlows();
+    expect(r._todayPending).toBeUndefined();
+    expect(r.summary.btcLast).toBe(180_000_000);
   });
 });

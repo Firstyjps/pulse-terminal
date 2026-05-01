@@ -73,9 +73,20 @@ function fmtPct(n: number, decimals = 3): string {
   return `${sign}${n.toFixed(decimals)}%`;
 }
 
-function deltaVsYesterday(flows: ETFFlowResponse["flows"], pick: "btc" | "eth"): number | null {
-  if (flows.length < 2) return null;
-  return flows[flows.length - 1][pick] - flows[flows.length - 2][pick];
+/**
+ * Δ vs yesterday for the most recent finalized day. When `pendingOffset=1`
+ * (today is stubbed at zero — see ETFFlowResponse._todayPending) we compare
+ * flows[len-2] vs flows[len-3] instead of len-1 vs len-2 — otherwise the
+ * delta would just be `-yesterday` which is meaningless.
+ */
+function deltaVsYesterday(
+  flows: ETFFlowResponse["flows"],
+  pick: "btc" | "eth",
+  pendingOffset = 0,
+): number | null {
+  const lastIdx = flows.length - 1 - pendingOffset;
+  if (lastIdx < 1) return null;
+  return flows[lastIdx][pick] - flows[lastIdx - 1][pick];
 }
 
 const FUNDING_LEAN_EMOJI: Record<FundingCluster["lean"], string> = {
@@ -110,10 +121,15 @@ export function formatMorningBrief(input: FormatInput): string {
   }
   lines.push("");
 
+  const pendingOffset = etf._todayPending ? 1 : 0;
+  const pendingHint = etf._todayPending ? " \\(today still trading\\)" : "";
+
   // ── 2. BTC ETF Flow (💰)
   lines.push(`💰 *BTC ETF Flow*`);
-  const btcDelta = deltaVsYesterday(etf.flows, "btc");
-  lines.push(`24h: *${escapeMarkdownV2(fmtUsd(etf.summary.btcLast))}*`);
+  const btcDelta = deltaVsYesterday(etf.flows, "btc", pendingOffset);
+  lines.push(
+    `24h: *${escapeMarkdownV2(fmtUsd(etf.summary.btcLast))}*${pendingHint}`,
+  );
   if (btcDelta !== null) {
     lines.push(`Δ vs yesterday: ${escapeMarkdownV2(fmtUsd(btcDelta))}`);
   }
@@ -123,8 +139,10 @@ export function formatMorningBrief(input: FormatInput): string {
 
   // ── 3. ETH ETF Flow (🔷) — fixed section in v2 (no skip)
   lines.push(`🔷 *ETH ETF Flow*`);
-  const ethDelta = deltaVsYesterday(etf.flows, "eth");
-  lines.push(`24h: *${escapeMarkdownV2(fmtUsd(etf.summary.ethLast))}*`);
+  const ethDelta = deltaVsYesterday(etf.flows, "eth", pendingOffset);
+  lines.push(
+    `24h: *${escapeMarkdownV2(fmtUsd(etf.summary.ethLast))}*${pendingHint}`,
+  );
   if (ethDelta !== null) {
     lines.push(`Δ vs yesterday: ${escapeMarkdownV2(fmtUsd(ethDelta))}`);
   }

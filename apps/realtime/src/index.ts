@@ -28,32 +28,49 @@ stoppers.push(startSnapshotPoller(cache));
 void preloadAprDriver();
 
 // Macro regime indicator — computes Risk-On/Off/Range every 5min from cached
-// data. Returns null when any required input is missing so the loop simply
-// skips that tick instead of polluting the store with partial readings.
+// data. The reader logs which specific inputs are missing so we can see why
+// a tick skipped (instead of failing silently).
 const regimeStore = new RegimeStore();
 stoppers.push(
   startRegimeLoop({
     store: regimeStore,
     read: async (): Promise<RegimeReading | null> => {
       const overview = cache.snapshot?.overview;
-      if (!overview?.btcDominance) return null;
       const btc = cache.fundingList({ exchange: "binance", symbol: "BTCUSDT" })[0];
       const eth = cache.fundingList({ exchange: "binance", symbol: "ETHUSDT" })[0];
       const sol = cache.fundingList({ exchange: "binance", symbol: "SOLUSDT" })[0];
-      if (!btc || !eth || !sol) return null;
-      const macro = await getMacro();
-      const dxy = macro.dxy?.current;
-      if (typeof dxy !== "number") return null;
+
+      let dxy: number | undefined;
+      try {
+        const macro = await getMacro();
+        dxy = macro.dxy?.current;
+      } catch (err) {
+        console.warn("[regime] macro fetch threw:", (err as Error).message);
+      }
+
+      const missing: string[] = [];
+      if (!overview?.btcDominance) missing.push("dominance");
+      if (!btc) missing.push("btc-funding");
+      if (!eth) missing.push("eth-funding");
+      if (!sol) missing.push("sol-funding");
+      if (typeof dxy !== "number") missing.push("dxy");
+
+      if (missing.length) {
+        console.log(`[regime] read skipped — missing: ${missing.join(", ")}`);
+        return null;
+      }
+
       return {
-        dominance: overview.btcDominance,
-        dxy,
-        btcFunding: btc.ratePercent,
-        ethFunding: eth.ratePercent,
-        solFunding: sol.ratePercent,
+        dominance: overview!.btcDominance,
+        dxy: dxy as number,
+        btcFunding: btc!.ratePercent,
+        ethFunding: eth!.ratePercent,
+        solFunding: sol!.ratePercent,
       };
     },
   }),
 );
+console.log("[regime] loop armed — interval 5min, sources: cache.snapshot + cache.funding + getMacro()");
 
 stoppers.push(
   startHttpServer(HTTP_PORT, { cache, apr: createAprReader(), regime: regimeStore }),

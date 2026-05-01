@@ -265,9 +265,18 @@ export function startRegimeLoop(opts: RegimeLoopOpts): () => void {
     if (stopped) return;
     try {
       const reading = await opts.read();
-      if (reading) opts.store.record(reading);
+      if (!reading) {
+        // Reader is responsible for logging *which* inputs were missing —
+        // we just record that the tick fired and produced nothing.
+        console.log("[regime] tick skipped reason=missing_data");
+        return;
+      }
+      const snap = opts.store.record(reading);
+      console.log(
+        `[regime] tick computed regime=${snap.regime} score=${snap.score.toFixed(2)} reason="${snap.reason}"`,
+      );
     } catch (err) {
-      console.warn("[regime] read failed:", (err as Error).message);
+      console.warn("[regime] tick failed:", (err as Error).message);
     }
   };
 
