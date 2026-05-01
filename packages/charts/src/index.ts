@@ -9,6 +9,12 @@ export type {
   PortfolioWindow,
 } from "./PortfolioSparkline";
 
+export { PortfolioTrend } from "./PortfolioTrend";
+export type {
+  PortfolioTrendProps,
+  PortfolioSnapshot,
+} from "./PortfolioTrend";
+
 export { RegimeChip } from "./RegimeChip";
 export type { RegimeChipProps, Regime } from "./RegimeChip";
 

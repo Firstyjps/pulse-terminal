@@ -15,6 +15,7 @@ import { FundingHistory } from "./FundingHistory";
 
 import { RegimeChip } from "./RegimeChip";
 import { PortfolioSparkline } from "./PortfolioSparkline";
+import { PortfolioTrend } from "./PortfolioTrend";
 
 import {
   SAMPLE_FUNDING_HISTORY,
@@ -301,5 +302,63 @@ describe("PortfolioSparkline", () => {
     expect(html).toContain("polyline");
     expect(html).toContain("−$500");
     expect(html).toContain("−5.00%");
+  });
+});
+
+describe("PortfolioTrend", () => {
+  const day = 86_400_000;
+  const now = Date.UTC(2026, 4, 1); // 2026-05-01
+
+  it("renders the empty-state hint when given no snapshots", () => {
+    const html = renders(<PortfolioTrend snapshots={[]} />);
+    expect(html).toContain("No portfolio history");
+  });
+
+  it("renders the empty-state hint when given a single snapshot (no line possible)", () => {
+    const html = renders(
+      <PortfolioTrend snapshots={[{ ts: now, totalUsd: 10_000 }]} />,
+    );
+    expect(html).toContain("No portfolio history");
+  });
+
+  it("renders the ResponsiveContainer wrapper for a 30-day series", () => {
+    const snapshots = Array.from({ length: 30 }, (_, i) => ({
+      ts: now - (29 - i) * day,
+      totalUsd: 10_000 + i * 100,
+    }));
+    // SSR via renderToStaticMarkup can't measure width, so Recharts only emits
+    // the responsive-container shell — assert on that, not the inner <svg>.
+    const html = renders(<PortfolioTrend snapshots={snapshots} />);
+    expect(html).toContain("recharts-responsive-container");
+    expect(html).not.toContain("No portfolio history");
+  });
+
+  it("accepts ISO string timestamps and still renders", () => {
+    const html = renders(
+      <PortfolioTrend
+        snapshots={[
+          { ts: "2026-04-01T00:00:00Z", totalUsd: 9_500 },
+          { ts: "2026-04-15T00:00:00Z", totalUsd: 10_200 },
+          { ts: "2026-05-01T00:00:00Z", totalUsd: 11_000 },
+        ]}
+      />,
+    );
+    expect(html).toContain("recharts-responsive-container");
+    expect(html).not.toContain("No portfolio history");
+  });
+
+  it("filters snapshots older than the trailing 30-day window", () => {
+    // Two ancient points (60 days ago) + one fresh point → only 1 in window
+    // → falls into the empty-state guard (need ≥ 2 points to draw a line).
+    const html = renders(
+      <PortfolioTrend
+        snapshots={[
+          { ts: now - 60 * day, totalUsd: 5_000 },
+          { ts: now - 45 * day, totalUsd: 6_000 },
+          { ts: now, totalUsd: 12_000 },
+        ]}
+      />,
+    );
+    expect(html).toContain("No portfolio history");
   });
 });
