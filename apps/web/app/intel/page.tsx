@@ -22,11 +22,11 @@ export default function IntelPage() {
         </Panel>
       </WsRow>
 
-      <WsRow height="feed">
+      <WsRow height="auto" style={{ minHeight: 580 }}>
         <Panel
           span={7}
           title="MARKET NEWS"
-          badge="CRYPTOPANIC · 5M REVALIDATE"
+          badge="RSS · 5M REVALIDATE · 1-6 TO FILTER"
           flush
         >
           <NewsFeed />

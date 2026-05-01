@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { colors, fonts, SignalPill } from "@pulse/ui";
 import type { NewsItem, NewsFilter } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
 
-const FILTERS: { id: NewsFilter; label: string }[] = [
-  { id: "all",     label: "ALL" },
-  { id: "BTC",     label: "BTC" },
-  { id: "ETH",     label: "ETH" },
-  { id: "hot",     label: "HOT" },
-  { id: "bullish", label: "BULL" },
-  { id: "bearish", label: "BEAR" },
+interface FilterDef { id: NewsFilter; label: string; key: string }
+const FILTERS: FilterDef[] = [
+  { id: "all",     label: "ALL",  key: "1" },
+  { id: "BTC",     label: "BTC",  key: "2" },
+  { id: "ETH",     label: "ETH",  key: "3" },
+  { id: "hot",     label: "HOT",  key: "4" },
+  { id: "bullish", label: "BULL", key: "5" },
+  { id: "bearish", label: "BEAR", key: "6" },
 ];
+
+const KEY_TO_FILTER = FILTERS.reduce<Record<string, NewsFilter>>((acc, f) => ((acc[f.key] = f.id), acc), {});
 
 interface NewsResp {
   filter: NewsFilter;
@@ -21,9 +24,33 @@ interface NewsResp {
   error?: string;
 }
 
+// TODO(role-3): bump getCryptoNews() merged.slice(0, 30) → slice(0, 50) in
+// packages/sources/src/news.ts:146 — the panel now has room for ~25 visible
+// items plus scroll; capping at 30 leaves little headroom for filter modes.
+
 export function NewsFeed() {
   const [filter, setFilter] = useState<NewsFilter>("all");
   const { data, loading, error } = useFlow<NewsResp>(`/api/news?filter=${filter}`, filter as unknown as number);
+
+  useEffect(() => {
+    const isTyping = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (isTyping(e.target)) return;
+      const next = KEY_TO_FILTER[e.key];
+      if (next) {
+        e.preventDefault();
+        setFilter(next);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -56,6 +83,7 @@ export function NewsFeed() {
                 fontWeight: active ? 600 : 400,
               }}
             >
+              <span style={{ color: active ? colors.amber : colors.txt4, marginRight: 5, fontSize: 9 }}>{f.key}</span>
               {f.label}
             </button>
           );

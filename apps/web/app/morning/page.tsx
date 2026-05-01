@@ -1,72 +1,42 @@
 "use client";
 
 import { Panel, WsRow, Workspace, StatBlock, MonoNum, SignalPill, colors, fonts } from "@pulse/ui";
+import { formatUSD } from "@pulse/sources";
+import { useFlow } from "../../lib/use-flow";
 
 /**
  * Morning Brief — question-driven single-screen dashboard.
- *
- * ROADMAP Action 1: open pulse.local in the morning → 30 seconds to know what
- * to focus on today. Sections in priority order:
  *
  *   Row 1 (stats):   PORTFOLIO STRIP    — total + per-window P&L + venue split
  *   Row 2 (digest):  OVERNIGHT DIGEST   c-8  ·  MACRO REGIME  c-4
  *   Row 3 (action):  SIGNAL FEED top-5  c-7  ·  ACTION ITEMS  c-5
  *
- * All data is PLACEHOLDER until subsequent dispatches wire:
- *   - /api/portfolio/aggregate (Role 3)
- *   - /api/digest/today        (alerts worker)
- *   - /api/regime              (intelligence layer)
- *   - re-ranked alerts feed    (signal scorer)
+ * Wired now: PORTFOLIO (/api/portfolio/aggregate), SIGNAL FEED (/api/alerts/recent re-ranked).
+ * Still PLACEHOLDER: OVERNIGHT DIGEST, MACRO REGIME inputs, ACTION ITEMS — wire at Week 2-3.
  */
 export default function MorningPage() {
   return (
     <Workspace>
-      {/* Row 1 — Portfolio strip (4 KPI tiles + venue breakdown) */}
       <WsRow height="stats">
-        <Panel
-          span={12}
-          title="PORTFOLIO"
-          badge={<span><span style={{ color: colors.amber }}>●</span> PLACEHOLDER</span>}
-          flush
-        >
+        <Panel span={12} title="PORTFOLIO" badge={<PortfolioBadge />} flush>
           <PortfolioStrip />
         </Panel>
       </WsRow>
 
-      {/* Row 2 — Overnight digest + Macro regime */}
       <WsRow height="auto" style={{ minHeight: 240 }}>
-        <Panel
-          span={8}
-          title="OVERNIGHT DIGEST"
-          badge="07:00 ICT · PLACEHOLDER"
-        >
+        <Panel span={8} title="OVERNIGHT DIGEST" badge="07:00 ICT · PLACEHOLDER">
           <OvernightDigest />
         </Panel>
-        <Panel
-          span={4}
-          title="MACRO REGIME"
-          badge="RULES v0 · PLACEHOLDER"
-        >
+        <Panel span={4} title="MACRO REGIME" badge="RULES v0 · PLACEHOLDER">
           <MacroRegime />
         </Panel>
       </WsRow>
 
-      {/* Row 3 — Signal feed + Action items */}
       <WsRow height="auto" style={{ minHeight: 360 }}>
-        <Panel
-          span={7}
-          title="SIGNAL FEED"
-          badge="TOP 5 · PLACEHOLDER"
-          flush
-        >
+        <Panel span={7} title="SIGNAL FEED" badge="TOP 5 · LIVE" flush>
           <SignalFeed />
         </Panel>
-        <Panel
-          span={5}
-          title="ACTION ITEMS"
-          badge="TODAY · PLACEHOLDER"
-          flush
-        >
+        <Panel span={5} title="ACTION ITEMS" badge="TODAY · PLACEHOLDER" flush>
           <ActionItems />
         </Panel>
       </WsRow>
@@ -75,11 +45,71 @@ export default function MorningPage() {
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/*  Section components — placeholder data flagged with `_isProxy: true`     */
-/*  shape until /api/portfolio/aggregate + /api/digest + /api/regime ship.  */
+/*  PORTFOLIO — wired to /api/portfolio/aggregate                            */
 /* ──────────────────────────────────────────────────────────────────────── */
 
+interface AggregateResp {
+  configured: boolean;
+  totalUsd: number;
+  byVenue: { name: string; totalUsd: number; balances: unknown[] }[];
+  byAsset: { ticker: string; totalUsd: number; venues: string[] }[];
+  lp: unknown[];
+  asOf: number;
+  errors?: string[];
+  message?: string;
+}
+
+const DEFI_VENUES = new Set(["meteora", "pendle", "orca", "aave"]);
+const VENUE_LABEL: Record<string, string> = {
+  binance: "BINANCE", bybit: "BYBIT", okx: "OKX", bitkub: "BITKUB", gate: "GATE",
+};
+
+function usePortfolio() {
+  return useFlow<AggregateResp>("/api/portfolio/aggregate");
+}
+
+function PortfolioBadge() {
+  const { data, loading } = usePortfolio();
+  if (loading) return <span style={{ color: colors.txt4 }}>LOADING…</span>;
+  if (!data?.configured) {
+    return (
+      <span>
+        <span style={{ color: colors.amber }}>●</span> NO KEYS SET
+      </span>
+    );
+  }
+  const ago = Math.max(0, Math.floor((Date.now() - data.asOf) / 1000));
+  return (
+    <span>
+      <span style={{ color: colors.green }}>●</span> LIVE · {ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)}m`} ago
+    </span>
+  );
+}
+
 function PortfolioStrip() {
+  const { data, loading, error } = usePortfolio();
+
+  if (loading && !data) return <PortfolioSkeleton />;
+
+  if (error || (!loading && !data)) {
+    return (
+      <PortfolioMessage tone="error">
+        Portfolio unavailable {error ? `(${error})` : ""}
+      </PortfolioMessage>
+    );
+  }
+
+  if (data && !data.configured) {
+    return (
+      <PortfolioMessage tone="amber">
+        {data.message ?? "Set BINANCE_API_KEY+SECRET / BYBIT_API_KEY+SECRET / OKX_API_KEY+SECRET+PASSPHRASE in .env.local"}
+      </PortfolioMessage>
+    );
+  }
+
+  const total = data!.totalUsd;
+  // PnL windows not yet collected (no snapshot history file). TODO: wire when
+  // a daily portfolio snapshot job lands (ROADMAP Week 1-2 follow-up).
   return (
     <div
       style={{
@@ -92,47 +122,56 @@ function PortfolioStrip() {
     >
       <StatBlock
         label="TOTAL USD"
-        value={<MonoNum size={18} value={null}>$—,—</MonoNum>}
-        delta="+—.——%"
-        deltaColor={colors.txt4}
-        sub="vs prev close"
+        value={<MonoNum size={18} value={total}>{formatUSD(total, { compact: true, decimals: 2 })}</MonoNum>}
+        sub={`${data!.byVenue.length} venues · ${data!.byAsset.length} assets`}
       />
       <StatBlock
         label="24H P&L"
         value={<MonoNum size={18} value={null}>$—</MonoNum>}
-        delta="—.——%"
-        deltaColor={colors.txt4}
-        sub="realized + unrealized"
+        sub="snapshot history not collected"
       />
       <StatBlock
         label="7D P&L"
         value={<MonoNum size={18} value={null}>$—</MonoNum>}
-        delta="—.——%"
-        deltaColor={colors.txt4}
-        sub="rolling 7d"
+        sub="snapshot history not collected"
       />
       <StatBlock
         label="30D P&L"
         value={<MonoNum size={18} value={null}>$—</MonoNum>}
-        delta="—.——%"
-        deltaColor={colors.txt4}
-        sub="rolling 30d"
+        sub="snapshot history not collected"
       />
-      <VenueBreakdown />
+      <VenueBreakdown data={data!} />
     </div>
   );
 }
 
-function VenueBreakdown() {
-  // PLACEHOLDER: real data from /api/portfolio/aggregate `byVenue` field
-  const venues: { name: string; pct: number }[] = [
-    { name: "BINANCE", pct: 0 },
-    { name: "BYBIT",   pct: 0 },
-    { name: "OKX",     pct: 0 },
-    { name: "BITKUB",  pct: 0 },
-    { name: "GATE",    pct: 0 },
-    { name: "DEFI LP", pct: 0 },
-  ];
+function PortfolioSkeleton() {
+  return (
+    <div style={{ padding: "14px 16px", fontFamily: fonts.mono, fontSize: 11, color: colors.txt4 }}>
+      Loading portfolio…
+    </div>
+  );
+}
+
+function PortfolioMessage({ tone, children }: { tone: "amber" | "error"; children: React.ReactNode }) {
+  const c = tone === "error" ? colors.red : colors.amber;
+  return (
+    <div style={{ padding: "14px 16px", fontFamily: fonts.mono, fontSize: 11, lineHeight: 1.55, color: colors.txt2, display: "flex", gap: 10, alignItems: "flex-start" }}>
+      <span style={{ color: c, fontSize: 14, lineHeight: 1 }}>●</span>
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function VenueBreakdown({ data }: { data: AggregateResp }) {
+  const total = data.totalUsd || 1;
+  const buckets = new Map<string, number>();
+  for (const v of data.byVenue) {
+    const label = DEFI_VENUES.has(v.name) ? "DEFI LP" : VENUE_LABEL[v.name] ?? v.name.toUpperCase();
+    buckets.set(label, (buckets.get(label) ?? 0) + v.totalUsd);
+  }
+  const ordered = [...buckets.entries()].sort((a, b) => b[1] - a[1]);
+
   return (
     <div
       style={{
@@ -144,15 +183,7 @@ function VenueBreakdown() {
         minWidth: 0,
       }}
     >
-      <div
-        style={{
-          fontFamily: fonts.mono,
-          fontSize: 9,
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          color: colors.txt3,
-        }}
-      >
+      <div style={{ fontFamily: fonts.mono, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", color: colors.txt3 }}>
         VENUE SPLIT
       </div>
       <div
@@ -164,34 +195,31 @@ function VenueBreakdown() {
           fontSize: 10,
         }}
       >
-        {venues.map((v) => (
-          <div key={v.name} style={{ display: "flex", justifyContent: "space-between", color: colors.txt3 }}>
-            <span>{v.name}</span>
-            <span style={{ color: colors.txt2, fontVariantNumeric: "tabular-nums" }}>
-              {v.pct.toFixed(1)}%
-            </span>
-          </div>
-        ))}
+        {ordered.length === 0 ? (
+          <span style={{ color: colors.txt4, gridColumn: "1 / -1" }}>no venues</span>
+        ) : (
+          ordered.map(([name, usd]) => {
+            const pct = (usd / total) * 100;
+            return (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", color: colors.txt3 }}>
+                <span>{name}</span>
+                <span style={{ color: colors.txt2, fontVariantNumeric: "tabular-nums" }}>{pct.toFixed(1)}%</span>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
 
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  OVERNIGHT DIGEST — placeholder until Week 2-3 (digest generator cron)    */
+/* ──────────────────────────────────────────────────────────────────────── */
+
 function OvernightDigest() {
-  // PLACEHOLDER: real paragraph from apps/alerts/data/digest-YYYY-MM-DD.md
   return (
-    <div
-      style={{
-        fontFamily: fonts.mono,
-        fontSize: 11,
-        lineHeight: 1.65,
-        color: colors.txt2,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        height: "100%",
-      }}
-    >
+    <div style={{ fontFamily: fonts.mono, fontSize: 11, lineHeight: 1.65, color: colors.txt2, display: "flex", flexDirection: "column", gap: 10, height: "100%" }}>
       <p style={{ margin: 0 }}>
         <span style={{ color: colors.amber }}>▸</span>{" "}
         <span style={{ color: colors.txt4, fontStyle: "italic" }}>
@@ -201,19 +229,8 @@ function OvernightDigest() {
           <code style={{ color: colors.cyan }}>apps/alerts/data/digest-YYYY-MM-DD.md</code>.
         </span>
       </p>
-
-      <div
-        style={{
-          padding: "8px 10px",
-          background: colors.bg2,
-          border: `1px dashed ${colors.line2}`,
-          color: colors.txt3,
-          fontSize: 10,
-        }}
-      >
-        <div style={{ color: colors.txt4, marginBottom: 4, letterSpacing: "0.08em" }}>
-          ── EXAMPLE OUTPUT (NOT LIVE) ──
-        </div>
+      <div style={{ padding: "8px 10px", background: colors.bg2, border: `1px dashed ${colors.line2}`, color: colors.txt3, fontSize: 10 }}>
+        <div style={{ color: colors.txt4, marginBottom: 4, letterSpacing: "0.08em" }}>── EXAMPLE OUTPUT (NOT LIVE) ──</div>
         Markets traded sideways overnight with BTC pinned around $—.—K and ETH
         showing modest weakness against the cross. Funding compressed across all
         three majors — Binance perp now at —bps vs. —bps yesterday — pointing to
@@ -223,60 +240,32 @@ function OvernightDigest() {
         ETF inflow notice from Farside scrape. Bias remains range-bound until
         funding crosses zero or DXY breaks $—.
       </div>
-
       <div style={{ marginTop: "auto", display: "flex", gap: 6, alignItems: "center" }}>
         <SignalPill tone="muted" size="xs">SOURCE</SignalPill>
-        <span style={{ color: colors.txt4, fontSize: 10 }}>
-          digest-2026-05-01.md (not generated yet)
-        </span>
+        <span style={{ color: colors.txt4, fontSize: 10 }}>digest-YYYY-MM-DD.md (not generated yet)</span>
       </div>
     </div>
   );
 }
 
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  MACRO REGIME — still placeholder inputs (rules engine pending)           */
+/* ──────────────────────────────────────────────────────────────────────── */
+
 function MacroRegime() {
-  // PLACEHOLDER: real value from /api/regime → "Risk-On" | "Risk-Off" | "Range"
   const regime = "RANGE" as "RISK-ON" | "RISK-OFF" | "RANGE";
   const tone = regime === "RISK-ON" ? "up" : regime === "RISK-OFF" ? "down" : "amber";
-
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        height: "100%",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-        <SignalPill tone={tone} size="sm" glow>
-          {regime}
-        </SignalPill>
-        <div
-          style={{
-            fontFamily: fonts.mono,
-            fontSize: 10,
-            color: colors.txt3,
-            lineHeight: 1.55,
-          }}
-        >
+        <SignalPill tone={tone} size="sm" glow>{regime}</SignalPill>
+        <div style={{ fontFamily: fonts.mono, fontSize: 10, color: colors.txt3, lineHeight: 1.55 }}>
           Funding compressed across BTC/ETH/SOL · DXY flat · stablecoins flat.
           No directional thrust either side.
         </div>
       </div>
-
       <div style={{ borderTop: `1px solid ${colors.line}`, paddingTop: 8 }}>
-        <div
-          style={{
-            fontFamily: fonts.mono,
-            fontSize: 9,
-            color: colors.txt4,
-            letterSpacing: "0.10em",
-            marginBottom: 6,
-          }}
-        >
-          INPUTS
-        </div>
+        <div style={{ fontFamily: fonts.mono, fontSize: 9, color: colors.txt4, letterSpacing: "0.10em", marginBottom: 6 }}>INPUTS</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "3px 8px", fontSize: 10, fontFamily: fonts.mono }}>
           <span style={{ color: colors.txt3 }}>Funding (4-venue avg)</span>
           <span style={{ color: colors.txt2, fontVariantNumeric: "tabular-nums" }}>—bps</span>
@@ -288,7 +277,6 @@ function MacroRegime() {
           <span style={{ color: colors.txt2, fontVariantNumeric: "tabular-nums" }}>$—M</span>
         </div>
       </div>
-
       <div style={{ marginTop: "auto" }}>
         <SignalPill tone="muted" size="xs">RULES v0 + LLM OVERRIDE PENDING</SignalPill>
       </div>
@@ -296,27 +284,115 @@ function MacroRegime() {
   );
 }
 
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  SIGNAL FEED — wired to /api/alerts/recent, re-ranked top 5               */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+interface AlertRecord {
+  ts: string;
+  scan_id: string;
+  symbol: string;
+  findings: { category: string; severity: "low" | "med" | "high"; signal: string; evidence: Record<string, unknown> }[];
+  marker: { btcPrice?: number; ethPrice?: number };
+}
+
+interface RecentResp {
+  configured: boolean;
+  count: number;
+  records: AlertRecord[];
+  message?: string;
+}
+
+interface RankedSignal {
+  tag: "WHALE" | "LIQ" | "FLOW" | "OI" | "PUMP" | "NEWS";
+  symbol: string;
+  signal: string;
+  severity: "low" | "med" | "high";
+  ts: number;
+  score: number;
+  ageStr: string;
+}
+
+const SEVERITY_W: Record<RankedSignal["severity"], number> = { high: 3, med: 2, low: 1 };
+
+function categoryToTag(cat: string): RankedSignal["tag"] {
+  const c = cat.toUpperCase();
+  if (c.includes("WHALE")) return "WHALE";
+  if (c.includes("LIQ")) return "LIQ";
+  if (c.includes("FLOW") || c.includes("ETF") || c.includes("STABLE")) return "FLOW";
+  if (c.includes("OI") || c.includes("OPEN_INTEREST")) return "OI";
+  if (c.includes("PUMP")) return "PUMP";
+  return "NEWS";
+}
+
+function ageString(ms: number): string {
+  const sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+function rankSignals(records: AlertRecord[]): RankedSignal[] {
+  const flat: { rec: AlertRecord; finding: AlertRecord["findings"][number]; ts: number }[] = [];
+  for (const rec of records) {
+    const ts = Date.parse(rec.ts);
+    if (!Number.isFinite(ts)) continue;
+    for (const f of rec.findings) flat.push({ rec, finding: f, ts });
+  }
+
+  // Novelty: 1.0 if (category, symbol) first occurrence in last 24h, else 0.5
+  const firstSeen = new Map<string, number>();
+  const cutoff24h = Date.now() - 24 * 3600 * 1000;
+  for (const item of flat) {
+    if (item.ts < cutoff24h) continue;
+    const key = `${item.finding.category}:${item.rec.symbol}`;
+    const prev = firstSeen.get(key);
+    if (prev == null || item.ts < prev) firstSeen.set(key, item.ts);
+  }
+
+  return flat
+    .map(({ rec, finding, ts }) => {
+      const sevW = SEVERITY_W[finding.severity];
+      const key = `${finding.category}:${rec.symbol}`;
+      const novelty = firstSeen.get(key) === ts ? 1.0 : 0.5;
+      const hoursOld = Math.max(0, (Date.now() - ts) / 3600_000);
+      const recency = Math.exp(-hoursOld / 12);
+      const score = sevW * novelty * recency;
+      return {
+        tag: categoryToTag(finding.category),
+        symbol: rec.symbol,
+        signal: finding.signal,
+        severity: finding.severity,
+        ts,
+        score,
+        ageStr: ageString(ts),
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+}
+
 function SignalFeed() {
-  // PLACEHOLDER: real signals from re-ranked apps/alerts/data/alerts.jsonl
-  type Sig = { tag: "WHALE" | "LIQ" | "FLOW" | "OI" | "PUMP" | "NEWS"; symbol: string; note: string; score: number; age: string };
-  const signals: Sig[] = [
-    { tag: "FLOW",  symbol: "—",       note: "(re-ranked alerts feed pending)", score: 0, age: "—" },
-    { tag: "OI",    symbol: "—",       note: "(re-ranked alerts feed pending)", score: 0, age: "—" },
-    { tag: "WHALE", symbol: "—",       note: "(re-ranked alerts feed pending)", score: 0, age: "—" },
-    { tag: "LIQ",   symbol: "—",       note: "(re-ranked alerts feed pending)", score: 0, age: "—" },
-    { tag: "NEWS",  symbol: "—",       note: "(re-ranked alerts feed pending)", score: 0, age: "—" },
-  ];
+  const { data, loading, error } = useFlow<RecentResp>("/api/alerts/recent?limit=100");
+
+  if (loading && !data) {
+    return <SignalEmpty>Loading signals…</SignalEmpty>;
+  }
+  if (error) {
+    return <SignalEmpty tone="red">Alerts feed error: {error}</SignalEmpty>;
+  }
+  if (!data?.configured && data?.message) {
+    return <SignalEmpty>{data.message}</SignalEmpty>;
+  }
+
+  const ranked = rankSignals(data?.records ?? []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontFamily: fonts.mono,
-          fontSize: 10,
-        }}
-      >
+      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: fonts.mono, fontSize: 10 }}>
         <thead>
           <tr style={{ color: colors.txt4, textAlign: "left", letterSpacing: "0.08em" }}>
             <th style={th}>TAG</th>
@@ -327,36 +403,45 @@ function SignalFeed() {
           </tr>
         </thead>
         <tbody>
-          {signals.map((s, i) => (
-            <tr
-              key={i}
-              style={{
-                borderTop: `1px solid ${colors.line}`,
-                color: colors.txt3,
-              }}
-            >
-              <td style={td}>
-                <SignalPill tone={s.tag} size="xs">{s.tag}</SignalPill>
+          {ranked.length === 0 ? (
+            <tr>
+              <td colSpan={5} style={{ padding: 16, color: colors.txt4 }}>
+                No findings in last {data?.count ?? 0} alert scans · scanner running clean
               </td>
-              <td style={{ ...td, color: colors.txt2 }}>{s.symbol}</td>
-              <td style={{ ...td, color: colors.txt3 }}>{s.note}</td>
-              <td style={{ ...td, textAlign: "right", color: colors.txt2, fontVariantNumeric: "tabular-nums" }}>
-                {s.score.toFixed(2)}
-              </td>
-              <td style={{ ...td, textAlign: "right", color: colors.txt4 }}>{s.age}</td>
             </tr>
-          ))}
+          ) : (
+            ranked.map((s, i) => (
+              <tr key={`${s.symbol}-${s.ts}-${i}`} style={{ borderTop: `1px solid ${colors.line}`, color: colors.txt3 }}>
+                <td style={td}><SignalPill tone={s.tag} size="xs">{s.tag}</SignalPill></td>
+                <td style={{ ...td, color: colors.txt2 }}>{s.symbol}</td>
+                <td style={{ ...td, color: colors.txt2 }}>{s.signal}</td>
+                <td style={{ ...td, textAlign: "right", color: colors.txt2, fontVariantNumeric: "tabular-nums" }}>{s.score.toFixed(2)}</td>
+                <td style={{ ...td, textAlign: "right", color: colors.txt4 }}>{s.ageStr}</td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
       <div style={{ marginTop: "auto", padding: "6px 10px", borderTop: `1px solid ${colors.line}`, fontSize: 9, color: colors.txt4 }}>
-        Composite score = severity × novelty × user-relevance · ranker pending
+        Composite score = severity({SEVERITY_W.high}/{SEVERITY_W.med}/{SEVERITY_W.low}) × novelty(1.0/0.5) × recency(exp(-h/12))
       </div>
     </div>
   );
 }
 
+function SignalEmpty({ children, tone }: { children: React.ReactNode; tone?: "red" }) {
+  return (
+    <div style={{ padding: "14px 16px", fontFamily: fonts.mono, fontSize: 11, color: tone === "red" ? colors.red : colors.txt3 }}>
+      {children}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  ACTION ITEMS — placeholder until signal scorer + DeFi adapters wire up   */
+/* ──────────────────────────────────────────────────────────────────────── */
+
 function ActionItems() {
-  // PLACEHOLDER: actions derived from signals + open positions + portfolio drift
   type Action = { kind: "DECIDE" | "WATCH" | "REBALANCE" | "REVIEW"; title: string; reason: string };
   const actions: Action[] = [
     { kind: "DECIDE",    title: "(action items derived from signals + portfolio drift)", reason: "wires up after signal scorer" },
@@ -368,15 +453,7 @@ function ActionItems() {
     k === "DECIDE" ? "amber" : k === "WATCH" ? "info" : k === "REBALANCE" ? "OI" : "muted";
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        fontFamily: fonts.mono,
-        fontSize: 10,
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: fonts.mono, fontSize: 10 }}>
       {actions.map((a, i) => (
         <div
           key={i}
