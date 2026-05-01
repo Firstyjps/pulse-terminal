@@ -4,7 +4,7 @@
   "display_name": "Pulse Terminal",
   "version": "0.1.0",
   "description": "Live crypto macro + derivatives intelligence \u00e2\u20ac\u201d overview, stablecoins, ETFs, perp futures, DEX volume, TVL, funding rates, open interest, and cross-source anomaly detection.",
-  "long_description": "Exposes 10 read-only MCP tools that pull real-time crypto market and derivatives data so Claude can analyse fund flows + leverage without an API key on the model side. Sources: CoinGecko (overview), DefiLlama (stablecoins / DEX / TVL), Binance/Bybit/OKX public endpoints (funding, OI, futures), alternative.me (Fear & Greed), Farside (real spot ETF flows). Optional COINGLASS_API_KEY swaps Farside for Coinglass since-inception cumulatives.",
+  "long_description": "Exposes 10 read-only MCP tools that pull real-time crypto market and derivatives data so Claude can analyse fund flows + leverage without an API key on the model side. Sources: CoinGecko (overview), DefiLlama (stablecoins / DEX / TVL), Binance/Bybit/OKX public endpoints (funding, OI, futures), alternative.me (Fear & Greed), Farside (real spot ETF flows).",
   "author": {
     "name": "Firsty"
   },
@@ -28,7 +28,6 @@
         "${__dirname}/dist/index.mjs"
       ],
       "env": {
-        "COINGLASS_API_KEY": "${user_config.coinglass_api_key}",
         "PULSE_HUB_URL": "${user_config.pulse_hub_url}"
       }
     }
@@ -112,14 +111,6 @@
     }
   ],
   "user_config": {
-    "coinglass_api_key": {
-      "type": "string",
-      "title": "Coinglass API key (optional)",
-      "description": "Optional. Replaces Farside ETF data with Coinglass since-inception cumulative. Leave blank \u00e2\u20ac\u201d Farside (free) is fine.",
-      "required": false,
-      "sensitive": true,
-      "default": ""
-    },
     "pulse_hub_url": {
       "type": "string",
       "title": "Pulse Hub URL",

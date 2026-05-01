@@ -71,7 +71,7 @@ const server = new McpServer(
       "Use these tools to fetch live crypto market + derivatives data.",
       "Start with get_fundflow_snapshot for broad questions — it bundles overview, stablecoins, etf, futures, dex, and tvl in one call.",
       "Use single-purpose tools (e.g. get_funding_summary) for narrow questions to save tokens.",
-      "All data is real-time. Sources: CoinGecko, DefiLlama, Binance/Bybit/OKX, alternative.me. ETF flows fall back to Farside-scraped proxy when COINGLASS_API_KEY is missing (flagged via _isProxy=true).",
+      "All data is real-time. Sources: CoinGecko, DefiLlama, Binance/Bybit/OKX, alternative.me, Farside (ETF flows).",
     ].join(" "),
   },
 );
@@ -162,8 +162,8 @@ server.tool(
 server.tool(
   "get_etf_flows",
   "Spot Bitcoin/Ethereum ETF daily flows in USD, 7d & 30d cumulative sums, " +
-    "and full cumulative since-inception totals. Source: Coinglass when key is " +
-    "set, otherwise Farside-scraped proxy with _isProxy=true.",
+    "and full cumulative since-inception totals. Source: Farside-scraped proxy " +
+    "(flagged via _isProxy=true).",
   {
     symbol: z
       .enum(["btc", "eth", "both"])

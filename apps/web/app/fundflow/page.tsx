@@ -126,7 +126,7 @@ export default function FundflowPage() {
           })()}
           {etf.data?._isProxy && (
             <p style={{ marginTop: 8, fontSize: 10, color: colors.amber, fontFamily: fonts.mono }}>
-              ⚠ Proxy data — set COINGLASS_API_KEY for real flows
+              ⚠ Proxy data — Farside scrape unavailable
             </p>
           )}
         </Panel>

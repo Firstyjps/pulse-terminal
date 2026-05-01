@@ -109,7 +109,7 @@ export function Dashboard() {
 
       <Section
         title="Spot ETF · Institutional Flows"
-        subtitle={etf.data?._isProxy ? "Proxy data — set COINGLASS_API_KEY for real flows" : undefined}
+        subtitle={etf.data?._isProxy ? "Proxy data — Farside scrape unavailable" : undefined}
       >
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Card>
