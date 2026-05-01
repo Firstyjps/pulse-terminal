@@ -6,6 +6,7 @@ import type { LLMCallParams } from "./types.js";
 export const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
 export const GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
+export const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
 
 interface OpenAIChoiceMessage {
   role: string;

@@ -132,6 +132,7 @@ regime)` — multiple ticks the same morning don't re-spend tokens.
 | `groq`          | yes (14.4k/day)  | `llama-3.3-70b-versatile`   | https://console.groq.com     |
 | `openrouter`    | varies           | `openai/gpt-4o-mini`        | https://openrouter.ai/keys   |
 | `gemini`        | yes (15 RPM)     | `gemini-2.5-flash`          | https://aistudio.google.com  |
+| `deepseek`      | no (paid, very cheap) | `deepseek-chat`        | https://platform.deepseek.com/api_keys |
 
 Cost for the daily brief is negligible on all paid providers (~$0.0001 –
 $0.001/day). Groq is the easiest free pick — generous quota, fast inference,
@@ -160,6 +161,10 @@ LLM_API_KEY=sk-proj-...
 LLM_PROVIDER=openrouter
 LLM_MODEL=anthropic/claude-3.5-sonnet
 LLM_API_KEY=sk-or-v1-...
+
+# DeepSeek (cheap paid; default deepseek-chat = V3, swap LLM_MODEL=deepseek-reasoner for R1)
+LLM_PROVIDER=deepseek
+LLM_API_KEY=sk-...
 
 # Disable explicitly (rules fallback always)
 LLM_PROVIDER=none

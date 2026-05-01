@@ -14,6 +14,7 @@ import { callAnthropic } from "./anthropic.js";
 import { callGemini } from "./gemini.js";
 import {
   callOpenAICompat,
+  DEEPSEEK_BASE_URL,
   GROQ_BASE_URL,
   OPENAI_BASE_URL,
   OPENROUTER_BASE_URL,
@@ -28,6 +29,7 @@ const DEFAULT_MODELS: Record<Exclude<LLMProvider, "none">, string> = {
   groq: "llama-3.3-70b-versatile",
   openrouter: "openai/gpt-4o-mini",
   gemini: "gemini-2.5-flash",
+  deepseek: "deepseek-chat",
 };
 
 const VALID_PROVIDERS: LLMProvider[] = [
@@ -37,6 +39,7 @@ const VALID_PROVIDERS: LLMProvider[] = [
   "groq",
   "openrouter",
   "gemini",
+  "deepseek",
 ];
 
 // Deduped log lines — each unique message fires once per process. Tests use
@@ -153,6 +156,8 @@ export async function callLLM(
       return callOpenAICompat(params, config.apiKey, config.model, GROQ_BASE_URL, opts.fetchImpl, timeoutMs);
     case "openrouter":
       return callOpenAICompat(params, config.apiKey, config.model, OPENROUTER_BASE_URL, opts.fetchImpl, timeoutMs);
+    case "deepseek":
+      return callOpenAICompat(params, config.apiKey, config.model, DEEPSEEK_BASE_URL, opts.fetchImpl, timeoutMs);
     case "gemini":
       return callGemini(params, config.apiKey, config.model, opts.fetchImpl, timeoutMs);
   }

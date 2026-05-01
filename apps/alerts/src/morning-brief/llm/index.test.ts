@@ -93,6 +93,13 @@ describe("resolveLLMConfig — provider resolution", () => {
         LLM_API_KEY: "k",
       } as NodeJS.ProcessEnv).model,
     ).toBe("gemini-2.5-flash");
+
+    expect(
+      resolveLLMConfig({
+        LLM_PROVIDER: "deepseek",
+        LLM_API_KEY: "k",
+      } as NodeJS.ProcessEnv).model,
+    ).toBe("deepseek-chat");
   });
 
   it("LLM_MODEL override beats default", () => {
@@ -165,6 +172,23 @@ describe("callLLM — dispatcher behavior", () => {
     expect(startupLogs[0]).toContain("key=...1234");
     expect(startupLogs[0]).not.toContain("sk-1234");
     logSpy.mockRestore();
+  });
+
+  it("LLM_PROVIDER=deepseek dispatches to openai-compat with the DeepSeek base URL", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "ok" } }] }),
+    } as unknown as Response);
+    const out = await callLLM(
+      { system: "s", user: "u", maxTokens: 50 },
+      {
+        config: { provider: "deepseek", apiKey: "sk-ds-xxxx", model: "deepseek-chat", legacyAnthropic: false },
+        fetchImpl,
+      },
+    );
+    expect(out).toBe("ok");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://api.deepseek.com/v1/chat/completions");
   });
 
   it("legacy anthropic config emits deprecation warn once", async () => {

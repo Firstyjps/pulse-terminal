@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   callOpenAICompat,
+  DEEPSEEK_BASE_URL,
   GROQ_BASE_URL,
   OPENAI_BASE_URL,
   OPENROUTER_BASE_URL,
@@ -72,6 +73,26 @@ describe("callOpenAICompat — request shape", () => {
       5_000,
     );
     expect(fetchImpl.mock.calls[0][0]).toBe("https://openrouter.ai/api/v1/chat/completions");
+  });
+
+  it("works against DeepSeek base URL with deepseek-chat default model", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(200, { choices: [{ message: { content: "ds reply" } }] }),
+    );
+    const out = await callOpenAICompat(
+      { system: "you are a quant", user: "?", maxTokens: 30 },
+      "sk-deepseek-zzzz",
+      "deepseek-chat",
+      DEEPSEEK_BASE_URL,
+      fetchImpl,
+      5_000,
+    );
+    expect(out).toBe("ds reply");
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe("https://api.deepseek.com/v1/chat/completions");
+    expect(init.headers.Authorization).toBe("Bearer sk-deepseek-zzzz");
+    const body = JSON.parse(init.body as string);
+    expect(body.model).toBe("deepseek-chat");
   });
 });
 

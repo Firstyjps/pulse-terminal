@@ -7,7 +7,8 @@ export type LLMProvider =
   | "openai"
   | "groq"
   | "openrouter"
-  | "gemini";
+  | "gemini"
+  | "deepseek";
 
 export interface LLMConfig {
   provider: LLMProvider;
