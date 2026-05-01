@@ -4,6 +4,13 @@
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./portfolio-snapshot/history": {
+      "types": "./src/portfolio-snapshot/history.ts",
+      "default": "./src/portfolio-snapshot/history.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",

@@ -6,6 +6,7 @@ import { Notifier } from "./notifier.js";
 import { startDualAssetsTick } from "./dual-assets-tick.js";
 import { startDualAssetsRollup } from "./dual-assets-rollup.js";
 import { startSnapshotCron } from "./snapshot-cron.js";
+import { startPortfolioSnapshotCron } from "./portfolio-snapshot/index.js";
 import { runMorningBrief } from "./morning-brief/index.js";
 
 const INTERVAL_MS = Number(process.env.ALERT_INTERVAL_MS ?? 240_000);
@@ -49,6 +50,9 @@ const stopRollup = startDualAssetsRollup();
 
 // Phase 6 — Daily market snapshot cron (00:05 UTC, 90-day rolling history)
 const stopSnapshotCron = startSnapshotCron();
+
+// Daily portfolio snapshot cron (23:59 BKK) — unlocks 24h/7d/30d PnL on Morning dashboard
+const stopPortfolioSnapshotCron = startPortfolioSnapshotCron();
 
 // ─────────────────────────────────────────────────────────────────
 // Morning Brief — Telegram push at 09:00 BKK Mon-Fri
@@ -105,6 +109,7 @@ const shutdown = (sig: string) => {
   stopDualAssets();
   stopRollup();
   stopSnapshotCron();
+  stopPortfolioSnapshotCron();
   stopMorningBrief();
   process.exit(0);
 };
