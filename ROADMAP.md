@@ -14,7 +14,7 @@ Single web dashboard that summarizes everything I need to make trading decisions
 |---|---|---|
 | Portfolio depth | (c) USD + per-asset + 24h/7d/30d P&L + DeFi LP positions in single dashboard | User has live LP positions across Meteora/Pendle/Orca/Aave — must aggregate |
 | Tax/cost basis | Deferred to Action 2 phase | Not blocking dashboard MVP |
-| Digest format | (b) Conversational paragraph + (d) mobile push at 07:00 Bangkok | Quant prefers nuance over bullet rigidity; mobile push leverages Remote Control |
+| Digest format | (b) Conversational paragraph + Telegram bot push at 09:00 Bangkok | 09:00 BKK = ETF data 99% complete (Farside + Coinglass/SoSoValue both synced). Telegram chosen over Claude mobile push: persistent channel, easier sharing, no app switching |
 | Audio TTS | Deferred to Action 3 | Nice-to-have, not core |
 | Macro regime | (d) Hybrid — rules-based base + LLM override on edge cases | Interpretability + flexibility |
 | Execution risk | (B) semi-auto with manual approval per trade → graduate to (C) full-auto only after 90+ days of stable paper-trade results | Stability first |
@@ -39,9 +39,19 @@ Single web dashboard that summarizes everything I need to make trading decisions
 - [ ] Density-first design (Bloomberg-grade info compression)
 
 ### Week 4-6: Notifications + polish
-- [ ] Mobile push at 07:00 via Remote Control bridge — sends digest paragraph + 1-tap link to dashboard
+- [ ] **Telegram bot** push at 09:00 BKK daily — sends digest paragraph + portfolio summary + ETF flows table + regime chip
 - [ ] Discord/Slack webhook fallback (already wired in alerts)
 - [ ] Dark mode default · keyboard shortcut to focus (`g m` jumps to morning brief)
+
+### Telegram bot scope (locked 2026-05-01)
+
+Daily ETF + macro brief delivered to user's Telegram:
+- Cron at 09:00 Bangkok (ETF data 99% complete by then)
+- Skip on weekends + US holidays (no flow → empty report adds noise)
+- Format: emoji-led, 5-section paragraph (regime · BTC ETF · ETH ETF · top whale move · top story)
+- Channel: 1-on-1 chat first; group/broadcast later if signal service productized
+- Telegram token + chat ID via env (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`)
+- Module location: extend `apps/alerts/` (already pm2-managed cron service)
 
 ### Acceptance criteria
 - Open dashboard fresh → all-up portfolio number visible in <2s

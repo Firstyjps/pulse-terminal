@@ -1,0 +1,8 @@
+{
+  "_doc": "Hand-curated catalysts keyed by BKK date (YYYY-MM-DD). Edit weekly. See README for upstream copy-paste source. Empty array = no catalysts. Strings should be 'HH:MM BKK — short description'.",
+  "2026-05-04": ["19:30 BKK — US ISM Manufacturing PMI", "21:00 BKK — Powell speech at Jackson Hole"],
+  "2026-05-05": ["12:30 BKK — China Caixin Services PMI"],
+  "2026-05-06": [],
+  "2026-05-07": ["19:30 BKK — US Initial Jobless Claims", "01:00 BKK (next day) — Fed minutes"],
+  "2026-05-08": ["19:30 BKK — US Nonfarm Payrolls"]
+}

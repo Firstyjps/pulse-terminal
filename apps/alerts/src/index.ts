@@ -6,6 +6,7 @@ import { Notifier } from "./notifier.js";
 import { startDualAssetsTick } from "./dual-assets-tick.js";
 import { startDualAssetsRollup } from "./dual-assets-rollup.js";
 import { startSnapshotCron } from "./snapshot-cron.js";
+import { runMorningBrief } from "./morning-brief/index.js";
 
 const INTERVAL_MS = Number(process.env.ALERT_INTERVAL_MS ?? 240_000);
 const LOG_PATH = resolve(process.env.ALERT_LOG_PATH ?? "./data/alerts.jsonl");
@@ -49,12 +50,62 @@ const stopRollup = startDualAssetsRollup();
 // Phase 6 — Daily market snapshot cron (00:05 UTC, 90-day rolling history)
 const stopSnapshotCron = startSnapshotCron();
 
+// ─────────────────────────────────────────────────────────────────
+// Morning Brief — Telegram push at 09:00 BKK Mon-Fri
+// Per .coordinator/telegram-morning-brief.md. Opt-in: skips entirely when
+// TELEGRAM_BOT_TOKEN is unset so unconfigured installs stay silent.
+// ─────────────────────────────────────────────────────────────────
+
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
+const HUB_BASE = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
+const DASHBOARD_URL = process.env.PULSE_DASHBOARD_URL ?? "http://localhost:3000/morning";
+
+let stopMorningBrief: () => void = () => {};
+if (TG_TOKEN && TG_CHAT) {
+  let lastFiredDate: string | null = null;
+  const tick = async () => {
+    const bkkNow = new Date(Date.now() + 7 * 60 * 60_000);
+    const dateStr = bkkNow.toISOString().slice(0, 10);
+    const hour = bkkNow.getUTCHours();
+    if (hour !== 9 || lastFiredDate === dateStr) return;
+    lastFiredDate = dateStr;
+    try {
+      const r = await runMorningBrief({
+        now: Date.now(),
+        hubBase: HUB_BASE,
+        telegramToken: TG_TOKEN,
+        chatId: TG_CHAT,
+        dashboardUrl: DASHBOARD_URL,
+      });
+      if (r.sent) {
+        console.log(
+          `[alerts] morning brief sent (${dateStr}) — image:${r.imageSent ? "ok" : `skip(${r.imageError ?? "?"})`}`,
+        );
+      } else {
+        console.log(`[alerts] morning brief skipped (${dateStr}) — ${r.reason ?? "?"}${r.error ? `: ${r.error}` : ""}`);
+      }
+    } catch (err) {
+      console.warn(`[alerts] morning brief threw:`, (err as Error).message);
+    }
+  };
+  const timer = setInterval(tick, 60_000);
+  void tick(); // probe immediately so a 09:00-late start still fires today
+  stopMorningBrief = () => clearInterval(timer);
+  console.log(
+    `[alerts] morning brief armed — 09:00 BKK Mon-Fri, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}`,
+  );
+} else {
+  console.log("[alerts] morning brief disabled — set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable");
+}
+
 const shutdown = (sig: string) => {
   console.log(`[alerts] ${sig} — shutting down`);
   clearInterval(timer);
   stopDualAssets();
   stopRollup();
   stopSnapshotCron();
+  stopMorningBrief();
   process.exit(0);
 };
 process.on("SIGINT", () => shutdown("SIGINT"));
