@@ -14,6 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { colors, withAlpha } from "@pulse/ui";
 
 export interface FlowPoint {
   date: string;
@@ -48,7 +49,7 @@ const defaultFmt = (n: number) => {
 export function FlowAreaChart({
   data,
   height = 280,
-  color = "#22d3ee",
+  color = colors.cyan,
   formatY = defaultFmt,
   formatTooltip,
   label = "Value",
@@ -161,8 +162,8 @@ export interface FlowBarChartProps {
 export function FlowBarChart({
   data,
   height = 280,
-  upColor = "#34d399",
-  downColor = "#f87171",
+  upColor = colors.green,
+  downColor = colors.red,
   formatY = defaultFmt,
   cumulativeLabel = "CUM",
 }: FlowBarChartProps) {
@@ -262,7 +263,7 @@ export function FlowBarChart({
                 </div>
               );
             }}
-            cursor={{ fill: "rgba(255,176,0,0.06)" }}
+            cursor={{ fill: withAlpha(colors.amber, 0.06) }}
           />
           <Bar dataKey="value" radius={[2, 2, 0, 0]} isAnimationActive={false}>
             {data.map((d, i) => (
@@ -274,7 +275,7 @@ export function FlowBarChart({
               yAxisId="cum"
               type="monotone"
               dataKey="cumulative"
-              stroke="#7c5cff"
+              stroke={colors.amber}
               strokeWidth={1.5}
               dot={false}
             />

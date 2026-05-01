@@ -1,4 +1,5 @@
 import * as React from "react";
+import { colors } from "@pulse/ui";
 
 export interface SparklineProps {
   data: number[];
@@ -41,7 +42,7 @@ export function Sparkline({
   const poly = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
   const fillPoly = `${xs[0].toFixed(1)},${height} ${poly} ${xs[xs.length - 1].toFixed(1)},${height}`;
 
-  const stroke = color ?? (positive ? "#34d399" : "#f87171");
+  const stroke = color ?? (positive ? colors.green : colors.red);
   const fillId = `spark-fill-${positive ? "up" : "down"}-${stroke.replace("#", "")}`;
 
   return (

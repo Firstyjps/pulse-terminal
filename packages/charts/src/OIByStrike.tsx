@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { colors } from "@pulse/ui";
 
 export interface OIPoint {
   strike: number;
@@ -54,8 +55,8 @@ export function OIByStrike({
   spot,
   height = 280,
   mirror = false,
-  callColor = "#41ff8b",
-  putColor = "#ff3355",
+  callColor = colors.green,
+  putColor = colors.red,
 }: OIByStrikeProps) {
   const rendered = React.useMemo(() => {
     const sorted = [...data].sort((a, b) => a.strike - b.strike);
@@ -106,9 +107,9 @@ export function OIByStrike({
           {spot !== undefined && (
             <ReferenceLine
               x={spot}
-              stroke="#ffb340"
+              stroke={colors.amber}
               strokeDasharray="3 3"
-              label={{ value: "ATM", fill: "#ffb340", fontSize: 10, position: "top" }}
+              label={{ value: "ATM", fill: colors.amber, fontSize: 10, position: "top" }}
             />
           )}
           <Bar dataKey="callOi" name="Call OI" fill={callColor} radius={[2, 2, 0, 0]} />

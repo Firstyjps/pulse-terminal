@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { colors } from "@pulse/ui";
 
 export interface DepthLevel {
   /** Price level. */
@@ -44,8 +45,8 @@ export function DepthChart({
   asks,
   height = 260,
   depth = 50,
-  bidColor = "#34d399",
-  askColor = "#f87171",
+  bidColor = colors.green,
+  askColor = colors.red,
 }: DepthChartProps) {
   const data = React.useMemo<MergedPoint[]>(() => {
     if (!bids.length && !asks.length) return [];

@@ -8,6 +8,7 @@ import {
   type UTCTimestamp,
   LineStyle,
 } from "lightweight-charts";
+import { colors, withAlpha } from "@pulse/ui";
 
 export interface PriceLinePoint {
   time: number; // unix seconds
@@ -43,7 +44,7 @@ export function PriceLine({
   data,
   height = 360,
   symbol,
-  color = "#ffb000",
+  color = colors.amber,
   showVolume = true,
   filled = true,
   showLastMarker = true,
@@ -82,16 +83,16 @@ export function PriceLine({
       crosshair: {
         mode: 1,
         vertLine: {
-          color: "rgba(255,176,0,0.4)",
+          color: withAlpha(colors.amber, 0.4),
           style: LineStyle.Dashed,
           width: 1,
-          labelBackgroundColor: "#ffb000",
+          labelBackgroundColor: colors.amber,
         },
         horzLine: {
-          color: "rgba(255,176,0,0.4)",
+          color: withAlpha(colors.amber, 0.4),
           style: LineStyle.Dashed,
           width: 1,
-          labelBackgroundColor: "#ffb000",
+          labelBackgroundColor: colors.amber,
         },
       },
     });
@@ -100,8 +101,8 @@ export function PriceLine({
       ? chart.addAreaSeries({
           lineColor: color,
           lineWidth: 2,
-          topColor: hexA(color, 0.32),
-          bottomColor: hexA(color, 0.02),
+          topColor: withAlpha(color, 0.32),
+          bottomColor: withAlpha(color, 0.02),
           priceLineVisible: showLastMarker,
           priceLineColor: color,
           priceLineWidth: 1,
@@ -123,7 +124,7 @@ export function PriceLine({
       vol = chart.addHistogramSeries({
         priceFormat: { type: "volume" },
         priceScaleId: "vol",
-        color: hexA(color, 0.35),
+        color: withAlpha(color, 0.35),
       });
       chart.priceScale("vol").applyOptions({
         scaleMargins: { top: 0.82, bottom: 0 },
@@ -164,7 +165,7 @@ export function PriceLine({
           return {
             time: d.time as UTCTimestamp,
             value: d.volume ?? 0,
-            color: up ? "rgba(52,211,153,0.45)" : "rgba(248,113,113,0.45)",
+            color: up ? withAlpha(colors.green, 0.45) : withAlpha(colors.red, 0.45),
           };
         }),
       );
@@ -184,13 +185,3 @@ export function PriceLine({
   );
 }
 
-/** "#ffb000" + alpha → "rgba(255,176,0,alpha)". Falls back to original on parse failure. */
-function hexA(hex: string, a: number): string {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex);
-  if (!m) return hex;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 0xff;
-  const g = (n >> 8) & 0xff;
-  const b = n & 0xff;
-  return `rgba(${r},${g},${b},${a})`;
-}

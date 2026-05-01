@@ -48,7 +48,24 @@ export const colors = {
   amberDim: "#8a5f00",
   cyan: "#44c8ff",
   magenta: "#ff5cf3",
+
+  // Chart chrome — axis/tick text + faint grid lines.
+  // Kept as rgba whites so they composite cleanly over any panel surface.
+  axis: "rgba(255,255,255,0.35)",
+  gridFaint: "rgba(255,255,255,0.05)",
 } as const;
+
+/**
+ * Derive an rgba string from a token hex. Returns the input unchanged if it
+ * isn't a 6-digit hex — so passing an already-rgba value is a no-op.
+ * Used by chart components to tint brand tokens (e.g. colors.green at 0.45).
+ */
+export const withAlpha = (hex: string, alpha: number): string => {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 0xff},${(n >> 8) & 0xff},${n & 0xff},${alpha})`;
+};
 
 export const gradients = {
   // No gradients in Bloomberg — kept for legacy. Render as flat amber.

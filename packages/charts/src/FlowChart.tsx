@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { colors } from "@pulse/ui";
 import { FlowAreaChart, FlowBarChart, type FlowBarPoint, type FlowPoint } from "./FlowAreaChart";
 
 export type FlowChartType = "stablecoin" | "etf" | "tvl" | "dex";
@@ -15,10 +16,10 @@ export interface FlowChartProps {
 }
 
 const PRESETS: Record<FlowChartType, { color: string; label: string }> = {
-  stablecoin: { color: "#22d3ee", label: "Stablecoin Supply" },
-  etf: { color: "#7c5cff", label: "ETF Net Flow" },
-  tvl: { color: "#34d399", label: "Total Value Locked" },
-  dex: { color: "#fb923c", label: "DEX Volume" },
+  stablecoin: { color: colors.cyan, label: "Stablecoin Supply" },
+  etf: { color: colors.magenta, label: "ETF Net Flow" },
+  tvl: { color: colors.green, label: "Total Value Locked" },
+  dex: { color: colors.orange, label: "DEX Volume" },
 };
 
 /**

@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { colors } from "@pulse/ui";
 
 export interface IVPoint {
   strike: number;
@@ -51,8 +52,8 @@ export function IVSmile({
   spot,
   splitSides,
   height = 280,
-  callColor = "#41ff8b",
-  putColor = "#ff3355",
+  callColor = colors.green,
+  putColor = colors.red,
 }: IVSmileProps) {
   const hasSides = data.some((p) => p.side === "call" || p.side === "put");
   const split = splitSides ?? hasSides;
@@ -116,9 +117,9 @@ export function IVSmile({
           {spot !== undefined && (
             <ReferenceLine
               x={spot}
-              stroke="#ffb340"
+              stroke={colors.amber}
               strokeDasharray="3 3"
-              label={{ value: "ATM", fill: "#ffb340", fontSize: 10, position: "top" }}
+              label={{ value: "ATM", fill: colors.amber, fontSize: 10, position: "top" }}
             />
           )}
           {split ? (

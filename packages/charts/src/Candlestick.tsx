@@ -7,6 +7,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { colors, withAlpha } from "@pulse/ui";
 
 export interface Candle {
   time: number; // unix seconds
@@ -66,10 +67,10 @@ export function Candlestick({
     });
 
     const candle = chart.addCandlestickSeries({
-      upColor: "#34d399",
-      downColor: "#f87171",
-      wickUpColor: "#34d399",
-      wickDownColor: "#f87171",
+      upColor: colors.green,
+      downColor: colors.red,
+      wickUpColor: colors.green,
+      wickDownColor: colors.red,
       borderVisible: false,
     });
 
@@ -78,7 +79,7 @@ export function Candlestick({
       vol = chart.addHistogramSeries({
         priceFormat: { type: "volume" },
         priceScaleId: "vol",
-        color: "rgba(124,92,255,0.5)",
+        color: withAlpha(colors.amber, 0.5),
       });
       chart.priceScale("vol").applyOptions({
         scaleMargins: { top: 0.78, bottom: 0 },
@@ -119,7 +120,7 @@ export function Candlestick({
         data.map((d) => ({
           time: d.time as UTCTimestamp,
           value: d.volume ?? 0,
-          color: d.close >= d.open ? "rgba(52,211,153,0.5)" : "rgba(248,113,113,0.5)",
+          color: d.close >= d.open ? withAlpha(colors.green, 0.5) : withAlpha(colors.red, 0.5),
         })),
       );
     }

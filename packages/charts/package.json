@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@pulse/ui": "workspace:*",
     "lightweight-charts": "4.2.0",
     "react": "^19.2.5",
     "recharts": "^2.15.0"

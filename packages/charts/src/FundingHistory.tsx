@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { colors } from "@pulse/ui";
 
 export interface FundingPoint {
   /** ISO timestamp or epoch ms — used as x-axis label. */
@@ -53,7 +54,7 @@ export function FundingHistory({
   data,
   height = 220,
   threshold,
-  color = "#41ff8b",
+  color = colors.green,
   label = "APR",
 }: FundingHistoryProps) {
   if (data.length === 0) {
@@ -106,9 +107,9 @@ export function FundingHistory({
           {threshold !== undefined && (
             <ReferenceLine
               y={threshold}
-              stroke="#ffb340"
+              stroke={colors.amber}
               strokeDasharray="3 3"
-              label={{ value: fmtApr(threshold), fill: "#ffb340", fontSize: 10, position: "right" }}
+              label={{ value: fmtApr(threshold), fill: colors.amber, fontSize: 10, position: "right" }}
             />
           )}
           <Area

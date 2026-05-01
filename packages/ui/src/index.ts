@@ -1,6 +1,6 @@
 // @pulse/ui — public exports
 
-export { colors, gradients, glows, fonts, radii, elevation } from "./tokens";
+export { colors, gradients, glows, fonts, radii, elevation, withAlpha } from "./tokens";
 export type { Colors, Gradients } from "./tokens";
 
 export { Card } from "./Card";

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { colors, withAlpha } from "@pulse/ui";
 
 export type Greek = "delta" | "gamma" | "theta" | "vega";
 
@@ -42,9 +43,9 @@ function colorFor(value: number, max: number): string {
   const norm = Math.max(-1, Math.min(1, value / max));
   const intensity = Math.abs(norm) * 0.85;
   if (norm >= 0) {
-    return `rgba(65,255,139,${intensity.toFixed(3)})`;
+    return withAlpha(colors.green, Number(intensity.toFixed(3)));
   }
-  return `rgba(255,51,85,${intensity.toFixed(3)})`;
+  return withAlpha(colors.red, Number(intensity.toFixed(3)));
 }
 
 /**
@@ -140,7 +141,7 @@ export function GreeksHeatmap({
           alignItems: "center",
           padding: "0 8px",
           borderBottom: "1px solid rgba(255,255,255,0.04)",
-          background: isSpot ? "rgba(255,179,64,0.08)" : "transparent",
+          background: isSpot ? withAlpha(colors.amber, 0.08) : "transparent",
         };
         return (
           <React.Fragment key={`${r.strike}-${r.side}`}>
@@ -149,7 +150,7 @@ export function GreeksHeatmap({
               <div
                 style={{
                   ...baseRowStyle,
-                  color: r.side === "call" ? "#41ff8b" : "#ff3355",
+                  color: r.side === "call" ? colors.green : colors.red,
                   fontSize: 10,
                   textTransform: "uppercase",
                 }}
@@ -164,7 +165,7 @@ export function GreeksHeatmap({
                 style={{
                   ...baseRowStyle,
                   background: isSpot
-                    ? "rgba(255,179,64,0.08)"
+                    ? withAlpha(colors.amber, 0.08)
                     : colorFor(r[g], maxes[g]),
                   color: "rgba(240,243,249,0.95)",
                   justifyContent: "flex-end",
