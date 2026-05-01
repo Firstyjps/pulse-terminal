@@ -1,28 +1,20 @@
 "use client";
 
-import { Panel, WsRow, Workspace, StatBlock, MonoNum, SignalPill, colors, fonts } from "@pulse/ui";
-import { formatUSD } from "@pulse/sources";
+import { Panel, WsRow, Workspace, SignalPill, colors, fonts } from "@pulse/ui";
 import { useFlow } from "../../lib/use-flow";
 
 /**
  * Morning Brief — question-driven single-screen dashboard.
  *
- *   Row 1 (stats):   PORTFOLIO STRIP    — total + per-window P&L + venue split
- *   Row 2 (digest):  OVERNIGHT DIGEST   c-8  ·  MACRO REGIME  c-4
- *   Row 3 (action):  SIGNAL FEED top-5  c-7  ·  ACTION ITEMS  c-5
+ *   Row 1 (digest):  OVERNIGHT DIGEST   c-8  ·  MACRO REGIME  c-4
+ *   Row 2 (action):  SIGNAL FEED top-5  c-7  ·  ACTION ITEMS  c-5
  *
- * Wired now: PORTFOLIO (/api/portfolio/aggregate), SIGNAL FEED (/api/alerts/recent re-ranked).
+ * Wired now: SIGNAL FEED (/api/alerts/recent re-ranked).
  * Still PLACEHOLDER: OVERNIGHT DIGEST, MACRO REGIME inputs, ACTION ITEMS — wire at Week 2-3.
  */
 export default function MorningPage() {
   return (
     <Workspace>
-      <WsRow height="stats">
-        <Panel span={12} title="PORTFOLIO" badge={<PortfolioBadge />} flush>
-          <PortfolioStrip />
-        </Panel>
-      </WsRow>
-
       <WsRow height="auto" style={{ minHeight: 240 }}>
         <Panel span={8} title="OVERNIGHT DIGEST" badge="07:00 ICT · PLACEHOLDER">
           <OvernightDigest />
@@ -41,181 +33,6 @@ export default function MorningPage() {
         </Panel>
       </WsRow>
     </Workspace>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  PORTFOLIO — wired to /api/portfolio/aggregate                            */
-/* ──────────────────────────────────────────────────────────────────────── */
-
-interface AggregateResp {
-  configured: boolean;
-  totalUsd: number;
-  byVenue: { name: string; totalUsd: number; balances: unknown[] }[];
-  byAsset: { ticker: string; totalUsd: number; venues: string[] }[];
-  lp: unknown[];
-  asOf: number;
-  _source?: "coinstats" | "multi-cex" | "none";
-  errors?: string[];
-  message?: string;
-}
-
-const DEFI_VENUES = new Set(["meteora", "pendle", "orca", "aave"]);
-const VENUE_LABEL: Record<string, string> = {
-  binance: "BINANCE", bybit: "BYBIT", okx: "OKX", bitkub: "BITKUB", gate: "GATE",
-};
-
-function usePortfolio() {
-  return useFlow<AggregateResp>("/api/portfolio/aggregate");
-}
-
-function PortfolioBadge() {
-  const { data, loading } = usePortfolio();
-  if (loading) return <span style={{ color: colors.txt4 }}>LOADING…</span>;
-  if (!data?.configured) {
-    return (
-      <span>
-        <span style={{ color: colors.amber }}>●</span> NO DATA
-      </span>
-    );
-  }
-  const ago = Math.max(0, Math.floor((Date.now() - data.asOf) / 1000));
-  const sourceLabel =
-    data._source === "coinstats" ? "COINSTATS LIVE"
-    : data._source === "multi-cex" ? "MULTI-CEX FALLBACK"
-    : "LIVE";
-  const dotColor = data._source === "coinstats" ? colors.green : data._source === "multi-cex" ? colors.amber : colors.green;
-  return (
-    <span>
-      <span style={{ color: dotColor }}>●</span> {sourceLabel} · {ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)}m`} ago
-    </span>
-  );
-}
-
-function PortfolioStrip() {
-  const { data, loading, error } = usePortfolio();
-
-  if (loading && !data) return <PortfolioSkeleton />;
-
-  if (error || (!loading && !data)) {
-    return (
-      <PortfolioMessage tone="error">
-        Portfolio unavailable {error ? `(${error})` : ""}
-      </PortfolioMessage>
-    );
-  }
-
-  if (data && !data.configured) {
-    return (
-      <PortfolioMessage tone="amber">
-        {data.message ?? "Set BINANCE_API_KEY+SECRET / BYBIT_API_KEY+SECRET / OKX_API_KEY+SECRET+PASSPHRASE in .env.local"}
-      </PortfolioMessage>
-    );
-  }
-
-  const total = data!.totalUsd;
-  // PnL windows not yet collected (no snapshot history file). TODO: wire when
-  // a daily portfolio snapshot job lands (ROADMAP Week 1-2 follow-up).
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, minmax(0, 1fr)) 1.4fr",
-        gap: 1,
-        background: colors.line,
-        height: "100%",
-      }}
-    >
-      <StatBlock
-        label="TOTAL USD"
-        value={<MonoNum size={18} value={total}>{formatUSD(total, { compact: true, decimals: 2 })}</MonoNum>}
-        sub={`${data!.byVenue.length} venues · ${data!.byAsset.length} assets`}
-      />
-      <StatBlock
-        label="24H P&L"
-        value={<MonoNum size={18} value={null}>$—</MonoNum>}
-        sub="snapshot history not collected"
-      />
-      <StatBlock
-        label="7D P&L"
-        value={<MonoNum size={18} value={null}>$—</MonoNum>}
-        sub="snapshot history not collected"
-      />
-      <StatBlock
-        label="30D P&L"
-        value={<MonoNum size={18} value={null}>$—</MonoNum>}
-        sub="snapshot history not collected"
-      />
-      <VenueBreakdown data={data!} />
-    </div>
-  );
-}
-
-function PortfolioSkeleton() {
-  return (
-    <div style={{ padding: "14px 16px", fontFamily: fonts.mono, fontSize: 11, color: colors.txt4 }}>
-      Loading portfolio…
-    </div>
-  );
-}
-
-function PortfolioMessage({ tone, children }: { tone: "amber" | "error"; children: React.ReactNode }) {
-  const c = tone === "error" ? colors.red : colors.amber;
-  return (
-    <div style={{ padding: "14px 16px", fontFamily: fonts.mono, fontSize: 11, lineHeight: 1.55, color: colors.txt2, display: "flex", gap: 10, alignItems: "flex-start" }}>
-      <span style={{ color: c, fontSize: 14, lineHeight: 1 }}>●</span>
-      <span>{children}</span>
-    </div>
-  );
-}
-
-function VenueBreakdown({ data }: { data: AggregateResp }) {
-  const total = data.totalUsd || 1;
-  const buckets = new Map<string, number>();
-  for (const v of data.byVenue) {
-    const label = DEFI_VENUES.has(v.name) ? "DEFI LP" : VENUE_LABEL[v.name] ?? v.name.toUpperCase();
-    buckets.set(label, (buckets.get(label) ?? 0) + v.totalUsd);
-  }
-  const ordered = [...buckets.entries()].sort((a, b) => b[1] - a[1]);
-
-  return (
-    <div
-      style={{
-        background: colors.bg1,
-        padding: "8px 10px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-        minWidth: 0,
-      }}
-    >
-      <div style={{ fontFamily: fonts.mono, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", color: colors.txt3 }}>
-        VENUE SPLIT
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "2px 12px",
-          fontFamily: fonts.mono,
-          fontSize: 10,
-        }}
-      >
-        {ordered.length === 0 ? (
-          <span style={{ color: colors.txt4, gridColumn: "1 / -1" }}>no venues</span>
-        ) : (
-          ordered.map(([name, usd]) => {
-            const pct = (usd / total) * 100;
-            return (
-              <div key={name} style={{ display: "flex", justifyContent: "space-between", color: colors.txt3 }}>
-                <span>{name}</span>
-                <span style={{ color: colors.txt2, fontVariantNumeric: "tabular-nums" }}>{pct.toFixed(1)}%</span>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
   );
 }
 

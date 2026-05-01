@@ -35,6 +35,9 @@ logs/
 # Prompt drafts (compose in editor, pipe to claude — local only)
 _prompts/
 
+# tmux orchestration prompt files (worker dispatch payloads — local only)
+.coordinator/
+
 # Tauri (desktop wrapper) — Rust target is huge, gen/ is auto-regenerated
 src-tauri/target/
 src-tauri/gen/
