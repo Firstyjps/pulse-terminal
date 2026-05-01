@@ -4,7 +4,10 @@ import { normaliseSymbol } from "./cache.js";
 
 const FUNDING_INTERVAL_MS = 60_000; // 1 min
 const OI_INTERVAL_MS = 60_000;
-const TRACKED_SYMBOLS = ["BTCUSDT", "ETHUSDT"];
+// Must mirror the symbols tracked by the native streams (binance/bybit/okx-stream.ts)
+// so the REST fallback covers everything those streams cover. Adding SOLUSDT here
+// closes the regime-loop gap when native WS is unavailable in production.
+const TRACKED_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
 
 /**
  * Polls @pulse/sources adapters and broadcasts updates to connected clients.
