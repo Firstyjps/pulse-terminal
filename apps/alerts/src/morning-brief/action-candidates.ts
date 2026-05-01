@@ -9,8 +9,8 @@
 // Output is bullet-prefixed, multi-line. The format layer drops it under the
 // "🎯 Action Candidates" section verbatim (callers must escape MarkdownV2).
 
-import Anthropic from "@anthropic-ai/sdk";
 import type { ETFFlowResponse } from "@pulse/sources";
+import { callLLM } from "./llm/index.js";
 import type { RegimeSlice } from "./format.js";
 
 export interface FundingCluster {
@@ -66,17 +66,20 @@ export async function generateActionCandidates(
     return cache.get(cacheKey)!;
   }
 
-  const llm = opts.complete ?? defaultLlm();
-  if (llm) {
-    try {
-      const result = await llm(SYSTEM_PROMPT, serializeData(input));
-      if (result && result.trim()) {
-        cache.set(cacheKey, result.trim());
-        return result.trim();
-      }
-    } catch {
-      // fall through to rules
+  // Test seam: caller can inject a custom completer (skips env-driven dispatch).
+  // Default path: route through callLLM, which honors LLM_PROVIDER + falls back
+  // gracefully (returns null) when no provider configured or any error occurs.
+  const llm: LlmComplete =
+    opts.complete ?? ((s, u) => callLLM({ system: s, user: u, maxTokens: 200 }));
+
+  try {
+    const result = await llm(SYSTEM_PROMPT, serializeData(input));
+    if (result && result.trim()) {
+      cache.set(cacheKey, result.trim());
+      return result.trim();
     }
+  } catch {
+    // fall through to rules
   }
 
   const fallback = rulesFallback(input, now);
@@ -87,29 +90,6 @@ export async function generateActionCandidates(
 /** Test seam — clears the in-memory cache between runs. */
 export function clearActionCandidatesCache(): void {
   cache.clear();
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Default LLM completer — uses Anthropic SDK if ANTHROPIC_API_KEY is set
-// ─────────────────────────────────────────────────────────────────────────
-
-function defaultLlm(): LlmComplete | null {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
-
-  const client = new Anthropic({ apiKey: key });
-  return async (system, user) => {
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
-      system,
-      messages: [{ role: "user", content: user }],
-    });
-    return msg.content
-      .filter((b): b is { type: "text"; text: string } & typeof b => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────

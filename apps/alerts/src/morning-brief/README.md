@@ -86,8 +86,10 @@ The following sections are **NOT** in the brief (per user decision in
    TELEGRAM_BOT_TOKEN=123456789:ABCdef-...
    TELEGRAM_CHAT_ID=987654321
 
-   # Optional — Anthropic LLM for action candidates (rules fallback if absent)
-   ANTHROPIC_API_KEY=sk-ant-...
+   # Optional — LLM for action candidates (rules fallback if unset).
+   # See "Action candidates" section below for the 6-provider table.
+   LLM_PROVIDER=groq
+   LLM_API_KEY=gsk_...
 
    # Optional — inline keyboard "Open Dashboard" target
    PULSE_DASHBOARD_URL=https://your-dashboard.example/morning
@@ -116,14 +118,61 @@ hour == 09 and it hasn't fired yet today, it calls `runMorningBrief()`, which:
 7. `sendMessage` with text + inline keyboard.
 8. Generates SVG sparkline → PNG → `sendPhoto` (best-effort; text already sent).
 
-### Action candidates — LLM + rules fallback
+### Action candidates — LLM (provider configurable) + rules fallback
 
-`apps/alerts/src/morning-brief/action-candidates.ts` calls
-`claude-haiku-4-5-20251001` with `max_tokens=200`. Output is cached in-memory
-keyed by `(BKK date + regime)` — so multiple ticks in the same morning don't
-re-spend tokens.
+`action-candidates.ts` routes through `llm/` which dispatches to one of 6
+providers based on env. Output is cached in-memory keyed by `(BKK date +
+regime)` — multiple ticks the same morning don't re-spend tokens.
 
-If `ANTHROPIC_API_KEY` is missing or the SDK throws, falls back to rules:
+| `LLM_PROVIDER`  | Free tier?       | Default model               | Get key                      |
+|-----------------|------------------|-----------------------------|------------------------------|
+| `none` (default)| n/a (rules only) | —                           | —                            |
+| `anthropic`     | no               | `claude-haiku-4-5-20251001` | https://console.anthropic.com |
+| `openai`        | no               | `gpt-4o-mini`               | https://platform.openai.com  |
+| `groq`          | yes (14.4k/day)  | `llama-3.3-70b-versatile`   | https://console.groq.com     |
+| `openrouter`    | varies           | `openai/gpt-4o-mini`        | https://openrouter.ai/keys   |
+| `gemini`        | yes (15 RPM)     | `gemini-2.5-flash`          | https://aistudio.google.com  |
+
+Cost for the daily brief is negligible on all paid providers (~$0.0001 –
+$0.001/day). Groq is the easiest free pick — generous quota, fast inference,
+no card required.
+
+#### Example .env snippets
+
+```dotenv
+# Groq (free tier, recommended starting point)
+LLM_PROVIDER=groq
+LLM_API_KEY=gsk_...your-key-here
+
+# Google Gemini (free tier, lower RPM)
+LLM_PROVIDER=gemini
+LLM_API_KEY=AIza...your-key-here
+
+# Anthropic Claude Haiku
+LLM_PROVIDER=anthropic
+LLM_API_KEY=sk-ant-api03-...
+
+# OpenAI
+LLM_PROVIDER=openai
+LLM_API_KEY=sk-proj-...
+
+# OpenRouter (model marketplace; pick any model id)
+LLM_PROVIDER=openrouter
+LLM_MODEL=anthropic/claude-3.5-sonnet
+LLM_API_KEY=sk-or-v1-...
+
+# Disable explicitly (rules fallback always)
+LLM_PROVIDER=none
+```
+
+> **Backward compat:** if `LLM_PROVIDER` is unset but `ANTHROPIC_API_KEY` is
+> present, the daemon still works as before (`provider=anthropic`, key picked
+> up from the legacy var). A one-line deprecation warn fires on first call —
+> migrate to `LLM_PROVIDER=anthropic` + `LLM_API_KEY=...` to silence it.
+
+If the provider is `none` or any error occurs (missing key, HTTP non-2xx,
+malformed body, timeout, SDK throw), `callLLM` returns `null` and
+`generateActionCandidates` falls back to rules:
 
 | Trigger                                                | Suggestion                                         |
 |--------------------------------------------------------|----------------------------------------------------|
@@ -134,6 +183,10 @@ If `ANTHROPIC_API_KEY` is missing or the SDK throws, falls back to rules:
 
 Rules fallback always appends `Risk: rules-based fallback (LLM unavailable). …`
 so the recipient knows it's not the LLM output.
+
+**Adding a new provider:** drop a `llm/<name>.ts` file mirroring `gemini.ts`
+or `openai-compat.ts`, add a switch case in `llm/index.ts`, and append a
+default model + free-tier note to the table above. No other code touches.
 
 ### Inline keyboard
 
@@ -232,7 +285,11 @@ even registered when the env is missing — zero overhead.
 |----------------------|--------------------------------|----------|------------------------------------------|
 | `TELEGRAM_BOT_TOKEN` | —                              | ✅       | BotFather HTTP API token                 |
 | `TELEGRAM_CHAT_ID`   | —                              | ✅       | destination chat id                      |
-| `ANTHROPIC_API_KEY`  | —                              | optional | LLM action candidates (else rules fallback) |
+| `LLM_PROVIDER`       | `none`                         | optional | `none`/`anthropic`/`openai`/`groq`/`openrouter`/`gemini` |
+| `LLM_MODEL`          | (per-provider default)         | optional | override the provider's default model    |
+| `LLM_API_KEY`        | —                              | optional | required when `LLM_PROVIDER` ≠ `none`    |
+| `LLM_TIMEOUT_MS`     | `15000`                        | optional | per-call abort timeout                   |
+| `ANTHROPIC_API_KEY`  | —                              | legacy   | back-compat shim for v1 (warns on use)   |
 | `PULSE_HUB_URL`      | `http://127.0.0.1:8081`        | optional | hub `/regime` lookup                     |
 | `PULSE_DASHBOARD_URL`| `http://localhost:3000/morning`| optional | inline-keyboard "Open Dashboard" target  |
 

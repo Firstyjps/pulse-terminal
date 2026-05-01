@@ -75,12 +75,22 @@ describe("generateActionCandidates — LLM path", () => {
     expect(out).toContain("Funding harvest candidate");
   });
 
-  it("falls back when ANTHROPIC_API_KEY missing and no completer injected", async () => {
-    const prev = process.env.ANTHROPIC_API_KEY;
+  it("falls back when no LLM provider configured and no completer injected", async () => {
+    // Clear both LLM_PROVIDER and ANTHROPIC_API_KEY so callLLM resolves to "none" → null
+    const prevAnthropic = process.env.ANTHROPIC_API_KEY;
+    const prevProvider = process.env.LLM_PROVIDER;
+    const prevKey = process.env.LLM_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
-    const out = await generateActionCandidates(input(), { now: NOW });
-    expect(out).toContain("Risk: rules-based fallback");
-    if (prev) process.env.ANTHROPIC_API_KEY = prev;
+    delete process.env.LLM_PROVIDER;
+    delete process.env.LLM_API_KEY;
+    try {
+      const out = await generateActionCandidates(input(), { now: NOW });
+      expect(out).toContain("Risk: rules-based fallback");
+    } finally {
+      if (prevAnthropic) process.env.ANTHROPIC_API_KEY = prevAnthropic;
+      if (prevProvider) process.env.LLM_PROVIDER = prevProvider;
+      if (prevKey) process.env.LLM_API_KEY = prevKey;
+    }
   });
 });
 
