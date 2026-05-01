@@ -1,8 +1,10 @@
 import WebSocket from "ws";
 import type { PulseServer } from "./server.js";
+import { TRACKED_SYMBOLS } from "./tracked-symbols.js";
 
 const OKX_WS = "wss://ws.okx.com:8443/ws/v5/public";
-const TRACKED_INST = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"];
+// OKX SWAP instId format: "BTC-USDT-SWAP" — derive from shared symbol list (BTCUSDT → BTC-USDT-SWAP).
+const TRACKED_INST = TRACKED_SYMBOLS.map((s) => `${s.replace(/USDT$/, "")}-USDT-SWAP`);
 const RECONNECT_DELAY_MS = 5_000;
 const MAX_RECONNECT_DELAY_MS = 60_000;
 const PING_MS = 25_000;

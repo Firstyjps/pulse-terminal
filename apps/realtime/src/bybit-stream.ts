@@ -1,8 +1,9 @@
 import WebSocket from "ws";
 import type { PulseServer } from "./server.js";
+import { TRACKED_SYMBOLS } from "./tracked-symbols.js";
 
 const BYBIT_WS = "wss://stream.bybit.com/v5/public/linear";
-const TRACKED = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
+const TRACKED = TRACKED_SYMBOLS;
 const RECONNECT_DELAY_MS = 5_000;
 const MAX_RECONNECT_DELAY_MS = 60_000;
 const PING_MS = 20_000;

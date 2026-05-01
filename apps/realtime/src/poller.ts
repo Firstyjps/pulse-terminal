@@ -1,13 +1,10 @@
 import { getFundingRates, getOpenInterest } from "@pulse/sources/server";
 import type { PulseServer } from "./server.js";
 import { normaliseSymbol } from "./cache.js";
+import { TRACKED_SYMBOLS, isTrackedSymbol } from "./tracked-symbols.js";
 
 const FUNDING_INTERVAL_MS = 60_000; // 1 min
 const OI_INTERVAL_MS = 60_000;
-// Must mirror the symbols tracked by the native streams (binance/bybit/okx-stream.ts)
-// so the REST fallback covers everything those streams cover. Adding SOLUSDT here
-// closes the regime-loop gap when native WS is unavailable in production.
-const TRACKED_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
 
 /**
  * Polls @pulse/sources adapters and broadcasts updates to connected clients.
@@ -20,7 +17,7 @@ export function startPollers(server: PulseServer): () => void {
     try {
       const rates = await getFundingRates();
       for (const r of rates) {
-        if (!TRACKED_SYMBOLS.includes(normaliseSymbol(r.symbol))) continue;
+        if (!isTrackedSymbol(normaliseSymbol(r.symbol))) continue;
         server.broadcast({
           type: "funding",
           exchange: r.exchange,

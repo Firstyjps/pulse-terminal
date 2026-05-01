@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import type { PulseServer } from "./server.js";
+import { TRACKED_SYMBOLS } from "./tracked-symbols.js";
 
 const BINANCE_WS = "wss://fstream.binance.com/ws/!markPrice@arr@1s";
 const RECONNECT_DELAY_MS = 5_000;
@@ -14,7 +15,7 @@ interface MarkPriceTick {
   T: number;     // next funding time
 }
 
-const TRACKED = new Set(["BTCUSDT", "ETHUSDT", "SOLUSDT"]);
+const TRACKED = new Set<string>(TRACKED_SYMBOLS);
 
 /**
  * Subscribe to Binance's all-symbol mark price stream and forward funding-rate
