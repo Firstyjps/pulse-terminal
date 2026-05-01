@@ -88,10 +88,14 @@ function maskKey(k: string): string {
 
 async function csFetch<T>(path: string, key: string): Promise<T> {
   const url = `${BASE}${path}`;
+  // 5-min cache — portfolio doesn't change that fast and CoinStats Open API
+  // is capped at 50k credits/month. Worst case (dashboard kept open 24/7) =
+  // 12 calls/hour = ~8.6k/month = 17% of cap. Daily snapshot cron still gets
+  // fresh data (only fires once/day so cache always cold by then).
   const res = await fetch(url, {
     headers: { "X-API-KEY": key, accept: "application/json", "User-Agent": "PulseTerminal/1.0" },
-    cache: "no-store",
-  });
+    next: { revalidate: 300 },
+  } as RequestInit);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`coinstats ${path} → ${res.status} (key ${maskKey(key)}): ${body.slice(0, 180)}`);
