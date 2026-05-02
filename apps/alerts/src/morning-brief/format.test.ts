@@ -137,9 +137,11 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
     expect(tiny).toContain("24h: *\\+$50\\.0K*");
   });
 
-  it("funding cluster shows 3 rates + lean emoji + annualized", () => {
+  it("funding cluster splits BTC+ETH on one line, SOL on next (avoids Telegram word-wrap)", () => {
     const out = formatMorningBrief(makeInput());
-    expect(out).toContain("BTC \\-0\\.012% · ETH \\-0\\.008% · SOL \\-0\\.005%");
+    expect(out).toContain("BTC \\-0\\.012% · ETH \\-0\\.008%");
+    expect(out).toContain("SOL \\-0\\.005%");
+    expect(out).not.toContain("ETH \\-0\\.008% · SOL");
     expect(out).toContain("🔴 Lean: *negative*");
     expect(out).toContain("BTC ann \\-13\\.1%");
   });
@@ -163,13 +165,14 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
     expect(out).toContain("No major catalysts scheduled");
   });
 
-  it("action candidates render line-by-line, MarkdownV2-escaped", () => {
+  it("action candidates render line-by-line, MarkdownV2-escaped, Risk caveat stripped", () => {
     const out = formatMorningBrief(makeInput());
     // Bullets and content escaped
     expect(out).toContain("🎯 *Action Candidates*");
     expect(out).toContain("• Funding harvest candidate");
-    // Risk line preserved
-    expect(out).toContain("Risk: rules\\-based fallback");
+    // Risk line stripped — user-requested 2026-05-02
+    expect(out).not.toContain("Risk:");
+    expect(out).not.toContain("Risk\\-based");
   });
 
   it("regime score sign rendered explicitly with '+' or '-'", () => {

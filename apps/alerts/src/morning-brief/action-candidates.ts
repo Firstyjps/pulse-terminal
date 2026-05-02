@@ -58,8 +58,7 @@ const SYSTEM_PROMPT =
   "outflow, cumulative, ann (annualized), bullish, bearish. " +
   "Be terse: 1 line per idea, prefix with bullet (•). Cite specific numbers " +
   "from the data verbatim. Avoid hedging language. " +
-  "End with a 1-line risk caveat starting with 'Risk: ' (the word 'Risk' stays " +
-  "English; the rest of the caveat is Thai).";
+  "Do NOT include a risk caveat or any line starting with 'Risk:' — output ONLY the bullet ideas.";
 
 // In-memory cache: key = `${bkkDate}:${regimeLabel}` → string output. Daemon
 // restart drops the cache, which is fine (cron fires once/day so the next
@@ -203,10 +202,6 @@ function rulesFallback(input: ActionCandidatesInput, now: number): string {
   if (!ideas.length) {
     ideas.push("• ไม่มีสัญญาณชัดเจน — รอดู.");
   }
-
-  ideas.push(
-    "Risk: rules-based fallback (LLM ไม่พร้อมใช้งาน) ตัวเลขอาจไม่สะท้อนการเคลื่อนไหวระหว่างวัน.",
-  );
   return ideas.join("\n");
 }
 

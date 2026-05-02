@@ -200,7 +200,10 @@ export function formatMorningBrief(input: FormatInput): string {
   if (funding) {
     const leanEmoji = FUNDING_LEAN_EMOJI[funding.lean];
     lines.push(
-      `BTC ${escapeMarkdownV2(fmtPct(funding.btc))} · ETH ${escapeMarkdownV2(fmtPct(funding.eth))} · SOL ${escapeMarkdownV2(fmtPct(funding.sol))}`,
+      `BTC ${escapeMarkdownV2(fmtPct(funding.btc))} · ETH ${escapeMarkdownV2(fmtPct(funding.eth))}`,
+    );
+    lines.push(
+      `SOL ${escapeMarkdownV2(fmtPct(funding.sol))}`,
     );
     lines.push(
       `${leanEmoji} Lean: *${escapeMarkdownV2(funding.lean)}* \\(BTC ann ${escapeMarkdownV2(fmtPct(funding.btcAnnualized, 1))}\\)`,
@@ -224,7 +227,10 @@ export function formatMorningBrief(input: FormatInput): string {
   // ── 6. Action Candidates (🎯) — LLM output, escape inline
   lines.push(`🎯 *Action Candidates*`);
   if (actionCandidates.trim()) {
+    // Strip any "Risk: ..." caveat line — user-requested 2026-05-02; brief is
+    // exploratory by design, the caveat repeats day-to-day and crowds the message.
     for (const ln of actionCandidates.split("\n")) {
+      if (/^\s*risk\s*:/i.test(ln)) continue;
       lines.push(escapeMarkdownV2(ln));
     }
   } else {

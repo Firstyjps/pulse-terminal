@@ -76,8 +76,8 @@ describe("generateActionCandidates — LLM path", () => {
     // Rules detect: negative funding + Risk-Off → harvest setup (Thai prose, English terms)
     expect(out).toContain("พิจารณา funding harvest");
     expect(out).toContain("long spot, short perp"); // tech terms stay English
-    expect(out).toContain("Risk: rules-based fallback");
-    expect(out).toContain("ไม่พร้อมใช้งาน"); // Thai risk caveat
+    // Risk caveat dropped 2026-05-02 — bullets only
+    expect(out).not.toContain("Risk:");
   });
 
   it("falls back to rules when LLM returns empty string", async () => {
@@ -96,7 +96,9 @@ describe("generateActionCandidates — LLM path", () => {
     delete process.env.LLM_API_KEY;
     try {
       const out = await generateActionCandidates(input(), { now: NOW });
-      expect(out).toContain("Risk: rules-based fallback");
+      // Risk caveat dropped 2026-05-02; verify rules fallback fires (harvest pattern)
+      expect(out).toContain("พิจารณา funding harvest");
+      expect(out).not.toContain("Risk:");
     } finally {
       if (prevAnthropic) process.env.ANTHROPIC_API_KEY = prevAnthropic;
       if (prevProvider) process.env.LLM_PROVIDER = prevProvider;
