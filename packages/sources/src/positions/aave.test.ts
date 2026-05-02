@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAavePositions } from "./aave-positions.js";
+import { getAavePositions } from "./aave.js";
 
 const EVM = "0x1234567890abcdef1234567890abcdef12345678";
 const SOL = "So11111111111111111111111111111111111111112";

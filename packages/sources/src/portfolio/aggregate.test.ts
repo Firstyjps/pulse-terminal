@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./portfolio-multi.js", () => ({ getMultiPortfolio: vi.fn() }));
-vi.mock("./meteora-positions.js", () => ({ getMeteoraPositions: vi.fn() }));
-vi.mock("./pendle-positions.js", () => ({ getPendlePositions: vi.fn() }));
-vi.mock("./orca-positions.js", () => ({ getOrcaPositions: vi.fn() }));
-vi.mock("./aave-positions.js", () => ({ getAavePositions: vi.fn() }));
-vi.mock("./coinstats.js", () => ({ getCoinStatsPortfolio: vi.fn() }));
+vi.mock("./multi.js", () => ({ getMultiPortfolio: vi.fn() }));
+vi.mock("../positions/meteora.js", () => ({ getMeteoraPositions: vi.fn() }));
+vi.mock("../positions/pendle.js", () => ({ getPendlePositions: vi.fn() }));
+vi.mock("../positions/orca.js", () => ({ getOrcaPositions: vi.fn() }));
+vi.mock("../positions/aave.js", () => ({ getAavePositions: vi.fn() }));
+vi.mock("../coinstats.js", () => ({ getCoinStatsPortfolio: vi.fn() }));
 
-import { getAggregatePortfolio } from "./portfolio-aggregate.js";
-import { getMultiPortfolio } from "./portfolio-multi.js";
-import { getMeteoraPositions } from "./meteora-positions.js";
-import { getPendlePositions } from "./pendle-positions.js";
-import { getOrcaPositions } from "./orca-positions.js";
-import { getAavePositions } from "./aave-positions.js";
-import { getCoinStatsPortfolio } from "./coinstats.js";
+import { getAggregatePortfolio } from "./aggregate.js";
+import { getMultiPortfolio } from "./multi.js";
+import { getMeteoraPositions } from "../positions/meteora.js";
+import { getPendlePositions } from "../positions/pendle.js";
+import { getOrcaPositions } from "../positions/orca.js";
+import { getAavePositions } from "../positions/aave.js";
+import { getCoinStatsPortfolio } from "../coinstats.js";
 
 const mockMulti = vi.mocked(getMultiPortfolio);
 const mockMeteora = vi.mocked(getMeteoraPositions);

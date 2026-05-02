@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getMeteoraPositions } from "./meteora-positions.js";
+import { getMeteoraPositions } from "./meteora.js";
 
 const SOL_A = "So11111111111111111111111111111111111111112";
 const SOL_B = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";

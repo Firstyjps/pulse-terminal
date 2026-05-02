@@ -4,7 +4,7 @@
 // This file is server-only — re-exported through `@pulse/sources/server`,
 // never the browser-safe `@pulse/sources` barrel.
 import { createHmac } from "node:crypto";
-import { fetchJson } from "./_helpers.js";
+import { fetchJson } from "../_helpers.js";
 
 export interface PortfolioBalance {
   asset: string;

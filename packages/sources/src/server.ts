@@ -19,27 +19,27 @@ export { getFundingRates, getOpenInterest } from "./funding.js";
 export { getFullSnapshot, summarizeSnapshot } from "./snapshot.js";
 export { scanAnomalies, deriveAnomalies } from "./anomalies.js";
 export { getMacro } from "./macro.js";
-export { getPortfolio } from "./portfolio.js";
-export type { PortfolioSnapshot, PortfolioBalance, PortfolioSource } from "./portfolio.js";
-export { getBybitPortfolio } from "./portfolio-bybit.js";
-export { getOkxPortfolio } from "./portfolio-okx.js";
-export { getMultiPortfolio } from "./portfolio-multi.js";
-export type { MultiPortfolioSnapshot } from "./portfolio-multi.js";
+export { getPortfolio } from "./portfolio/binance.js";
+export type { PortfolioSnapshot, PortfolioBalance, PortfolioSource } from "./portfolio/binance.js";
+export { getBybitPortfolio } from "./portfolio/bybit.js";
+export { getOkxPortfolio } from "./portfolio/okx.js";
+export { getMultiPortfolio } from "./portfolio/multi.js";
+export type { MultiPortfolioSnapshot } from "./portfolio/multi.js";
 export { getCoinStatsPortfolio } from "./coinstats.js";
 export type { CoinStatsPortfolio, CoinStatsAsset } from "./coinstats.js";
 
 // Phase 6 W1-2 — DeFi position adapters + unified aggregator
-export { getMeteoraPositions } from "./meteora-positions.js";
-export { getPendlePositions } from "./pendle-positions.js";
-export { getOrcaPositions } from "./orca-positions.js";
-export { getAavePositions } from "./aave-positions.js";
-export { getAggregatePortfolio } from "./portfolio-aggregate.js";
+export { getMeteoraPositions } from "./positions/meteora.js";
+export { getPendlePositions } from "./positions/pendle.js";
+export { getOrcaPositions } from "./positions/orca.js";
+export { getAavePositions } from "./positions/aave.js";
+export { getAggregatePortfolio } from "./portfolio/aggregate.js";
 export type {
   AggregateSnapshot,
   VenueSummary,
   VenueBalance,
   AssetSummary,
-} from "./portfolio-aggregate.js";
+} from "./portfolio/aggregate.js";
 export { parseWallets, getEvmWallets, getSolanaWallets } from "./_wallets.js";
 export type { ParsedWallet, WalletChain } from "./_wallets.js";
 export { getDepth } from "./depth.js";

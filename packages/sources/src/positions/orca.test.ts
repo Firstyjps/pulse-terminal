@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getOrcaPositions } from "./orca-positions.js";
+import { getOrcaPositions } from "./orca.js";
 
 const SOL_A = "So11111111111111111111111111111111111111112";
 const EVM = "0x1234567890abcdef1234567890abcdef12345678";

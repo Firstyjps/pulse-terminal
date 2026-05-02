@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPortfolio } from "./portfolio.js";
+import { getPortfolio } from "./binance.js";
 
 const ACCOUNT_FIXTURE = {
   updateTime: 1_770_000_000_000,

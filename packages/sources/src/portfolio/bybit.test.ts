@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
-import { getBybitPortfolio } from "./portfolio-bybit.js";
+import { getBybitPortfolio } from "./bybit.js";
 
 const FROZEN_TIME = 1_700_000_000_000;
 

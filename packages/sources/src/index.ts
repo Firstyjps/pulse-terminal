@@ -30,18 +30,18 @@ export type {
   AnomalySeverity,
 } from "./anomalies.js";
 export type { MacroPoint, MacroSeries, MacroResponse } from "./macro.js";
-export type { PortfolioBalance, PortfolioSnapshot, PortfolioSource } from "./portfolio.js";
-export type { MultiPortfolioSnapshot } from "./portfolio-multi.js";
+export type { PortfolioBalance, PortfolioSnapshot, PortfolioSource } from "./portfolio/binance.js";
+export type { MultiPortfolioSnapshot } from "./portfolio/multi.js";
 
 // Phase 6 W1-2 — position adapter shared types (browser-safe; pure types)
-export type { Position, PositionType, PositionResult, PositionFetcher } from "./position-types.js";
+export type { Position, PositionType, PositionResult, PositionFetcher } from "./positions/types.js";
 export type {
   AggregateSnapshot,
   VenueSummary,
   VenueBalance,
   AssetSummary,
   PortfolioSourceTag,
-} from "./portfolio-aggregate.js";
+} from "./portfolio/aggregate.js";
 export type { CoinStatsPortfolio, CoinStatsAsset } from "./coinstats.js";
 export type { ParsedWallet, WalletChain } from "./_wallets.js";
 

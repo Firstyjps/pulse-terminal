@@ -1,8 +1,8 @@
 // Aave V3 lending + borrow positions across EVM chains.
 // Reads from a Graph subgraph (decentralized network requires THEGRAPH_API_KEY).
 // Each `userReserve` row yields up to 2 positions: lending (aToken) + borrow (variable debt).
-import type { Position, PositionResult } from "./position-types.js";
-import { getEvmWallets } from "./_wallets.js";
+import type { Position, PositionResult } from "./types.js";
+import { getEvmWallets } from "../_wallets.js";
 
 // Per-chain Aave V3 subgraph IDs on the Graph decentralized network.
 // Override the gateway base via `THEGRAPH_GATEWAY_URL` for testing.

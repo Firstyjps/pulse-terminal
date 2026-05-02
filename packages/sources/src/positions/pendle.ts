@@ -3,8 +3,8 @@
 //
 // Pendle's dashboard API is read-only and unauthenticated. We poll each
 // supported chain per wallet; failures on one chain do not block others.
-import type { Position, PositionResult } from "./position-types.js";
-import { getEvmWallets } from "./_wallets.js";
+import type { Position, PositionResult } from "./types.js";
+import { getEvmWallets } from "../_wallets.js";
 
 function pendleApi(): string {
   return process.env.PENDLE_API_URL ?? "https://api-v2.pendle.finance";

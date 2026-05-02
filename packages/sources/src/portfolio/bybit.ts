@@ -4,7 +4,7 @@
 // Bybit V5 wallet response is pre-priced (per-coin `usdValue`), so we do NOT
 // need a separate price fetch.
 import { createHmac } from "node:crypto";
-import type { PortfolioBalance, PortfolioSnapshot } from "./portfolio.js";
+import type { PortfolioBalance, PortfolioSnapshot } from "./binance.js";
 
 interface BybitWalletResponse {
   retCode: number;

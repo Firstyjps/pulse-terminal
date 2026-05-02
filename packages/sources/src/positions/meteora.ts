@@ -3,8 +3,8 @@
 //
 // Endpoint pattern: https://dlmm-api.meteora.ag/position/<wallet>
 // Response is an array of position records (one per LB pair the wallet owns).
-import type { Position, PositionResult } from "./position-types.js";
-import { getSolanaWallets } from "./_wallets.js";
+import type { Position, PositionResult } from "./types.js";
+import { getSolanaWallets } from "../_wallets.js";
 
 function meteoraApi(): string {
   return process.env.METEORA_API_URL ?? "https://dlmm-api.meteora.ag";

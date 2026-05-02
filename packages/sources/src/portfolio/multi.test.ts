@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./portfolio.js", () => ({ getPortfolio: vi.fn() }));
-vi.mock("./portfolio-bybit.js", () => ({ getBybitPortfolio: vi.fn() }));
-vi.mock("./portfolio-okx.js", () => ({ getOkxPortfolio: vi.fn() }));
+vi.mock("./binance.js", () => ({ getPortfolio: vi.fn() }));
+vi.mock("./bybit.js", () => ({ getBybitPortfolio: vi.fn() }));
+vi.mock("./okx.js", () => ({ getOkxPortfolio: vi.fn() }));
 
-import { getMultiPortfolio } from "./portfolio-multi.js";
-import { getPortfolio } from "./portfolio.js";
-import { getBybitPortfolio } from "./portfolio-bybit.js";
-import { getOkxPortfolio } from "./portfolio-okx.js";
+import { getMultiPortfolio } from "./multi.js";
+import { getPortfolio } from "./binance.js";
+import { getBybitPortfolio } from "./bybit.js";
+import { getOkxPortfolio } from "./okx.js";
 
 const mockBinance = vi.mocked(getPortfolio);
 const mockBybit = vi.mocked(getBybitPortfolio);

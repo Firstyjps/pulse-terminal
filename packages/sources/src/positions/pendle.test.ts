@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPendlePositions } from "./pendle-positions.js";
+import { getPendlePositions } from "./pendle.js";
 
 const EVM = "0x1234567890abcdef1234567890abcdef12345678";
 const SOL = "So11111111111111111111111111111111111111112";

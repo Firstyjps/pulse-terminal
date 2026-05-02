@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
-import { getOkxPortfolio } from "./portfolio-okx.js";
+import { getOkxPortfolio } from "./okx.js";
 
 const FROZEN_TIME = new Date("2024-01-15T12:00:00.000Z");
 

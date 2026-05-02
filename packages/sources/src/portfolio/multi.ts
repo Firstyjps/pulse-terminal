@@ -1,9 +1,9 @@
 // Multi-source portfolio aggregator — Binance + Bybit + OKX (read-only).
 // Each source is opt-in via env keys; missing keys return null and are skipped.
-import { getPortfolio } from "./portfolio.js";
-import { getBybitPortfolio } from "./portfolio-bybit.js";
-import { getOkxPortfolio } from "./portfolio-okx.js";
-import type { PortfolioSnapshot, PortfolioSource } from "./portfolio.js";
+import { getPortfolio } from "./binance.js";
+import { getBybitPortfolio } from "./bybit.js";
+import { getOkxPortfolio } from "./okx.js";
+import type { PortfolioSnapshot, PortfolioSource } from "./binance.js";
 
 export interface MultiPortfolioSnapshot {
   /** Per-source snapshots in fetch order; configured sources only. */

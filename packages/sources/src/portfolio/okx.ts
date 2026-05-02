@@ -3,7 +3,7 @@
 //
 // OKX V5 returns per-asset `eqUsd` already, so no price fetch needed.
 import { createHmac } from "node:crypto";
-import type { PortfolioBalance, PortfolioSnapshot } from "./portfolio.js";
+import type { PortfolioBalance, PortfolioSnapshot } from "./binance.js";
 
 interface OkxBalanceResponse {
   code: string;

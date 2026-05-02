@@ -4,8 +4,8 @@
 // Anchor decoder. For the Phase 6 foundation we accept a pluggable URL
 // (`ORCA_API_URL`) pointing at any service that exposes the documented
 // shape below; if unset, we fall through to a placeholder default.
-import type { Position, PositionResult } from "./position-types.js";
-import { getSolanaWallets } from "./_wallets.js";
+import type { Position, PositionResult } from "./types.js";
+import { getSolanaWallets } from "../_wallets.js";
 
 function orcaApi(): string {
   return process.env.ORCA_API_URL ?? "https://api.mainnet.orca.so";
