@@ -6,6 +6,15 @@
 //
 // Output target: a single regime chip + reason string for the morning brief
 // (acceptance criterion in ROADMAP.md L49).
+//
+// 2026-05-02: added disk persistence. The store atomically writes the latest
+// snapshot to `data/last-regime.json` on every successful tick and hydrates
+// from that file on construction. After `pm2 restart pulse-realtime`, the
+// hub serves the last known reading with `_isStale: true` until the first
+// fresh tick lands — replaces the previous 503 cold-start window.
+
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -195,23 +204,64 @@ interface HistoryEntry {
   reading: RegimeReading;
 }
 
+export interface RegimeStoreOpts {
+  /**
+   * Disk path for the persisted-snapshot file. Pass an explicit string to
+   * override; pass `null` to disable persistence; omit to use the default
+   * (off in vitest, `./data/last-regime.json` otherwise — env var
+   * `REGIME_PERSIST_PATH` overrides). History is NOT persisted — only the
+   * latest snapshot. `findPrior` computes against in-memory history only;
+   * after a restart the next tick computes with `prior: undefined` until
+   * fresh history accumulates (same as today's first-ever-boot path).
+   */
+  persistPath?: string | null;
+}
+
+function defaultPersistPath(): string | undefined {
+  // vitest sets VITEST=true; keep tests in-memory unless they pass a tmp path.
+  if (process.env.VITEST) return undefined;
+  return process.env.REGIME_PERSIST_PATH || "./data/last-regime.json";
+}
+
 export class RegimeStore {
   private latest: RegimeSnapshot | null = null;
   private history: HistoryEntry[] = [];
+  private persistPath: string | undefined;
+  /** True when `latest` came from disk (not from a tick this process ran). */
+  private hydrated = false;
+
+  constructor(opts: RegimeStoreOpts = {}) {
+    // null → explicit off; undefined → fall through to default.
+    if (opts.persistPath === null) {
+      this.persistPath = undefined;
+    } else if (typeof opts.persistPath === "string" && opts.persistPath.length) {
+      this.persistPath = opts.persistPath;
+    } else {
+      this.persistPath = defaultPersistPath();
+    }
+    if (this.persistPath) this.tryHydrate();
+  }
 
   /** Record a new reading and recompute. Returns the resulting snapshot. */
   record(reading: RegimeReading, now: number = Date.now()): RegimeSnapshot {
     const prior = this.findPrior(now);
     const snap = computeRegime({ current: reading, prior, now });
     this.latest = snap;
+    this.hydrated = false;
     this.history.push({ ts: now, reading });
     this.prune(now);
+    this.tryPersist(snap);
     return snap;
   }
 
   /** Latest computed snapshot, or null if `record()` has never been called. */
   get(): RegimeSnapshot | null {
     return this.latest;
+  }
+
+  /** True iff `latest` was loaded from disk and no fresh tick has succeeded yet this process. */
+  isHydrated(): boolean {
+    return this.hydrated;
   }
 
   /** Number of readings retained (for tests / `/health` debug). */
@@ -240,6 +290,46 @@ export class RegimeStore {
   private prune(now: number) {
     const cutoff = now - HISTORY_RETAIN_MS;
     this.history = this.history.filter((h) => h.ts >= cutoff);
+  }
+
+  private tryHydrate(): void {
+    if (!this.persistPath) return;
+    try {
+      const raw = readFileSync(this.persistPath, "utf-8");
+      const parsed = JSON.parse(raw) as RegimeSnapshot;
+      if (
+        parsed &&
+        typeof parsed.regime === "string" &&
+        typeof parsed.score === "number" &&
+        typeof parsed.ts === "number"
+      ) {
+        this.latest = parsed;
+        this.hydrated = true;
+        const ageMin = Math.round((Date.now() - parsed.ts) / 60_000);
+        console.log(
+          `[regime] hydrated from disk: regime=${parsed.regime} score=${parsed.score} age=${ageMin}min`,
+        );
+      }
+    } catch (err) {
+      // ENOENT on first-ever boot is normal — log only on parse / IO errors.
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.warn("[regime] hydrate failed:", (err as Error).message);
+      }
+    }
+  }
+
+  private tryPersist(snap: RegimeSnapshot): void {
+    if (!this.persistPath) return;
+    try {
+      mkdirSync(dirname(this.persistPath), { recursive: true });
+      const tmp = `${this.persistPath}.tmp`;
+      writeFileSync(tmp, JSON.stringify(snap), "utf-8");
+      // Atomic on POSIX. On Windows MoveFileEx replaces the existing file.
+      renameSync(tmp, this.persistPath);
+    } catch (err) {
+      // Persistence is best-effort; loop keeps running.
+      console.warn("[regime] persist failed:", (err as Error).message);
+    }
   }
 }
 

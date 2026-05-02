@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   REGIME_THRESHOLDS,
   RegimeStore,
   computeRegime,
   type RegimeReading,
+  type RegimeSnapshot,
 } from "./index.js";
 
 const NOW = 1_745_842_200_000; // fixed reference time
@@ -247,5 +251,105 @@ describe("RegimeStore — rolling 24h prior", () => {
     store.record(NEUTRAL, NOW);
     // After the third record, the 40h-old entry should be pruned.
     expect(store.size()).toBe(2);
+  });
+});
+
+describe("RegimeStore — disk persistence", () => {
+  const tmpDirs: string[] = [];
+
+  function tmpFile(): string {
+    const dir = mkdtempSync(join(tmpdir(), "regime-"));
+    tmpDirs.push(dir);
+    return join(dir, "last-regime.json");
+  }
+
+  afterEach(() => {
+    for (const d of tmpDirs.splice(0)) {
+      try {
+        rmSync(d, { recursive: true, force: true });
+      } catch {
+        /* best effort cleanup */
+      }
+    }
+  });
+
+  it("writes JSON file on record() (atomic via .tmp + rename)", () => {
+    const path = tmpFile();
+    const store = new RegimeStore({ persistPath: path });
+    store.record({ ...NEUTRAL }, NOW);
+    expect(existsSync(path)).toBe(true);
+    const parsed = JSON.parse(readFileSync(path, "utf-8")) as RegimeSnapshot;
+    expect(parsed.regime).toBeDefined();
+    expect(parsed.ts).toBe(NOW);
+    expect(existsSync(path + ".tmp")).toBe(false); // tmp cleaned via rename
+  });
+
+  it("hydrates on construction when file exists", () => {
+    const path = tmpFile();
+    const fixture = {
+      regime: "Risk-Off",
+      score: -0.5,
+      reason: "test",
+      ts: Date.now() - 600_000,
+      reading: NEUTRAL,
+      signals: {},
+    };
+    writeFileSync(path, JSON.stringify(fixture), "utf-8");
+    const store = new RegimeStore({ persistPath: path });
+    expect(store.get()?.regime).toBe("Risk-Off");
+    expect(store.isHydrated()).toBe(true);
+  });
+
+  it("isHydrated() flips false after a fresh record()", () => {
+    const path = tmpFile();
+    const fixture = {
+      regime: "Risk-Off",
+      score: -0.5,
+      reason: "test",
+      ts: Date.now() - 600_000,
+      reading: NEUTRAL,
+      signals: {},
+    };
+    writeFileSync(path, JSON.stringify(fixture), "utf-8");
+    const store = new RegimeStore({ persistPath: path });
+    expect(store.isHydrated()).toBe(true);
+    store.record({ ...NEUTRAL }, NOW);
+    expect(store.isHydrated()).toBe(false);
+  });
+
+  it("first-ever boot (no file): get() returns null, isHydrated() false", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "regime-")), "absent.json");
+    const store = new RegimeStore({ persistPath: path });
+    expect(store.get()).toBeNull();
+    expect(store.isHydrated()).toBe(false);
+  });
+
+  it("malformed disk JSON → falls through to null, no throw", () => {
+    const path = tmpFile();
+    writeFileSync(path, "{not valid json", "utf-8");
+    const store = new RegimeStore({ persistPath: path });
+    expect(store.get()).toBeNull();
+    expect(store.isHydrated()).toBe(false);
+  });
+
+  it("disk JSON missing required fields → ignored, hydrated stays false", () => {
+    const path = tmpFile();
+    writeFileSync(path, JSON.stringify({ foo: "bar" }), "utf-8");
+    const store = new RegimeStore({ persistPath: path });
+    expect(store.get()).toBeNull();
+    expect(store.isHydrated()).toBe(false);
+  });
+
+  it("persistPath:null → in-memory only, no file IO", () => {
+    const store = new RegimeStore({ persistPath: null });
+    store.record({ ...NEUTRAL }, NOW);
+    expect(store.get()).not.toBeNull();
+  });
+
+  it("write failure (bogus path) is swallowed — record() still returns snapshot", () => {
+    // Path with NUL byte forces ENOENT on mkdirSync + writeFileSync on every OS.
+    const store = new RegimeStore({ persistPath: "\0/invalid/path.json" });
+    expect(() => store.record({ ...NEUTRAL }, NOW)).not.toThrow();
+    expect(store.get()).not.toBeNull();
   });
 });

@@ -191,10 +191,38 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
     expect(range).toContain("score \\+0\\.00");
   });
 
-  it("regime block falls back to 'unavailable' when null", () => {
+  it("regime block renders 'warming up' copy when null (cold-start fallback)", () => {
     const out = formatMorningBrief(makeInput({ regime: null }));
     expect(out).toContain("🎯 *Macro Regime*");
-    expect(out).toContain("_unavailable_");
+    expect(out).toContain("warming up");
+    expect(out).toContain("09:30 BKK");
+    expect(out).not.toContain("_unavailable_");
+  });
+
+  it("regime block appends 'as of Xm ago — hub warming up' when _isStale=true", () => {
+    const out = formatMorningBrief(
+      makeInput({
+        regime: { ...REGIME_FIXTURE, _isStale: true, _ageMs: 7 * 60_000 },
+      }),
+    );
+    expect(out).toContain("🔴"); // Risk-Off emoji from REGIME_FIXTURE
+    expect(out).toContain("as of 7m ago");
+    expect(out).toContain("hub warming up");
+  });
+
+  it("fresh regime (no _isStale) does NOT show staleness footer", () => {
+    const out = formatMorningBrief(makeInput({ regime: REGIME_FIXTURE }));
+    expect(out).not.toContain("hub warming up");
+    expect(out).not.toContain("as of");
+  });
+
+  it("rounds _ageMs to whole minutes", () => {
+    const out = formatMorningBrief(
+      makeInput({
+        regime: { ...REGIME_FIXTURE, _isStale: true, _ageMs: 7 * 60_000 + 32_000 }, // 7m 32s
+      }),
+    );
+    expect(out).toContain("as of 8m ago");
   });
 
   it("output stays under Telegram's 4096-char limit for typical payload", () => {

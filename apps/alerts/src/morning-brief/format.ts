@@ -21,6 +21,10 @@ export interface RegimeSlice {
   score: number;
   reason: string;
   reading?: { dominance?: number; dxy?: number };
+  /** True when the hub served a hydrated-from-disk snapshot (cold-start window). */
+  _isStale?: boolean;
+  /** Age of the snapshot in ms — only present when _isStale. */
+  _ageMs?: number;
 }
 
 export interface FormatInput {
@@ -147,8 +151,12 @@ export function formatMorningBrief(input: FormatInput): string {
       const dxy = regime.reading.dxy.toFixed(1);
       lines.push(`BTC dom ${escapeMarkdownV2(dom)}% · DXY ${escapeMarkdownV2(dxy)}`);
     }
+    if (regime._isStale && regime._ageMs != null) {
+      const mins = Math.round(regime._ageMs / 60_000);
+      lines.push(`_as of ${escapeMarkdownV2(String(mins))}m ago — hub warming up_`);
+    }
   } else {
-    lines.push("_unavailable_");
+    lines.push("_warming up — check after 09:30 BKK_");
   }
   lines.push("");
 

@@ -81,7 +81,13 @@ function handle(req: IncomingMessage, res: ServerResponse, routes: Routes) {
     if (!routes.regime) return send(res, 404, { error: "regime store not wired" });
     const snap = routes.regime.get();
     if (!snap) return send(res, 503, { error: "regime not computed yet" });
-    return sendCached(res, snap, Date.now() - snap.ts);
+    const isStale = routes.regime.isHydrated();
+    const ageMs = Date.now() - snap.ts;
+    return sendCached(
+      res,
+      isStale ? { ...snap, _isStale: true, _ageMs: ageMs } : snap,
+      ageMs,
+    );
   }
 
   // GET /funding[?exchange=X&symbol=Y]

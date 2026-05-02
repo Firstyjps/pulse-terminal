@@ -85,12 +85,18 @@ async function fetchRegime(
   try {
     const res = await fetchImpl(`${hubBase}/regime`, { cache: "no-store" } as RequestInit);
     if (!res.ok) return null;
-    const j = (await res.json()) as RegimeSlice & { reading?: unknown };
+    const j = (await res.json()) as RegimeSlice & {
+      reading?: unknown;
+      _isStale?: boolean;
+      _ageMs?: number;
+    };
     return {
       regime: j.regime,
       score: j.score,
       reason: j.reason,
       reading: j.reading as RegimeSlice["reading"],
+      _isStale: j._isStale,
+      _ageMs: j._ageMs,
     };
   } catch {
     return null;

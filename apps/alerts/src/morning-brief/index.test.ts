@@ -426,6 +426,33 @@ describe("runMorningBrief — success path", () => {
     expect(svgSpy).not.toHaveBeenCalled();
   });
 
+  it("fetchRegime passes _isStale + _ageMs through to format (warming-up footer rendered)", async () => {
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/regime")) {
+        return Promise.resolve(jsonResponse({
+          ...fakeRegime,
+          _isStale: true,
+          _ageMs: 5 * 60_000,
+        }));
+      }
+      if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      return Promise.resolve(jsonResponse({ ok: true, result: {} }));
+    });
+    const r = await runMorningBrief({
+      now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => fakeEtf,
+      fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• ok\nRisk: x",
+      svgToPngImpl: async () => null,
+      fetchImpl,
+    });
+    expect(r.sent).toBe(true);
+    expect(r.text).toContain("hub warming up");
+    expect(r.text).toContain("as of 5m ago");
+  });
+
   it("brief skips image when fetchKlines returns < 2 rows", async () => {
     const svgSpy = vi.fn(async () => new Uint8Array([1]));
     const fetchImpl = vi.fn().mockImplementation((url: string) => {

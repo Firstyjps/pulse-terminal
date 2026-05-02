@@ -28,6 +28,10 @@ apps/mcp/pulse-terminal.dxt
 # Alert worker run-time data
 apps/alerts/data/
 
+# Realtime hub run-time data — persisted regime snapshot + atomic-write tmp
+apps/realtime/data/last-regime.json
+apps/realtime/data/last-regime.json.tmp
+
 # pm2 logs + state
 logs/
 .pm2/
