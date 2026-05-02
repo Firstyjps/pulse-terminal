@@ -26,7 +26,8 @@ export interface FundingCluster {
 
 export interface ActionCandidatesInput {
   regime: RegimeSlice | null;
-  etf: ETFFlowResponse;
+  /** Null on weekend mode when ETF data is unavailable (US markets closed). */
+  etf: ETFFlowResponse | null;
   funding: FundingCluster | null;
   catalysts: string[];
 }
@@ -119,13 +120,17 @@ function serializeData(input: ActionCandidatesInput): string {
     lines.push("Regime: unavailable");
   }
 
-  const etf = input.etf.summary;
-  lines.push(
-    `BTC ETF: 24h ${fmtUsd(etf.btcLast)}, 7d ${fmtUsd(etf.btc7dSum)}, cumulative ${fmtUsd(etf.btcCumulative)}`,
-  );
-  lines.push(
-    `ETH ETF: 24h ${fmtUsd(etf.ethLast)}, 7d ${fmtUsd(etf.eth7dSum)}, cumulative ${fmtUsd(etf.ethCumulative)}`,
-  );
+  const etf = input.etf?.summary;
+  if (etf) {
+    lines.push(
+      `BTC ETF: 24h ${fmtUsd(etf.btcLast)}, 7d ${fmtUsd(etf.btc7dSum)}, cumulative ${fmtUsd(etf.btcCumulative)}`,
+    );
+    lines.push(
+      `ETH ETF: 24h ${fmtUsd(etf.ethLast)}, 7d ${fmtUsd(etf.eth7dSum)}, cumulative ${fmtUsd(etf.ethCumulative)}`,
+    );
+  } else {
+    lines.push("ETF: weekend — no fresh data (US markets closed)");
+  }
 
   if (input.funding) {
     const f = input.funding;
@@ -178,8 +183,9 @@ function rulesFallback(input: ActionCandidatesInput, now: number): string {
     );
   }
 
-  // 2. Mean-revert watch on ETH
+  // 2. Mean-revert watch on ETH (skipped when etf data unavailable, e.g. weekend)
   if (
+    input.etf &&
     input.etf.summary.eth7dSum > 0 &&
     input.regime?.regime === "Risk-Off"
   ) {

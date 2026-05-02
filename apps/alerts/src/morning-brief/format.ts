@@ -24,7 +24,13 @@ export interface RegimeSlice {
 }
 
 export interface FormatInput {
-  etf: ETFFlowResponse;
+  /**
+   * `weekday` renders the full 5-section brief.
+   * `weekend` (BKK Sat/Sun) drops the BTC/ETH ETF blocks and emits a single
+   * ⏸ ETF Status line; `etf` is allowed to be null in that mode.
+   */
+  mode: "weekday" | "weekend";
+  etf: ETFFlowResponse | null;
   regime: RegimeSlice | null;
   funding: FundingCluster | null;
   catalysts: string[];
@@ -95,8 +101,33 @@ const FUNDING_LEAN_EMOJI: Record<FundingCluster["lean"], string> = {
   mixed: "🟡",
 };
 
+/**
+ * Weekend ⏸ ETF Status one-liner. Replaces the BTC/ETH flow blocks when
+ * `mode === "weekend"`. Two cases:
+ *   A: etf has finalized flows → cite last reported date + BTC/ETH last values
+ *   B: etf is null / empty → short body only ("flows resume Mon")
+ */
+function renderEtfStatus(etf: ETFFlowResponse | null, lines: string[]): void {
+  lines.push(`⏸ *ETF Status*`);
+  const flows = etf?.flows ?? [];
+  const pendingOffset = etf?._todayPending ? 1 : 0;
+  const lastIdx = flows.length - 1 - pendingOffset;
+  const last = lastIdx >= 0 ? flows[lastIdx] : null;
+  if (last && etf) {
+    const dateEsc = escapeMarkdownV2(last.date);
+    const btc = escapeMarkdownV2(fmtUsd(etf.summary.btcLast));
+    const eth = escapeMarkdownV2(fmtUsd(etf.summary.ethLast));
+    lines.push(
+      `US markets closed for the weekend — flows resume Mon\\. Last reported ${dateEsc}: BTC ${btc} · ETH ${eth}\\.`,
+    );
+  } else {
+    lines.push("US markets closed for the weekend — flows resume Mon\\.");
+  }
+  lines.push("");
+}
+
 export function formatMorningBrief(input: FormatInput): string {
-  const { etf, regime, funding, catalysts, actionCandidates, asOf } = input;
+  const { mode, etf, regime, funding, catalysts, actionCandidates, asOf } = input;
   const lines: string[] = [];
 
   // ── Header
@@ -121,34 +152,40 @@ export function formatMorningBrief(input: FormatInput): string {
   }
   lines.push("");
 
-  const pendingOffset = etf._todayPending ? 1 : 0;
-  const pendingHint = etf._todayPending ? " \\(today still trading\\)" : "";
+  if (mode === "weekday") {
+    // etf is required in weekday mode — orchestrator gates this upstream.
+    const etfWk = etf as ETFFlowResponse;
+    const pendingOffset = etfWk._todayPending ? 1 : 0;
+    const pendingHint = etfWk._todayPending ? " \\(today still trading\\)" : "";
 
-  // ── 2. BTC ETF Flow (💰)
-  lines.push(`💰 *BTC ETF Flow*`);
-  const btcDelta = deltaVsYesterday(etf.flows, "btc", pendingOffset);
-  lines.push(
-    `24h: *${escapeMarkdownV2(fmtUsd(etf.summary.btcLast))}*${pendingHint}`,
-  );
-  if (btcDelta !== null) {
-    lines.push(`Δ vs yesterday: ${escapeMarkdownV2(fmtUsd(btcDelta))}`);
-  }
-  lines.push(`7d sum: ${escapeMarkdownV2(fmtUsd(etf.summary.btc7dSum))}`);
-  lines.push(`Cumulative: ${escapeMarkdownV2(fmtUsd(etf.summary.btcCumulative))}`);
-  lines.push("");
+    // ── 2. BTC ETF Flow (💰)
+    lines.push(`💰 *BTC ETF Flow*`);
+    const btcDelta = deltaVsYesterday(etfWk.flows, "btc", pendingOffset);
+    lines.push(
+      `24h: *${escapeMarkdownV2(fmtUsd(etfWk.summary.btcLast))}*${pendingHint}`,
+    );
+    if (btcDelta !== null) {
+      lines.push(`Δ vs yesterday: ${escapeMarkdownV2(fmtUsd(btcDelta))}`);
+    }
+    lines.push(`7d sum: ${escapeMarkdownV2(fmtUsd(etfWk.summary.btc7dSum))}`);
+    lines.push(`Cumulative: ${escapeMarkdownV2(fmtUsd(etfWk.summary.btcCumulative))}`);
+    lines.push("");
 
-  // ── 3. ETH ETF Flow (🔷) — fixed section in v2 (no skip)
-  lines.push(`🔷 *ETH ETF Flow*`);
-  const ethDelta = deltaVsYesterday(etf.flows, "eth", pendingOffset);
-  lines.push(
-    `24h: *${escapeMarkdownV2(fmtUsd(etf.summary.ethLast))}*${pendingHint}`,
-  );
-  if (ethDelta !== null) {
-    lines.push(`Δ vs yesterday: ${escapeMarkdownV2(fmtUsd(ethDelta))}`);
+    // ── 3. ETH ETF Flow (🔷) — fixed section in v2 (no skip)
+    lines.push(`🔷 *ETH ETF Flow*`);
+    const ethDelta = deltaVsYesterday(etfWk.flows, "eth", pendingOffset);
+    lines.push(
+      `24h: *${escapeMarkdownV2(fmtUsd(etfWk.summary.ethLast))}*${pendingHint}`,
+    );
+    if (ethDelta !== null) {
+      lines.push(`Δ vs yesterday: ${escapeMarkdownV2(fmtUsd(ethDelta))}`);
+    }
+    lines.push(`7d sum: ${escapeMarkdownV2(fmtUsd(etfWk.summary.eth7dSum))}`);
+    lines.push(`Cumulative: ${escapeMarkdownV2(fmtUsd(etfWk.summary.ethCumulative))}`);
+    lines.push("");
+  } else {
+    renderEtfStatus(etf, lines);
   }
-  lines.push(`7d sum: ${escapeMarkdownV2(fmtUsd(etf.summary.eth7dSum))}`);
-  lines.push(`Cumulative: ${escapeMarkdownV2(fmtUsd(etf.summary.ethCumulative))}`);
-  lines.push("");
 
   // ── 4. Funding rate cluster (📊)
   lines.push(`📊 *Funding Rate Cluster \\(8h\\)*`);

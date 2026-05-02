@@ -54,6 +54,7 @@ const ACTION_CANDIDATES_FIXTURE = [
 
 function makeInput(overrides: Partial<FormatInput> = {}): FormatInput {
   return {
+    mode: "weekday",
     etf: ETF_FIXTURE,
     regime: REGIME_FIXTURE,
     funding: FUNDING_FIXTURE,
@@ -63,6 +64,8 @@ function makeInput(overrides: Partial<FormatInput> = {}): FormatInput {
     ...overrides,
   };
 }
+
+const SAT_ASOF = new Date("2026-05-09T02:00:00.000Z"); // 09:00 BKK Sat
 
 describe("escapeMarkdownV2", () => {
   it("escapes every reserved char", () => {
@@ -251,5 +254,84 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
     // Δ = 245.3M - 100M = +145.3M (NOT 0 - 245.3M = -245.3M)
     expect(out).toContain("Δ vs yesterday: \\+$145\\.3M");
     expect(out).not.toContain("Δ vs yesterday: \\-$245\\.3M");
+  });
+});
+
+describe("formatMorningBrief — weekend mode", () => {
+  it("renders ⏸ ETF Status block instead of BTC/ETH flow blocks", () => {
+    const out = formatMorningBrief(makeInput({ mode: "weekend", asOf: SAT_ASOF }));
+    expect(out).toContain("⏸ *ETF Status*");
+    expect(out).not.toContain("💰 *BTC ETF Flow*");
+    expect(out).not.toContain("🔷 *ETH ETF Flow*");
+  });
+
+  it("ETF Status references last finalized date + BTC/ETH last values", () => {
+    const out = formatMorningBrief(makeInput({ mode: "weekend", asOf: SAT_ASOF }));
+    expect(out).toContain("Last reported 2026\\-05\\-03"); // last row in ETF_FIXTURE
+    expect(out).toContain("BTC \\+$245\\.3M");
+    expect(out).toContain("ETH \\+$12\\.4M");
+  });
+
+  it("ETF Status falls back to short body when etf is null", () => {
+    const out = formatMorningBrief(makeInput({ mode: "weekend", asOf: SAT_ASOF, etf: null }));
+    expect(out).toContain("⏸ *ETF Status*");
+    expect(out).toContain("US markets closed for the weekend");
+    expect(out).not.toContain("Last reported");
+  });
+
+  it("ETF Status uses pendingOffset when _todayPending=true (Fri stub row at end)", () => {
+    // 3 rows: [day-2] day-1 today(stub). With pendingOffset=1 the "last
+    // reported" row should be day-1 (2026-05-08), not the stub at day-0.
+    const out = formatMorningBrief(
+      makeInput({
+        mode: "weekend",
+        asOf: SAT_ASOF,
+        etf: {
+          flows: [
+            { date: "2026-05-07", btc: 100_000_000, eth: 5_000_000, btcCumulative: 30_000_000_000, ethCumulative: 4_000_000_000 },
+            { date: "2026-05-08", btc: 245_300_000, eth: 12_400_000, btcCumulative: 30_245_300_000, ethCumulative: 4_012_400_000 },
+            { date: "2026-05-09", btc: 0, eth: 0, btcCumulative: 30_245_300_000, ethCumulative: 4_012_400_000 },
+          ],
+          summary: {
+            btcLast: 245_300_000,
+            ethLast: 12_400_000,
+            btcCumulative: 30_245_300_000,
+            ethCumulative: 4_012_400_000,
+            btc7dSum: 1_200_000_000,
+            eth7dSum: 65_000_000,
+            btc30dSum: 5_500_000_000,
+            eth30dSum: 200_000_000,
+          },
+          _source: "farside",
+          _isProxy: false,
+          _todayPending: true,
+        },
+      }),
+    );
+    expect(out).toContain("Last reported 2026\\-05\\-08");
+    expect(out).not.toContain("Last reported 2026\\-05\\-09");
+  });
+
+  it("keeps regime, funding, catalysts, action candidates in weekend mode", () => {
+    const out = formatMorningBrief(makeInput({ mode: "weekend", asOf: SAT_ASOF }));
+    expect(out).toContain("🎯 *Macro Regime*");
+    expect(out).toContain("📊 *Funding Rate Cluster");
+    expect(out).toContain("⚠️ *Today's Catalysts*");
+    expect(out).toContain("🎯 *Action Candidates*");
+  });
+
+  it("header shows (Sat) day-of-week", () => {
+    const out = formatMorningBrief(makeInput({ mode: "weekend", asOf: SAT_ASOF }));
+    expect(out).toContain("\\(Sat\\)");
+  });
+
+  it("output stays under 4096 chars in weekend mode", () => {
+    const out = formatMorningBrief(makeInput({ mode: "weekend", asOf: SAT_ASOF }));
+    expect(out.length).toBeLessThan(4096);
+  });
+
+  it("escapes the period after 'Mon' (MarkdownV2 reserved char)", () => {
+    const out = formatMorningBrief(makeInput({ mode: "weekend", asOf: SAT_ASOF }));
+    expect(out).toMatch(/flows resume Mon\\\./);
   });
 });

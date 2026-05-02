@@ -68,30 +68,8 @@ describe("classifyCluster", () => {
   });
 });
 
-describe("runMorningBrief — skip rules", () => {
-  it("skips on BKK Saturday", async () => {
-    const r = await runMorningBrief({
-      now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
-      fetchEtf: async () => fakeEtf, fetchImpl: vi.fn(),
-      fetchFunding: async () => fakeFunding,
-      loadCatalysts: () => [],
-    });
-    expect(r.skipped).toBe(true);
-    expect(r.reason).toBe("weekend");
-  });
-
-  it("skips on BKK Sunday", async () => {
-    const r = await runMorningBrief({
-      now: SUN, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
-      fetchEtf: async () => fakeEtf, fetchImpl: vi.fn(),
-      fetchFunding: async () => fakeFunding,
-      loadCatalysts: () => [],
-    });
-    expect(r.skipped).toBe(true);
-    expect(r.reason).toBe("weekend");
-  });
-
-  it("skips when ETF _isProxy=true", async () => {
+describe("runMorningBrief — weekday skip rules", () => {
+  it("skips when ETF _isProxy=true (weekday)", async () => {
     const r = await runMorningBrief({
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => ({ ...fakeEtf, _isProxy: true }),
@@ -101,9 +79,10 @@ describe("runMorningBrief — skip rules", () => {
     });
     expect(r.skipped).toBe(true);
     expect(r.reason).toBe("proxy_data");
+    expect(r.mode).toBe("weekday");
   });
 
-  it("skips when ETF flows empty", async () => {
+  it("skips when ETF flows empty (weekday)", async () => {
     const r = await runMorningBrief({
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => ({ ...fakeEtf, flows: [] }),
@@ -113,6 +92,132 @@ describe("runMorningBrief — skip rules", () => {
     });
     expect(r.skipped).toBe(true);
     expect(r.reason).toBe("no_etf_data");
+    expect(r.mode).toBe("weekday");
+  });
+
+  it("skips when ETF fetch rejects (weekday)", async () => {
+    const r = await runMorningBrief({
+      now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => { throw new Error("upstream down"); },
+      fetchFunding: async () => fakeFunding,
+      loadCatalysts: () => [],
+      fetchImpl: vi.fn(),
+    });
+    expect(r.skipped).toBe(true);
+    expect(r.reason).toBe("no_etf_data");
+    expect(r.mode).toBe("weekday");
+  });
+});
+
+describe("runMorningBrief — weekend mode", () => {
+  function makeFetchImpl(messageOk = true) {
+    return vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
+      if (url.includes("/sendMessage")) {
+        return Promise.resolve(jsonResponse(messageOk ? { ok: true, result: { message_id: 1 } } : { ok: false, description: "fail" }, messageOk));
+      }
+      if (url.includes("/sendPhoto")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 2 } }));
+      return Promise.resolve(jsonResponse({ ok: true, result: {} }));
+    });
+  }
+
+  it("sends weekend brief on BKK Saturday with mode:weekend + ⏸ ETF Status", async () => {
+    const r = await runMorningBrief({
+      now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => fakeEtf,
+      fetchFunding: async () => fakeFunding,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• weekend idea\nRisk: thin liquidity",
+      svgToPngImpl: async () => null,
+      fetchImpl: makeFetchImpl(),
+    });
+    expect(r.sent).toBe(true);
+    expect(r.mode).toBe("weekend");
+    expect(r.text).toContain("⏸ *ETF Status*");
+    expect(r.text).not.toContain("💰 *BTC ETF Flow*");
+    expect(r.text).not.toContain("🔷 *ETH ETF Flow*");
+    expect(r.text).toContain("\\(Sat\\)");
+  });
+
+  it("sends weekend brief on BKK Sunday", async () => {
+    const r = await runMorningBrief({
+      now: SUN, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => fakeEtf,
+      fetchFunding: async () => fakeFunding,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• weekend idea\nRisk: x",
+      svgToPngImpl: async () => null,
+      fetchImpl: makeFetchImpl(),
+    });
+    expect(r.sent).toBe(true);
+    expect(r.mode).toBe("weekend");
+    expect(r.text).toContain("\\(Sun\\)");
+    expect(r.text).toContain("⏸ *ETF Status*");
+  });
+
+  it("weekend brief still sends when ETF fetch rejects (no_etf_data is not a skip on weekend)", async () => {
+    const r = await runMorningBrief({
+      now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => { throw new Error("upstream down"); },
+      fetchFunding: async () => fakeFunding,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: async () => null,
+      fetchImpl: makeFetchImpl(),
+    });
+    expect(r.sent).toBe(true);
+    expect(r.mode).toBe("weekend");
+    expect(r.text).toContain("⏸ *ETF Status*");
+    expect(r.text).not.toContain("Last reported"); // null etf → Case B
+  });
+
+  it("weekend brief still sends when ETF flows are empty", async () => {
+    const r = await runMorningBrief({
+      now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => ({ ...fakeEtf, flows: [] }),
+      fetchFunding: async () => fakeFunding,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: async () => null,
+      fetchImpl: makeFetchImpl(),
+    });
+    expect(r.sent).toBe(true);
+    expect(r.mode).toBe("weekend");
+    expect(r.text).toContain("⏸ *ETF Status*");
+    expect(r.text).not.toContain("Last reported");
+  });
+
+  it("weekend brief still sends when ETF is _isProxy=true", async () => {
+    const r = await runMorningBrief({
+      now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => ({ ...fakeEtf, _isProxy: true }),
+      fetchFunding: async () => fakeFunding,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: async () => null,
+      fetchImpl: makeFetchImpl(),
+    });
+    expect(r.sent).toBe(true);
+    expect(r.mode).toBe("weekend");
+    expect(r.text).toContain("⏸ *ETF Status*");
+    expect(r.text).not.toContain("Last reported"); // proxy treated as no-data
+  });
+
+  it("weekend brief skips chart attempt entirely when etf is null", async () => {
+    const svgSpy = vi.fn(async () => new Uint8Array([1]));
+    const r = await runMorningBrief({
+      now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => { throw new Error("upstream down"); },
+      fetchFunding: async () => fakeFunding,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: svgSpy,
+      fetchImpl: makeFetchImpl(),
+    });
+    expect(r.sent).toBe(true);
+    expect(r.imageSent).toBe(false);
+    expect(r.imageError).toBe("weekend: no chart");
+    expect(svgSpy).not.toHaveBeenCalled();
   });
 });
 

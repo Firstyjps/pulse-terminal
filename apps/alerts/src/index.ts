@@ -55,7 +55,8 @@ const stopSnapshotCron = startSnapshotCron();
 const stopPortfolioSnapshotCron = startPortfolioSnapshotCron();
 
 // ─────────────────────────────────────────────────────────────────
-// Morning Brief — Telegram push at 09:00 BKK Mon-Fri
+// Morning Brief — Telegram push at 09:00 BKK daily (weekend brief drops
+// ETF sections — see morning-brief/README.md#weekend-mode).
 // Per .coordinator/telegram-morning-brief.md. Opt-in: skips entirely when
 // TELEGRAM_BOT_TOKEN is unset so unconfigured installs stay silent.
 // ─────────────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ if (TG_TOKEN && TG_CHAT) {
   void tick(); // probe immediately so a 09:00-late start still fires today
   stopMorningBrief = () => clearInterval(timer);
   console.log(
-    `[alerts] morning brief armed — 09:00 BKK Mon-Fri, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}`,
+    `[alerts] morning brief armed — 09:00 BKK daily, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}`,
   );
 } else {
   console.log("[alerts] morning brief disabled — set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable");

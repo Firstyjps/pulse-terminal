@@ -47,7 +47,7 @@ Single web dashboard that summarizes everything I need to make trading decisions
 
 Daily ETF + macro brief delivered to user's Telegram:
 - Cron at 09:00 Bangkok (ETF data 99% complete by then)
-- Skip on weekends + US holidays (no flow → empty report adds noise)
+- Skip on US holidays only — weekends DO send (see weekend brief format: drops ETF blocks, keeps regime/funding/catalysts/action candidates)
 - Format: emoji-led, 5-section paragraph (regime · BTC ETF · ETH ETF · top whale move · top story)
 - Channel: 1-on-1 chat first; group/broadcast later if signal service productized
 - Telegram token + chat ID via env (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`)

@@ -1,6 +1,7 @@
 # Morning Brief — Telegram push (v2)
 
-Daily ETF + macro regime brief sent to Telegram at **09:00 Asia/Bangkok** (Mon-Fri).
+Daily ETF + macro regime brief sent to Telegram at **09:00 Asia/Bangkok**
+(weekend brief drops ETF sections — see [Weekend mode](#weekend-mode)).
 Lives inside `@pulse/alerts` and runs on the same pm2 worker as the anomaly
 scanner. Pure cron — no inbound webhooks, no bot-command handling.
 
@@ -54,6 +55,19 @@ Risk: catalyst clustering may compress reversal windows.
 → Followed by a 600×300 PNG: BTC ETF cumulative flow over the last 30 days,
 dark theme matching the dashboard (`#04050a` bg, `#7c5cff` line).
 
+### Weekend mode
+
+On BKK Saturday/Sunday the brief still fires at 09:00 but renders a slightly
+different shape: the BTC and ETH ETF flow blocks are replaced by one
+⏸ *ETF Status* line ("US markets closed for the weekend — flows resume Mon.
+Last reported \<Fri-date\>: BTC ±$X · ETH ±$Y."). All other sections (Macro
+Regime, Funding Rate Cluster, Today's Catalysts, Action Candidates) render
+exactly as on weekdays. The image chart is skipped on weekends.
+
+Snooze interaction note for v3: a `snooze_1` callback ("snooze tomorrow")
+fired from a Friday brief should mute Saturday's brief; the v3 persistence
+should treat "next brief" not "next weekday brief".
+
 ### v2 explicit drops
 
 The following sections are **NOT** in the brief (per user decision in
@@ -98,7 +112,7 @@ The following sections are **NOT** in the brief (per user decision in
 5. **Restart alerts:** `pm2 restart pulse-alerts`. Look for in `logs/alerts.out.log`:
 
    ```
-   [alerts] morning brief armed — 09:00 BKK Mon-Fri, hub http://127.0.0.1:8081, dashboard http://localhost:3000/morning
+   [alerts] morning brief armed — 09:00 BKK daily, hub http://127.0.0.1:8081, dashboard http://localhost:3000/morning
    ```
 
 ## How it works
@@ -106,12 +120,16 @@ The following sections are **NOT** in the brief (per user decision in
 A `setInterval` ticks every 60s inside `apps/alerts/src/index.ts`. When BKK
 hour == 09 and it hasn't fired yet today, it calls `runMorningBrief()`, which:
 
-1. Skips Sat/Sun in BKK (US holidays — see [Deferred](#deferred)).
+1. Detects Sat/Sun in BKK and switches to **weekend mode** (drops the BTC/ETH
+   ETF blocks, replaces them with a single ⏸ ETF Status line; everything else
+   renders). US holidays still skip — see [Deferred](#deferred).
 2. **Parallel fan-out** of three reads:
    - `getETFFlows()` (in-process via `@pulse/sources/server`)
    - `${PULSE_HUB_URL}/regime` (HTTP to the realtime hub)
    - Funding rates for BTC/ETH/SOL on Binance (in-process)
-3. Skips if ETF data is `_isProxy=true` (Farside fallback) or empty.
+3. Weekday only: skips if ETF data is `_isProxy=true` (Farside fallback) or
+   empty. On weekend these conditions just yield `etf=null` and the brief
+   still ships.
 4. Loads today's catalysts from `catalysts.json` (BKK-keyed).
 5. Calls `generateActionCandidates()` — LLM (Haiku 4.5) with rules fallback.
 6. Formats as MarkdownV2.
@@ -275,14 +293,15 @@ even registered when the env is missing — zero overhead.
 
 ## Deferred
 
-| Feature                          | Status   | Notes                                                                |
-|----------------------------------|----------|----------------------------------------------------------------------|
-| US holiday calendar (NYSE)       | v3       | Brief currently fires on Memorial Day / July 4 with $0 ETF flows     |
-| Live economic-calendar API       | v3       | `catalysts.json` hand-edited weekly is enough for now                |
-| Snooze persistence               | v3       | Callback handler is log-only; needs disk/SQLite + skip check in cron |
-| Chart re-render on demand        | v3       | `chart_btc` callback is log-only; wire to chart endpoint             |
-| Multi-channel broadcast          | v3       | One `chat_id` only; group ids work but require bot-in-group          |
-| Localization (Thai/English)      | won't do | English-only per CLAUDE.md (project pivot 2026-04-30)                |
+| Feature                          | Status     | Notes                                                                |
+|----------------------------------|------------|----------------------------------------------------------------------|
+| Weekend skip                     | won't do   | **Reversed 2026-05-02** — weekend now sends with mode="weekend" (drops ETF blocks). See [Weekend mode](#weekend-mode). |
+| US holiday calendar (NYSE)       | v3         | Brief currently fires on Memorial Day / July 4 with $0 ETF flows     |
+| Live economic-calendar API       | v3         | `catalysts.json` hand-edited weekly is enough for now                |
+| Snooze persistence               | v3         | Callback handler is log-only; needs disk/SQLite + skip check in cron |
+| Chart re-render on demand        | v3         | `chart_btc` callback is log-only; wire to chart endpoint             |
+| Multi-channel broadcast          | v3         | One `chat_id` only; group ids work but require bot-in-group          |
+| Localization (Thai/English)      | won't do   | English-only per CLAUDE.md (project pivot 2026-04-30)                |
 
 ## Env var reference
 

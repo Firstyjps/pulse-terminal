@@ -5,12 +5,13 @@
 // image chart via sendPhoto. The sendPhoto step is best-effort: if the SVG
 // → PNG conversion fails (native binding issue) the text message still goes.
 //
-// Skip rules:
-//   - weekend (BKK Sat/Sun)        → reason="weekend"
+// Skip rules (weekday only — Mon-Fri BKK):
 //   - ETF response _isProxy=true   → reason="proxy_data"
 //   - no ETF flows                  → reason="no_etf_data"
-//   - sendMessage failure           → reason="send_failed"
+//   - sendMessage failure           → reason="send_failed" (also weekend)
 //
+// Weekend (BKK Sat/Sun) sends with mode="weekend": ETF blocks are replaced
+// by a single ⏸ ETF Status line; ETF data is best-effort (null tolerated).
 // US holidays still deferred to v3 — see README.
 
 import type { ETFFlowResponse } from "@pulse/sources";
@@ -55,9 +56,11 @@ export interface RunMorningBriefOpts {
 export interface RunMorningBriefResult {
   sent: boolean;
   skipped?: boolean;
-  reason?: "weekend" | "proxy_data" | "no_etf_data" | "send_failed";
+  reason?: "proxy_data" | "no_etf_data" | "send_failed";
   error?: string;
   text?: string;
+  /** "weekday" Mon-Fri BKK · "weekend" Sat/Sun BKK (drops ETF blocks). */
+  mode?: "weekday" | "weekend";
   /** True iff the photo step also succeeded. False on best-effort failure. */
   imageSent?: boolean;
   imageError?: string;
@@ -123,32 +126,42 @@ export async function runMorningBrief(
   opts: RunMorningBriefOpts,
 ): Promise<RunMorningBriefResult> {
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const mode: "weekday" | "weekend" = isBkkWeekend(opts.now) ? "weekend" : "weekday";
 
-  if (isBkkWeekend(opts.now)) {
-    return { sent: false, skipped: true, reason: "weekend" };
-  }
-
-  // Parallel fan-out: ETF (required), regime (best-effort), funding (best-effort)
+  // Parallel fan-out: ETF (required weekday, best-effort weekend), regime + funding best-effort.
   const [etfR, regimeR, fundingR] = await Promise.allSettled([
     opts.fetchEtf ? opts.fetchEtf() : getETFFlows(),
     fetchRegime(opts.hubBase, fetchImpl),
     opts.fetchFunding ? opts.fetchFunding() : defaultFundingCluster(),
   ]);
 
-  if (etfR.status === "rejected") {
-    return {
-      sent: false,
-      skipped: true,
-      reason: "no_etf_data",
-      error: (etfR.reason as Error)?.message?.slice(0, 200),
-    };
-  }
-  const etf = etfR.value;
-  if (etf._isProxy === true) {
-    return { sent: false, skipped: true, reason: "proxy_data" };
-  }
-  if (!etf.flows.length) {
-    return { sent: false, skipped: true, reason: "no_etf_data" };
+  let etf: ETFFlowResponse | null = null;
+
+  if (mode === "weekday") {
+    if (etfR.status === "rejected") {
+      return {
+        sent: false,
+        skipped: true,
+        reason: "no_etf_data",
+        mode,
+        error: (etfR.reason as Error)?.message?.slice(0, 200),
+      };
+    }
+    if (etfR.value._isProxy === true) {
+      return { sent: false, skipped: true, reason: "proxy_data", mode };
+    }
+    if (!etfR.value.flows.length) {
+      return { sent: false, skipped: true, reason: "no_etf_data", mode };
+    }
+    etf = etfR.value;
+  } else {
+    // weekend: fulfilled + non-proxy + has flows → use it; anything else → null.
+    etf =
+      etfR.status === "fulfilled" &&
+      !etfR.value._isProxy &&
+      etfR.value.flows.length
+        ? etfR.value
+        : null;
   }
 
   const regime = regimeR.status === "fulfilled" ? regimeR.value : null;
@@ -164,6 +177,7 @@ export async function runMorningBrief(
   );
 
   const text = formatMorningBrief({
+    mode,
     etf,
     regime,
     funding,
@@ -183,32 +197,36 @@ export async function runMorningBrief(
     fetchImpl,
   );
   if (!msgRes.ok) {
-    return { sent: false, reason: "send_failed", error: msgRes.error, text };
+    return { sent: false, reason: "send_failed", error: msgRes.error, text, mode };
   }
 
-  // Best-effort image — SVG→PNG conversion can fail on native-binding issues;
-  // we still report sent:true because the text already landed.
+  // Best-effort image — only when ETF data has ≥2 rows (chart needs ≥2 to be
+  // meaningful). On weekend with etf=null we silently skip.
   let imageSent = false;
   let imageError: string | undefined;
-  try {
-    const svg = buildBtcEtfSparklineSvg(etf.flows);
-    const png = opts.svgToPngImpl ? await opts.svgToPngImpl(svg) : await svgToPng(svg);
-    if (png) {
-      const photoRes = await sendTelegramPhoto(
-        opts.telegramToken,
-        opts.chatId,
-        png,
-        undefined,
-        fetchImpl,
-      );
-      imageSent = photoRes.ok;
-      if (!photoRes.ok) imageError = photoRes.error;
-    } else {
-      imageError = "svg-to-png returned null";
+  if (etf && etf.flows.length >= 2) {
+    try {
+      const svg = buildBtcEtfSparklineSvg(etf.flows);
+      const png = opts.svgToPngImpl ? await opts.svgToPngImpl(svg) : await svgToPng(svg);
+      if (png) {
+        const photoRes = await sendTelegramPhoto(
+          opts.telegramToken,
+          opts.chatId,
+          png,
+          undefined,
+          fetchImpl,
+        );
+        imageSent = photoRes.ok;
+        if (!photoRes.ok) imageError = photoRes.error;
+      } else {
+        imageError = "svg-to-png returned null";
+      }
+    } catch (err) {
+      imageError = (err as Error).message.slice(0, 200);
     }
-  } catch (err) {
-    imageError = (err as Error).message.slice(0, 200);
+  } else if (mode === "weekend") {
+    imageError = "weekend: no chart";
   }
 
-  return { sent: true, text, imageSent, imageError };
+  return { sent: true, text, mode, imageSent, imageError };
 }
