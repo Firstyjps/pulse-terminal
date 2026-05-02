@@ -41,6 +41,45 @@
 
 ## 📰 Activity log (newest at top)
 
+### 2026-05-02 · Code session — readability refactor (no functional change)
+**Two organizational refactors. No public API change. typecheck + sources tests + MCP probe all clean.**
+
+  **🛠 Refactor 1 — `apps/mcp/src/` split**
+  - `apps/mcp/src/index.ts` shrunk from **663 → 47 lines**. Bootstraps server + delegates registration.
+  - **NEW** `apps/mcp/src/_helpers.ts` — `hubFetch`, `json`, `text`, `RegisterFn` type.
+  - **NEW** `apps/mcp/src/tools/` — 6 register modules grouped by domain:
+    - `fundflow.ts` (7 tools: market_overview, stablecoin_flows, etf_flows, futures, dex_leaderboard, tvl_breakdown, fundflow_snapshot)
+    - `derivatives.ts` (2: funding_summary, oi_snapshot)
+    - `options.ts` (3: options_chain, iv_smile, options_arbitrage)
+    - `dual-assets.ts` (3: dual_assets_apr, best_dual_assets_hour, dual_assets_daily_summary)
+    - `intelligence.ts` (2: detect_anomalies, grade_signal)
+    - `markets.ts` (2: order_book, whale_flow)
+  - Probe-mcp confirms 19/19 tools register intact.
+  - **Note:** `dist/index.mjs` (esbuild bundle used by `pack-dxt`) is now stale. Re-bundle when next packing the .dxt.
+
+  **🛠 Refactor 2 — `packages/sources/src/` subdirs**
+  - **NEW** `packages/sources/src/positions/` — moved 4 DeFi position adapters + shared types via `git mv` (history preserved):
+    - `aave-positions.ts` → `positions/aave.ts` (+ test)
+    - `meteora-positions.ts` → `positions/meteora.ts` (+ test)
+    - `orca-positions.ts` → `positions/orca.ts` (+ test)
+    - `pendle-positions.ts` → `positions/pendle.ts` (+ test)
+    - `position-types.ts` → `positions/types.ts`
+  - **NEW** `packages/sources/src/portfolio/` — moved 5 portfolio adapters:
+    - `portfolio.ts` → `portfolio/binance.ts` (+ test)
+    - `portfolio-bybit.ts` → `portfolio/bybit.ts` (+ test)
+    - `portfolio-okx.ts` → `portfolio/okx.ts` (+ test)
+    - `portfolio-multi.ts` → `portfolio/multi.ts` (+ test)
+    - `portfolio-aggregate.ts` → `portfolio/aggregate.ts` (+ test)
+  - `server.ts` + `index.ts` re-exports updated to new paths. **External `@pulse/sources/server` surface unchanged** — exports map only exposes `.` and `./server`, so no consumer changes were needed.
+  - 28/28 sources test files green (14 pre-existing failures in `dual-assets/store.test.ts` + `depth.test.ts` are unrelated — better-sqlite3 native binding not loading on Node 24.14.1 + Win11; reproduces on master).
+
+- **[verified]** `pnpm typecheck` — all 7 workspaces clean
+- **[verified]** `pnpm --filter @pulse/sources test` — 345/359 pass (same baseline as before refactor)
+- **[verified]** `node scripts/probe-mcp.mjs` — 19 tools list intact
+- **[doing]** nothing — handing back
+- **[blocked]** None
+- **[next]** No follow-up needed. Future MCP tool additions go in the matching `apps/mcp/src/tools/<group>.ts`. Future portfolio/position adapters go in the matching subdir.
+
 ### 2026-05-01 · Code session (latest — Phase 6 Extended Platform)
 **4 features shipped: snapshot history · webhook test UI · popup chart · Tauri desktop wrapper config.**
 

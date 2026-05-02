@@ -5,7 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Pulse Terminal — Crypto Macro Intelligence Terminal. Monorepo (pnpm + turbo) consolidating seven prior projects into one product. **MCP-first**: the web app is a visualization layer; AI analysis happens in Claude Desktop via the bundled MCP server.
 
 ## Read first
-- [AGENTS.md](./AGENTS.md) — work split into 8 roles, owned files, public contracts, status board
+- [STATUS.md](./STATUS.md) — live coordination board for the 3 parallel Claude sessions; check before starting work and update on completion / change of direction
+- [SESSIONS.md](./SESSIONS.md) — 3-session protocol (who's who, behavior rules)
+- [AGENTS.md](./AGENTS.md) — work split into 8 roles, owned files, public contracts
 - [README.md](./README.md) — public overview, tabs, MCP setup
 - When a session starts, **announce your role** (e.g. "Taking Role 2 — UI Agent") and only modify files inside that role's owned directories. If you need a contract from another role that doesn't exist, **stub it on the consumer side** and add a `// TODO(role-X): ...` comment.
 
