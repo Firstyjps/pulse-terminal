@@ -31,7 +31,12 @@ import {
   sendTelegram,
   sendTelegramPhoto,
 } from "./telegram.js";
-import { buildBtcEtfSparklineSvg, svgToPng } from "./chart.js";
+import {
+  buildBtcPriceChartSvg,
+  fetchBtcKlines7d,
+  svgToPng,
+  type KlineRow,
+} from "./chart.js";
 
 const DEFAULT_DASHBOARD = "http://localhost:3000/morning";
 
@@ -47,6 +52,7 @@ export interface RunMorningBriefOpts {
   fetchImpl?: typeof fetch;
   fetchEtf?: () => Promise<ETFFlowResponse>;
   fetchFunding?: () => Promise<FundingCluster | null>;
+  fetchKlines?: () => Promise<KlineRow[] | null>;
   loadCatalysts?: () => string[];
   llmComplete?: LlmComplete;
   /** Override SVG→PNG conversion. Useful for tests + when resvg unavailable. */
@@ -128,11 +134,13 @@ export async function runMorningBrief(
   const fetchImpl = opts.fetchImpl ?? fetch;
   const mode: "weekday" | "weekend" = isBkkWeekend(opts.now) ? "weekend" : "weekday";
 
-  // Parallel fan-out: ETF (required weekday, best-effort weekend), regime + funding best-effort.
-  const [etfR, regimeR, fundingR] = await Promise.allSettled([
+  // Parallel fan-out: ETF (required weekday, best-effort weekend), regime
+  // + funding best-effort, klines best-effort (BTC 7d price chart for image).
+  const [etfR, regimeR, fundingR, klinesR] = await Promise.allSettled([
     opts.fetchEtf ? opts.fetchEtf() : getETFFlows(),
     fetchRegime(opts.hubBase, fetchImpl),
     opts.fetchFunding ? opts.fetchFunding() : defaultFundingCluster(),
+    opts.fetchKlines ? opts.fetchKlines() : fetchBtcKlines7d(fetchImpl),
   ]);
 
   let etf: ETFFlowResponse | null = null;
@@ -166,6 +174,7 @@ export async function runMorningBrief(
 
   const regime = regimeR.status === "fulfilled" ? regimeR.value : null;
   const funding = fundingR.status === "fulfilled" ? fundingR.value : null;
+  const klines = klinesR.status === "fulfilled" ? klinesR.value : null;
 
   const catalysts = opts.loadCatalysts
     ? opts.loadCatalysts()
@@ -200,13 +209,13 @@ export async function runMorningBrief(
     return { sent: false, reason: "send_failed", error: msgRes.error, text, mode };
   }
 
-  // Best-effort image — only when ETF data has ≥2 rows (chart needs ≥2 to be
-  // meaningful). On weekend with etf=null we silently skip.
+  // Best-effort image — BTC/USD 7d price chart from spot klines. Renders
+  // 7 days/week (BTC trades 24/7). Weekend no longer suppresses the image.
   let imageSent = false;
   let imageError: string | undefined;
-  if (etf && etf.flows.length >= 2) {
+  if (klines && klines.length >= 2) {
     try {
-      const svg = buildBtcEtfSparklineSvg(etf.flows);
+      const svg = buildBtcPriceChartSvg(klines);
       const png = opts.svgToPngImpl ? await opts.svgToPngImpl(svg) : await svgToPng(svg);
       if (png) {
         const photoRes = await sendTelegramPhoto(
@@ -224,8 +233,8 @@ export async function runMorningBrief(
     } catch (err) {
       imageError = (err as Error).message.slice(0, 200);
     }
-  } else if (mode === "weekend") {
-    imageError = "weekend: no chart";
+  } else {
+    imageError = "no klines";
   }
 
   return { sent: true, text, mode, imageSent, imageError };

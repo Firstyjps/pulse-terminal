@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ETFFlow } from "@pulse/sources";
-import { buildBtcEtfSparklineSvg, svgToPng } from "./chart.js";
+import {
+  buildBtcEtfSparklineSvg,
+  buildBtcPriceChartSvg,
+  fetchBtcKlines7d,
+  svgToPng,
+  type KlineRow,
+} from "./chart.js";
 
 function makeFlows(n: number, slope = 1_000_000_000): ETFFlow[] {
   const out: ETFFlow[] = [];
@@ -110,5 +116,189 @@ describe("svgToPng", () => {
     };
     const out = await svgToPng("<svg/>", fakeResvg);
     expect(out).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// BTC price chart
+// ──────────────────────────────────────────────────────────────────────────
+
+function makeKlines(
+  n: number,
+  opts: { startPrice?: number; slope?: number; startTs?: number } = {},
+): KlineRow[] {
+  const startPrice = opts.startPrice ?? 60_000;
+  const slope = opts.slope ?? 100;
+  const startTs = opts.startTs ?? Date.UTC(2026, 4, 1); // 2026-05-01
+  const out: KlineRow[] = [];
+  for (let i = 0; i < n; i++) {
+    const close = startPrice + i * slope;
+    out.push({
+      ts: startTs + i * 3_600_000,
+      open: close - 5,
+      high: close + 10,
+      low: close - 10,
+      close,
+      volume: 100 + (i % 20),
+    });
+  }
+  return out;
+}
+
+describe("buildBtcPriceChartSvg", () => {
+  it("returns a complete <svg> with dark bg + 1280x320 dims", () => {
+    const svg = buildBtcPriceChartSvg(makeKlines(168));
+    expect(svg).toMatch(/^<svg[^>]+xmlns/);
+    expect(svg).toContain('width="1280"');
+    expect(svg).toContain('height="320"');
+    expect(svg).toContain('fill="#0b0d12"');
+    expect(svg.trim().endsWith("</svg>")).toBe(true);
+  });
+
+  it("uses green stroke when 7d change is positive", () => {
+    const svg = buildBtcPriceChartSvg(makeKlines(168, { slope: 100 }));
+    expect(svg).toContain('stroke="#22c55e"');
+    expect(svg).not.toContain('stroke="#ef4444"');
+  });
+
+  it("uses red stroke when 7d change is negative", () => {
+    const svg = buildBtcPriceChartSvg(makeKlines(168, { slope: -100 }));
+    expect(svg).toContain('stroke="#ef4444"');
+    expect(svg).not.toContain('stroke="#22c55e"');
+  });
+
+  it("renders title + last price + signed pct", () => {
+    const svg = buildBtcPriceChartSvg(makeKlines(168));
+    expect(svg).toContain("BTC/USD · 7D");
+    expect(svg).toMatch(/\$[\d,]+/);
+    expect(svg).toMatch(/[+\-]\d+\.\d{2}%/);
+  });
+
+  it("renders 'No price data' when input is empty or has < 2 rows", () => {
+    expect(buildBtcPriceChartSvg([])).toContain("No price data");
+    expect(buildBtcPriceChartSvg(makeKlines(1))).toContain("No price data");
+  });
+
+  it("flat-line input still renders without div-by-zero", () => {
+    const flat = makeKlines(168, { slope: 0 });
+    const svg = buildBtcPriceChartSvg(flat);
+    expect(svg).not.toContain("NaN");
+    expect(svg).not.toContain("Infinity");
+    // 0% change → still treated as ≥ 0, so green
+    expect(svg).toContain('stroke="#22c55e"');
+  });
+
+  it("emits line path with M + 167 L commands for 168 rows", () => {
+    const svg = buildBtcPriceChartSvg(makeKlines(168));
+    // The line path is the one with stroke (no fill); area is fill, no stroke.
+    const lineMatch = svg.match(/d="(M[^"]+)"\s+fill="none"/);
+    expect(lineMatch).toBeTruthy();
+    const stroke = lineMatch![1];
+    const lCount = (stroke.match(/L/g) ?? []).length;
+    expect(lCount).toBe(167);
+  });
+
+  it("output is deterministic for fixed input (snapshot-friendly)", () => {
+    const a = buildBtcPriceChartSvg(makeKlines(50, { startPrice: 60_000, slope: 50 }));
+    const b = buildBtcPriceChartSvg(makeKlines(50, { startPrice: 60_000, slope: 50 }));
+    expect(a).toBe(b);
+  });
+
+  it("filters out NaN/Infinity rows defensively", () => {
+    const rows = makeKlines(5);
+    rows[2].close = NaN;
+    rows[3].close = Infinity;
+    const svg = buildBtcPriceChartSvg(rows);
+    // 3 valid rows survive (0, 1, 4) → enough to draw a line, no crash
+    expect(svg).not.toContain("NaN");
+    expect(svg).not.toContain("Infinity");
+    expect(svg).toMatch(/^<svg/);
+  });
+});
+
+describe("fetchBtcKlines7d", () => {
+  function fakeKline(i: number, startTs = Date.UTC(2026, 4, 1)) {
+    return [
+      startTs + i * 3_600_000,
+      "60000",
+      "60100",
+      "59900",
+      "60050",
+      "100",
+      0,
+      "0",
+      0,
+      "0",
+      "0",
+      "0",
+    ];
+  }
+
+  it("returns parsed rows on a 200 response", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => Array.from({ length: 168 }, (_, i) => fakeKline(i)),
+    } as unknown as Response));
+    const rows = await fetchBtcKlines7d(fetchImpl as unknown as typeof fetch);
+    expect(rows).not.toBeNull();
+    expect(rows!.length).toBe(168);
+    expect(rows![0].close).toBe(60050);
+    expect(fetchImpl).toHaveBeenCalledTimes(1); // succeeded on first host
+  });
+
+  it("returns null when all 4 hosts return non-2xx", async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 418 } as Response));
+    const rows = await fetchBtcKlines7d(fetchImpl as unknown as typeof fetch);
+    expect(rows).toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
+  it("returns null when response has < 2 rows", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [fakeKline(0)],
+    } as unknown as Response));
+    const rows = await fetchBtcKlines7d(fetchImpl as unknown as typeof fetch);
+    expect(rows).toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(4); // exhausts all hosts
+  });
+
+  it("falls through to next host on JSON parse failure", async () => {
+    let call = 0;
+    const fetchImpl = vi.fn(async () => {
+      call++;
+      if (call === 1) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => {
+            throw new Error("bad json");
+          },
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () =>
+          Array.from({ length: 2 }, (_, i) => fakeKline(i)),
+      } as unknown as Response;
+    });
+    const rows = await fetchBtcKlines7d(fetchImpl as unknown as typeof fetch);
+    expect(rows).not.toBeNull();
+    expect(rows!.length).toBe(2);
+    expect(call).toBe(2);
+  });
+
+  it("returns null when response shape is non-array", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ msg: "rate limited" }),
+    } as unknown as Response));
+    const rows = await fetchBtcKlines7d(fetchImpl as unknown as typeof fetch);
+    expect(rows).toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 });

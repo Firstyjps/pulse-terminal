@@ -5,6 +5,24 @@ import {
   clearActionCandidatesCache,
   type FundingCluster,
 } from "./action-candidates.js";
+import type { KlineRow } from "./chart.js";
+
+function makeKlines(n: number, slope = 100, startPrice = 60_000): KlineRow[] {
+  const startTs = Date.UTC(2026, 4, 1);
+  const rows: KlineRow[] = [];
+  for (let i = 0; i < n; i++) {
+    const close = startPrice + i * slope;
+    rows.push({
+      ts: startTs + i * 3_600_000,
+      open: close - 5,
+      high: close + 10,
+      low: close - 10,
+      close,
+      volume: 100,
+    });
+  }
+  return rows;
+}
 
 const MON = new Date("2026-05-04T02:00:00.000Z").getTime();
 const SAT = new Date("2026-05-09T02:00:00.000Z").getTime();
@@ -74,6 +92,7 @@ describe("runMorningBrief — weekday skip rules", () => {
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => ({ ...fakeEtf, _isProxy: true }),
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       fetchImpl: vi.fn().mockResolvedValue(jsonResponse(fakeRegime)),
     });
@@ -87,6 +106,7 @@ describe("runMorningBrief — weekday skip rules", () => {
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => ({ ...fakeEtf, flows: [] }),
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       fetchImpl: vi.fn(),
     });
@@ -100,6 +120,7 @@ describe("runMorningBrief — weekday skip rules", () => {
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => { throw new Error("upstream down"); },
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       fetchImpl: vi.fn(),
     });
@@ -126,6 +147,7 @@ describe("runMorningBrief — weekend mode", () => {
       now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => fakeEtf,
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       llmComplete: async () => "• weekend idea\nRisk: thin liquidity",
       svgToPngImpl: async () => null,
@@ -144,6 +166,7 @@ describe("runMorningBrief — weekend mode", () => {
       now: SUN, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => fakeEtf,
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       llmComplete: async () => "• weekend idea\nRisk: x",
       svgToPngImpl: async () => null,
@@ -160,6 +183,7 @@ describe("runMorningBrief — weekend mode", () => {
       now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => { throw new Error("upstream down"); },
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       llmComplete: async () => "• idea\nRisk: x",
       svgToPngImpl: async () => null,
@@ -176,6 +200,7 @@ describe("runMorningBrief — weekend mode", () => {
       now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => ({ ...fakeEtf, flows: [] }),
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       llmComplete: async () => "• idea\nRisk: x",
       svgToPngImpl: async () => null,
@@ -192,6 +217,7 @@ describe("runMorningBrief — weekend mode", () => {
       now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => ({ ...fakeEtf, _isProxy: true }),
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       llmComplete: async () => "• idea\nRisk: x",
       svgToPngImpl: async () => null,
@@ -203,21 +229,22 @@ describe("runMorningBrief — weekend mode", () => {
     expect(r.text).not.toContain("Last reported"); // proxy treated as no-data
   });
 
-  it("weekend brief skips chart attempt entirely when etf is null", async () => {
-    const svgSpy = vi.fn(async () => new Uint8Array([1]));
+  it("weekend brief sends image when klines are available (chart works 24/7 now)", async () => {
+    const svgSpy = vi.fn(async () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
     const r = await runMorningBrief({
       now: SAT, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => { throw new Error("upstream down"); },
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => makeKlines(168),
       loadCatalysts: () => [],
       llmComplete: async () => "• idea\nRisk: x",
       svgToPngImpl: svgSpy,
       fetchImpl: makeFetchImpl(),
     });
     expect(r.sent).toBe(true);
-    expect(r.imageSent).toBe(false);
-    expect(r.imageError).toBe("weekend: no chart");
-    expect(svgSpy).not.toHaveBeenCalled();
+    expect(r.mode).toBe("weekend");
+    expect(r.imageSent).toBe(true);
+    expect(svgSpy).toHaveBeenCalledOnce();
   });
 });
 
@@ -252,6 +279,7 @@ describe("runMorningBrief — success path", () => {
       dashboardUrl: "https://example.test/morning",
       fetchEtf: async () => fakeEtf,
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => makeKlines(168),
       loadCatalysts: () => ["19:30 BKK — US CPI"],
       llmComplete: async () => "• cached LLM idea\nRisk: test",
       svgToPngImpl: async () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
@@ -278,6 +306,7 @@ describe("runMorningBrief — success path", () => {
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => fakeEtf,
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => makeKlines(168),
       loadCatalysts: () => [],
       llmComplete: async () => "• idea\nRisk: x",
       svgToPngImpl: async () => null, // simulate resvg failure
@@ -302,6 +331,7 @@ describe("runMorningBrief — success path", () => {
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => fakeEtf,
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       llmComplete: async () => "• idea\nRisk: x",
       svgToPngImpl: async () => new Uint8Array([1]),
@@ -331,10 +361,93 @@ describe("runMorningBrief — success path", () => {
       now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
       fetchEtf: async () => fakeEtf,
       fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
       loadCatalysts: () => [],
       llmComplete: async () => "• ok\nRisk: x",
       svgToPngImpl: async () => null,
       fetchImpl,
     });
+  });
+
+  it("brief sends image on weekday with valid klines (imageSent:true)", async () => {
+    const photoSpy = vi.fn(async () => ({ ok: true, result: { message_id: 99 } }));
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
+      if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      if (url.includes("/sendPhoto")) return Promise.resolve(jsonResponse(photoSpy()));
+      return Promise.resolve(jsonResponse({ ok: true, result: {} }));
+    });
+
+    const svgPngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const svgSpy = vi.fn(async (_svg: string) => svgPngBytes);
+
+    const r = await runMorningBrief({
+      now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => fakeEtf,
+      fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => makeKlines(168, 100, 60_000),
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: svgSpy,
+      fetchImpl,
+    });
+
+    expect(r.sent).toBe(true);
+    expect(r.imageSent).toBe(true);
+    expect(svgSpy).toHaveBeenCalledOnce();
+    // The SVG passed to svgToPng is the new BTC price chart
+    const svgArg = svgSpy.mock.calls[0][0];
+    expect(svgArg).toContain("BTC/USD · 7D");
+    expect(svgArg).toContain('width="1280"');
+  });
+
+  it("brief skips image when fetchKlines returns null (imageError:'no klines')", async () => {
+    const svgSpy = vi.fn(async () => new Uint8Array([1]));
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
+      if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      return Promise.resolve(jsonResponse({ ok: true, result: {} }));
+    });
+
+    const r = await runMorningBrief({
+      now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => fakeEtf,
+      fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: svgSpy,
+      fetchImpl,
+    });
+
+    expect(r.sent).toBe(true);
+    expect(r.imageSent).toBe(false);
+    expect(r.imageError).toBe("no klines");
+    expect(svgSpy).not.toHaveBeenCalled();
+  });
+
+  it("brief skips image when fetchKlines returns < 2 rows", async () => {
+    const svgSpy = vi.fn(async () => new Uint8Array([1]));
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
+      if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      return Promise.resolve(jsonResponse({ ok: true, result: {} }));
+    });
+
+    const r = await runMorningBrief({
+      now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => fakeEtf,
+      fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => makeKlines(1),
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: svgSpy,
+      fetchImpl,
+    });
+
+    expect(r.sent).toBe(true);
+    expect(r.imageSent).toBe(false);
+    expect(r.imageError).toBe("no klines");
+    expect(svgSpy).not.toHaveBeenCalled();
   });
 });

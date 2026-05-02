@@ -232,13 +232,24 @@ it to a real action in v3 by:
 
 ### Image chart
 
-`chart.ts` builds a deterministic SVG (snapshottable in tests) and converts
-to PNG via `@resvg/resvg-js` (small native dep, no headless browser). 600×300,
-dark theme matching CLAUDE.md design tokens.
+`chart.ts:buildBtcPriceChartSvg` builds a deterministic SVG (snapshottable in
+tests) for the BTC/USD price over the last 7 days (1h candles, 168 closes
+fetched from Binance spot). Converted to PNG via `@resvg/resvg-js` (small
+native dep, no headless browser). 1280×320, dark theme. Stroke + filled
+gradient area are tinted **green** when the 7d change is ≥0 and **red**
+when negative; the last close + signed pct are rendered top-right.
+
+The chart renders **7 days/week** (BTC trades 24/7); the previous "weekend:
+no chart" suppression is gone. Klines fetch is best-effort: 4 Binance hosts
+tried in order with a 5s per-host timeout; on full failure the brief text
+still sends with `imageSent: false` and `imageError: "no klines"`.
 
 If resvg fails to load (native binding issue, missing prebuilt for your
 arch), the message still sends — `sent: true` with `imageSent: false` and
 `imageError` populated for diagnostics.
+
+The legacy `buildBtcEtfSparklineSvg` ETF cumulative-flow chart is kept in
+`chart.ts` (marked `@deprecated`) for one-line revert if needed.
 
 ## catalysts.json maintenance
 
