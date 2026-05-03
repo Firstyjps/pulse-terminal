@@ -71,18 +71,18 @@ export function AssetInspector({ activeId }: Props) {
   // section keeps its own space and the panel grows to fit them all.
   if (isMobile) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", padding: "12px 14px", gap: 14, fontFamily: fonts.mono }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: "14px 16px", gap: 16, fontFamily: fonts.mono }}>
         {/* Header */}
         <div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ color: colors.amber, fontSize: 16, fontWeight: 700 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 32 }}>
+            <span style={{ color: colors.amber, fontSize: 17, fontWeight: 700 }}>
               {coin.symbol.toUpperCase()}
             </span>
             <span style={{ color: colors.txt3, fontSize: 12 }}>{coin.name}</span>
             <span
               style={{
                 color: colors.txt4,
-                fontSize: 10,
+                fontSize: 11,
                 marginLeft: "auto",
                 letterSpacing: "0.08em",
               }}
@@ -90,10 +90,10 @@ export function AssetInspector({ activeId }: Props) {
               RANK #{coin.market_cap_rank ?? "—"}
             </span>
           </div>
-          <div style={{ marginTop: 6, display: "flex", alignItems: "baseline", gap: 10 }}>
+          <div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 10 }}>
             <span
               className="mono-num"
-              style={{ fontSize: 26, color: colors.txt1, letterSpacing: "-0.01em", fontWeight: 500 }}
+              style={{ fontSize: 28, color: colors.txt1, letterSpacing: "-0.01em", fontWeight: 500 }}
             >
               {formatUSD(coin.current_price, { compact: false, decimals: coin.current_price < 1 ? 4 : 2 })}
             </span>

@@ -15,9 +15,9 @@ interface Props {
 /**
  * MarketPulseStats — 6 stat tiles.
  *
- *   Desktop  (≥1024)  : 6×1  one row per handoff Row 1 (h-stats, 96px)
- *   Tablet   (720..1024): 3×2 two stacked rows
- *   Mobile   (<720)   : 2×3 three stacked rows, ≥44px tap-tall
+ *   Desktop  (≥1024)   : 6×1 one row per handoff Row 1 (h-stats, 96px)
+ *   Tablet   (768..1023): 3×2 two stacked rows
+ *   Mobile   (<768)    : 6×1 single column, comfortable tap-tall (Phase 2 rescale)
  *
  * 1px gaps between tiles via grid + line-color background showing through.
  */
@@ -53,16 +53,18 @@ export function MetricStrip({ refreshKey }: Props) {
     vp === "tablet" ? "repeat(3, 1fr)" :
     "repeat(6, 1fr)";
 
+  const mobile = vp === "mobile";
+
   return (
     <div
       style={{
         display: "grid",
         gridTemplateColumns: cols,
-        gridAutoRows: vp === "mobile" ? "minmax(72px, auto)" : undefined,
+        gridAutoRows: mobile ? "minmax(72px, auto)" : undefined,
         gap: 1,
         background: colors.line,
-        height: vp === "mobile" ? "auto" : "100%",
-        minHeight: vp === "mobile" ? "auto" : vp === "tablet" ? 192 : "100%",
+        height: mobile ? "auto" : "100%",
+        minHeight: mobile ? "auto" : vp === "tablet" ? 192 : "100%",
       }}
     >
       <StatBlock
@@ -71,11 +73,13 @@ export function MetricStrip({ refreshKey }: Props) {
         delta={chgText}
         deltaColor={chgColor}
         sub="24h Δ"
+        mobile={mobile}
       />
       <StatBlock
         label="Volume · 24h"
         value={vol}
         sub={turn}
+        mobile={mobile}
       />
       <StatBlock
         label="BTC Dominance"
@@ -83,11 +87,13 @@ export function MetricStrip({ refreshKey }: Props) {
         delta={`ETH ${ethD}`}
         deltaColor={colors.cyan}
         sub="vs total mcap"
+        mobile={mobile}
       />
       <StatBlock
         label="Active Assets"
         value={active}
         sub="tracked across feeds"
+        mobile={mobile}
       />
       <StatBlock
         label="Fear & Greed"
@@ -95,6 +101,7 @@ export function MetricStrip({ refreshKey }: Props) {
         delta={fgClassName}
         deltaColor={fgColor}
         sub="alternative.me · 24h"
+        mobile={mobile}
       />
       <SessionStrip />
     </div>

@@ -16,7 +16,7 @@ const SHELL_BYPASS_ROUTES = ["/chart-popup"];
 /**
  * AppShell — Bloomberg/CryptoPulse responsive terminal grid.
  *
- *   Desktop (≥ 720px) — 4-row layout per handoff
+ *   Desktop (≥ 768px) — 4-row layout per handoff
  *   ┌──────────────────────────────────────────────────────┐
  *   │ TerminalStatusBar                              22px  │
  *   │ TerminalTicker                                 26px  │
@@ -24,7 +24,7 @@ const SHELL_BYPASS_ROUTES = ["/chart-popup"];
  *   │ TerminalBotBar                                 22px  │
  *   └──────────────────────────────────────────────────────┘
  *
- *   Mobile (< 720px) — collapsed shell, bottom-tab nav
+ *   Mobile (< 768px) — collapsed shell, bottom-tab nav
  *   ┌──────────────────────────────────────────────────────┐
  *   │ TerminalStatusBar (compact)                    22px  │
  *   │ TerminalTicker                                 26px  │

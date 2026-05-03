@@ -200,6 +200,20 @@ export function FundingHeatmap() {
           <span style={{ color: colors.red }}>■ HOT LONG</span>
           <span style={{ color: colors.green }}>■ HOT SHORT</span>
         </span>
+        {isMobile && (
+          <span
+            style={{
+              flexBasis: "100%",
+              fontSize: 10,
+              color: colors.amber,
+              fontFamily: fonts.mono,
+              letterSpacing: "0.08em",
+              opacity: 0.85,
+            }}
+          >
+            ← swipe table sideways to see all venues →
+          </span>
+        )}
       </div>
 
       {/* Table */}

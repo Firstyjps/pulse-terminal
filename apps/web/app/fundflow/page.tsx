@@ -12,6 +12,7 @@ import type {
   FuturesResponse,
 } from "@pulse/sources";
 import { useFlow } from "../../lib/use-flow";
+import { useIsMobile } from "../../lib/use-media";
 import { MetricStrip } from "../../components/MetricStrip";
 import { MCPQuickAsk } from "../../components/MCPQuickAsk";
 
@@ -32,6 +33,7 @@ export default function FundflowPage() {
   const tvl = useFlow<TvlResponse>("/api/flows/tvl", refresh);
   const dex = useFlow<DexVolumeResponse>("/api/flows/dex", refresh);
   const futures = useFlow<FuturesResponse>("/api/flows/futures", refresh);
+  const isMobile = useIsMobile();
 
   const refreshBtn = (
     <button
@@ -40,12 +42,13 @@ export default function FundflowPage() {
         background: colors.bg1,
         border: `1px solid ${colors.line2}`,
         color: colors.amber,
-        padding: "2px 10px",
+        padding: isMobile ? "10px 16px" : "2px 10px",
         fontFamily: fonts.mono,
-        fontSize: 9,
+        fontSize: isMobile ? 13 : 9,
         letterSpacing: "0.08em",
         cursor: "pointer",
         textTransform: "uppercase",
+        minHeight: isMobile ? 44 : undefined,
       }}
     >
       ↻ REFRESH
@@ -176,14 +179,23 @@ export default function FundflowPage() {
               }
             >
               {f ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: colors.line, fontFamily: fonts.mono }}>
-                  <FuturesCell label="OI" value={formatUSD(f.openInterest)} />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+                    gap: 1,
+                    background: colors.line,
+                    fontFamily: fonts.mono,
+                  }}
+                >
+                  <FuturesCell label="OI" value={formatUSD(f.openInterest)} mobile={isMobile} />
                   <FuturesCell
                     label="Funding"
                     value={`${f.fundingRate.toFixed(4)}%`}
                     valueColor={f.fundingRate >= 0 ? colors.green : colors.red}
+                    mobile={isMobile}
                   />
-                  <FuturesCell label="L/S" value={f.longShortRatio.toFixed(2)} />
+                  <FuturesCell label="L/S" value={f.longShortRatio.toFixed(2)} mobile={isMobile} />
                 </div>
               ) : (
                 <p style={{ color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>Loading…</p>
@@ -226,23 +238,27 @@ export default function FundflowPage() {
                 key={c.name}
                 style={{
                   flex: 1,
-                  minHeight: 0,
+                  minHeight: isMobile ? 44 : 0,
                   display: "grid",
                   gridTemplateColumns: "1fr auto auto",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "0 4px",
-                  fontSize: 11,
+                  gap: isMobile ? 10 : 12,
+                  padding: isMobile ? "8px 6px" : "0 4px",
+                  fontSize: isMobile ? 13 : 11,
                   borderBottom:
                     idx === arr.length - 1 ? "none" : `1px dashed ${colors.line}`,
                 }}
               >
                 <span style={{ color: colors.amber, fontWeight: 600 }}>{c.name}</span>
                 <span style={{ color: colors.txt3 }}>{formatUSD(c.tvl, { compact: true, decimals: 1 })}</span>
+                {/* Drop the fixed `width:56` on mobile so the % column can
+                    auto-size and never get pushed off the right edge of the
+                    panel by a long TVL value. */}
                 <span
                   style={{
                     color: c.change7d >= 0 ? colors.green : colors.red,
-                    width: 56,
+                    width: isMobile ? "auto" : 56,
+                    minWidth: isMobile ? 60 : undefined,
                     textAlign: "right",
                   }}
                 >
@@ -278,7 +294,49 @@ export default function FundflowPage() {
   );
 }
 
-function FuturesCell({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+function FuturesCell({
+  label,
+  value,
+  valueColor,
+  mobile,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+  mobile?: boolean;
+}) {
+  // Mobile lays the 3 cells in a 1-col stack and uses `space-between` so the
+  // label sits left and the value right — same data, no horizontal overflow
+  // when "$118,234M" doesn't fit a 1/3 width of a 358px panel.
+  if (mobile) {
+    return (
+      <div
+        style={{
+          background: colors.bg1,
+          padding: "10px 14px",
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: colors.txt3 }}>
+          {label}
+        </div>
+        <div
+          className="mono-num"
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            color: valueColor ?? colors.txt1,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {value}
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ background: colors.bg1, padding: "8px 10px" }}>
       <div

@@ -15,6 +15,7 @@ import type {
 } from "@pulse/sources";
 import { MCPQuickAsk } from "../../components/MCPQuickAsk";
 import { useFlow } from "../../lib/use-flow";
+import { useIsMobile } from "../../lib/use-media";
 import {
   Bar,
   BarChart,
@@ -66,6 +67,7 @@ export default function OptionsPage() {
   const [asset, setAsset] = useState<OptionAsset>("BTC");
   const [expiry, setExpiry] = useState<string | null>(null);
   const [selected, setSelected] = useState<Selected | null>(null);
+  const isMobile = useIsMobile();
 
   const aggregate = useFlow<AggregateWithArb>(`/api/options/aggregate?asset=${asset}&arbitrage=1`);
   const ivSmile = useFlow<IVSmileResp>(
@@ -156,11 +158,20 @@ export default function OptionsPage() {
           }
           flush
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, background: colors.line, height: "100%" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+              gap: 1,
+              background: colors.line,
+              height: isMobile ? "auto" : "100%",
+            }}
+          >
             <StatBlock
               label={`${asset} Spot`}
               value={spot ? formatUSD(spot, { compact: false, decimals: 0 }) : "—"}
               sub={aggregate.data ? `${aggregate.data.errors.length === 0 ? "all venues live" : `${aggregate.data.errors.length} venue err`}` : undefined}
+              mobile={isMobile}
             />
             <StatBlock
               label="ATM IV (call)"
@@ -168,6 +179,7 @@ export default function OptionsPage() {
               delta={stats.atmIvPut != null ? `PUT ${stats.atmIvPut.toFixed(1)}%` : ""}
               deltaColor={colors.cyan}
               sub="closest strike to spot"
+              mobile={isMobile}
             />
             <StatBlock
               label="Put/Call Ratio"
@@ -175,6 +187,7 @@ export default function OptionsPage() {
               delta={stats.putCallRatio != null ? (stats.putCallRatio > 1 ? "BEARISH" : "BULLISH") : ""}
               deltaColor={stats.putCallRatio != null && stats.putCallRatio > 1 ? colors.red : colors.green}
               sub="OI weighted"
+              mobile={isMobile}
             />
             <StatBlock
               label="Total OI · Volume"
@@ -182,12 +195,13 @@ export default function OptionsPage() {
               delta={stats.totalVol ? formatUSD(stats.totalVol, { compact: true, decimals: 1 }) : ""}
               deltaColor={colors.amber}
               sub="across all expiries"
+              mobile={isMobile}
             />
           </div>
         </Panel>
       </WsRow>
 
-      <WsRow height="auto" style={{ minHeight: 460 }}>
+      <WsRow height="auto" style={{ minHeight: isMobile ? 0 : 460 }}>
         <Panel
           span={7}
           title="STRIKE LADDER"
@@ -199,6 +213,7 @@ export default function OptionsPage() {
             rows={ladderRows}
             spot={spot}
             selected={selected}
+            isMobile={isMobile}
             onPick={(strike, side) =>
               setSelected((cur) =>
                 cur && cur.strike === strike && cur.side === side ? null : { strike, side },
@@ -218,7 +233,7 @@ export default function OptionsPage() {
               splitSides
               selectedStrike={selected?.strike}
               selectedSide={selected?.side}
-              height={380}
+              height={isMobile ? 200 : 380}
             />
           ) : (
             <p style={{ color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
@@ -228,7 +243,7 @@ export default function OptionsPage() {
         </Panel>
       </WsRow>
 
-      <WsRow height="auto" style={{ minHeight: 320 }}>
+      <WsRow height="auto" style={{ minHeight: isMobile ? 0 : 320 }}>
         <Panel
           span={7}
           title="IV TERM STRUCTURE"
@@ -238,7 +253,7 @@ export default function OptionsPage() {
               : "LOADING"
           }
         >
-          <TermStructureChart data={term.data} />
+          <TermStructureChart data={term.data} isMobile={isMobile} />
         </Panel>
         <Panel
           span={5}
@@ -249,22 +264,24 @@ export default function OptionsPage() {
               : "LOADING"
           }
         >
-          <OIByExpiryChart data={term.data} />
+          <OIByExpiryChart data={term.data} isMobile={isMobile} />
         </Panel>
       </WsRow>
 
-      <WsRow height="auto" style={{ minHeight: 360 }}>
+      <WsRow height="auto" style={{ minHeight: isMobile ? 0 : 360 }}>
         <Panel
           span={8}
           title="GREEKS HEATMAP"
           badge={greeksRows.length > 0 ? `${greeksRows.length} ROWS` : "LOADING"}
           flush
         >
-          <div style={{ height: "100%", overflow: "auto", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ height: isMobile ? "auto" : "100%", overflow: "auto", WebkitOverflowScrolling: "touch" }}>
             {greeksRows.length === 0 ? (
               <p style={{ padding: 16, color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
                 {aggregate.loading ? "Loading…" : "No Greeks data for this expiry"}
               </p>
+            ) : isMobile ? (
+              <GreeksMobileList rows={greeksRows} spot={spot} />
             ) : (
               <GreeksHeatmap data={greeksRows} spot={spot} side="both" rowHeight={22} />
             )}
@@ -286,6 +303,7 @@ export default function OptionsPage() {
               row={ladderRows.find((r) => r.strike === selected.strike) ?? null}
               spot={spot}
               expiry={expiry}
+              isMobile={isMobile}
               onClose={() => setSelected(null)}
             />
           ) : (
@@ -297,7 +315,7 @@ export default function OptionsPage() {
   );
 }
 
-function TermStructureChart({ data }: { data: OptionsTermStructure | null }) {
+function TermStructureChart({ data, isMobile }: { data: OptionsTermStructure | null; isMobile: boolean }) {
   if (!data || data.termStructure.length === 0) {
     return (
       <p style={{ padding: 16, color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
@@ -305,22 +323,23 @@ function TermStructureChart({ data }: { data: OptionsTermStructure | null }) {
       </p>
     );
   }
+  const tickFs = isMobile ? 12 : 10;
   return (
-    <div style={{ height: 280, padding: "8px 12px 12px" }}>
+    <div style={{ height: isMobile ? 220 : 280, padding: "8px 12px 12px" }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data.termStructure} margin={{ top: 6, right: 12, left: -8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="2 4" stroke={colors.line} vertical={false} />
           <XAxis
             dataKey="dte"
             tickFormatter={(v: number) => (v < 1 ? "<1d" : `${Math.round(v)}d`)}
-            tick={{ fill: colors.txt3, fontSize: 10, fontFamily: "JetBrains Mono" }}
+            tick={{ fill: colors.txt3, fontSize: tickFs, fontFamily: "JetBrains Mono" }}
             axisLine={{ stroke: colors.line }}
             tickLine={false}
             label={{ value: "DTE", position: "insideBottomRight", offset: -2, fill: colors.txt4, fontSize: 9 }}
           />
           <YAxis
             tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-            tick={{ fill: colors.txt3, fontSize: 10, fontFamily: "JetBrains Mono" }}
+            tick={{ fill: colors.txt3, fontSize: tickFs, fontFamily: "JetBrains Mono" }}
             axisLine={{ stroke: colors.line }}
             tickLine={false}
             domain={["auto", "auto"]}
@@ -384,7 +403,7 @@ function TermStructureChart({ data }: { data: OptionsTermStructure | null }) {
   );
 }
 
-function OIByExpiryChart({ data }: { data: OptionsTermStructure | null }) {
+function OIByExpiryChart({ data, isMobile }: { data: OptionsTermStructure | null; isMobile: boolean }) {
   if (!data || data.termStructure.length === 0) {
     return (
       <p style={{ padding: 16, color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
@@ -392,30 +411,34 @@ function OIByExpiryChart({ data }: { data: OptionsTermStructure | null }) {
       </p>
     );
   }
-  // Show only the next 12 expiries to avoid clutter on /SOL where there are 60+
-  const series = data.termStructure.slice(0, 12).map((p) => ({
-    expiry: p.expiry.length === 8 ? `${p.expiry.slice(4, 6)}/${p.expiry.slice(6, 8)}` : p.expiry,
-    callOI: p.callOI,
-    putOI: p.putOI,
-  }));
+  // Show next 12 expiries on desktop, next 6 on mobile to keep angled ticks
+  // legible. /SOL has 60+ expiries which would collide otherwise.
+  const series = data.termStructure
+    .slice(0, isMobile ? 6 : 12)
+    .map((p) => ({
+      expiry: p.expiry.length === 8 ? `${p.expiry.slice(4, 6)}/${p.expiry.slice(6, 8)}` : p.expiry,
+      callOI: p.callOI,
+      putOI: p.putOI,
+    }));
+  const tickFs = isMobile ? 11 : 9;
   return (
-    <div style={{ height: 280, padding: "8px 12px 12px" }}>
+    <div style={{ height: isMobile ? 220 : 280, padding: "8px 12px 12px" }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={series} margin={{ top: 6, right: 8, left: -12, bottom: 8 }}>
           <CartesianGrid strokeDasharray="2 4" stroke={colors.line} vertical={false} />
           <XAxis
             dataKey="expiry"
-            tick={{ fill: colors.txt3, fontSize: 9, fontFamily: "JetBrains Mono" }}
+            tick={{ fill: colors.txt3, fontSize: tickFs, fontFamily: "JetBrains Mono" }}
             axisLine={{ stroke: colors.line }}
             tickLine={false}
             interval={0}
             angle={-30}
-            height={40}
+            height={isMobile ? 50 : 40}
             textAnchor="end"
           />
           <YAxis
             tickFormatter={(v: number) => compact(v)}
-            tick={{ fill: colors.txt3, fontSize: 10, fontFamily: "JetBrains Mono" }}
+            tick={{ fill: colors.txt3, fontSize: isMobile ? 12 : 10, fontFamily: "JetBrains Mono" }}
             axisLine={{ stroke: colors.line }}
             tickLine={false}
           />
@@ -610,11 +633,13 @@ function StrikeLadder({
   rows,
   spot,
   selected,
+  isMobile,
   onPick,
 }: {
   rows: LadderRow[];
   spot: number;
   selected: Selected | null;
+  isMobile: boolean;
   onPick: (strike: number, side: Side) => void;
 }) {
   if (rows.length === 0) {
@@ -622,6 +647,72 @@ function StrikeLadder({
       <p style={{ padding: 16, color: colors.txt3, fontSize: 11, fontFamily: fonts.mono }}>
         Pick an expiry to load the strike ladder.
       </p>
+    );
+  }
+
+  // Mobile: 1 strike per card, two big tap zones (CALL left / PUT right) per
+  // card. The 11-column desktop table at fontSize 10 is unreadable + forces
+  // horizontal scroll on a 390px viewport; cards keep all the same numbers
+  // (mark/IV/OI per side) but stack them vertically inside each side.
+  if (isMobile) {
+    return (
+      <div style={{ overflow: "auto", WebkitOverflowScrolling: "touch", fontFamily: fonts.mono }}>
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {rows.map((r) => {
+            const callSelected = selected?.strike === r.strike && selected.side === "call";
+            const putSelected = selected?.strike === r.strike && selected.side === "put";
+            return (
+              <li
+                key={r.strike}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  borderBottom: `1px solid ${colors.line}`,
+                  background: r.isATM ? "rgba(255,176,0,0.06)" : "transparent",
+                }}
+              >
+                <div
+                  style={{
+                    gridColumn: "1 / -1",
+                    padding: "8px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: r.isATM ? "rgba(255,176,0,0.10)" : colors.bg2,
+                  }}
+                >
+                  <span
+                    className="mono-num"
+                    style={{ color: colors.amber, fontWeight: 700, fontSize: 14, letterSpacing: "0.04em" }}
+                  >
+                    K {compact(r.strike)}
+                  </span>
+                  {r.isATM && (
+                    <span style={{ color: colors.amberBright, fontSize: 10, fontWeight: 600, letterSpacing: "0.10em" }}>
+                      ◆ ATM
+                    </span>
+                  )}
+                  <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 10 }}>
+                    spot ${compact(spot)}
+                  </span>
+                </div>
+                <SideCell
+                  side="call"
+                  q={r.call}
+                  selected={callSelected}
+                  onPick={() => r.call && onPick(r.strike, "call")}
+                />
+                <SideCell
+                  side="put"
+                  q={r.put}
+                  selected={putSelected}
+                  onPick={() => r.put && onPick(r.strike, "put")}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     );
   }
 
@@ -725,6 +816,130 @@ function StrikeLadder({
   );
 }
 
+function SideCell({
+  side,
+  q,
+  selected,
+  onPick,
+}: {
+  side: Side;
+  q: BestQuote | null;
+  selected: boolean;
+  onPick: () => void;
+}) {
+  const isCall = side === "call";
+  const accent = isCall ? colors.green : colors.red;
+  const bg = !q
+    ? colors.bg1
+    : selected
+      ? isCall
+        ? "rgba(25,210,122,0.18)"
+        : "rgba(255,77,94,0.18)"
+      : isCall
+        ? "rgba(25,210,122,0.04)"
+        : "rgba(255,77,94,0.04)";
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      disabled={!q}
+      style={{
+        background: bg,
+        border: "none",
+        borderRight: side === "call" ? `1px solid ${colors.line}` : "none",
+        padding: "10px 12px",
+        textAlign: "left",
+        fontFamily: fonts.mono,
+        cursor: q ? "pointer" : "default",
+        minHeight: 64,
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+      }}
+    >
+      <span style={{ color: accent, fontSize: 11, fontWeight: 700, letterSpacing: "0.10em" }}>
+        {isCall ? "CALL" : "PUT"}
+      </span>
+      {q ? (
+        <>
+          <span className="mono-num" style={{ color: colors.txt1, fontSize: 16, fontWeight: 600 }}>
+            {q.mark.toFixed(2)}
+          </span>
+          <span style={{ display: "flex", gap: 10, fontSize: 10, color: colors.txt4 }}>
+            <span>IV {q.iv.toFixed(0)}%</span>
+            <span>OI {compact(q.oi)}</span>
+          </span>
+        </>
+      ) : (
+        <span style={{ color: colors.txt4, fontSize: 11 }}>—</span>
+      )}
+    </button>
+  );
+}
+
+function GreeksMobileList({ rows, spot }: { rows: GreeksRow[]; spot: number }) {
+  // Mobile card list — one card per (strike, side). Replaces the
+  // GreeksHeatmap SVG that doesn't fit a 390px viewport. Sorted by
+  // |strike − spot| so ATM appears first (most actionable greeks).
+  const sorted = [...rows].sort(
+    (a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot),
+  );
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontFamily: fonts.mono }}>
+      {sorted.map((g) => {
+        const isCall = g.side === "call";
+        const accent = isCall ? colors.green : colors.red;
+        return (
+          <li
+            key={`${g.strike}-${g.side}`}
+            style={{
+              padding: "10px 14px",
+              borderBottom: `1px solid ${colors.line}`,
+              display: "grid",
+              gridTemplateColumns: "auto 1fr",
+              columnGap: 12,
+              rowGap: 6,
+            }}
+          >
+            <span
+              style={{
+                color: accent,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.10em",
+                alignSelf: "center",
+              }}
+            >
+              {isCall ? "CALL" : "PUT"}
+            </span>
+            <span
+              className="mono-num"
+              style={{ color: colors.amber, fontSize: 13, fontWeight: 600, textAlign: "right" }}
+            >
+              K {compact(g.strike)}
+            </span>
+            <span style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, fontSize: 11 }}>
+              <GreekKv k="Δ" v={g.delta.toFixed(2)} />
+              <GreekKv k="Γ" v={g.gamma.toFixed(4)} />
+              <GreekKv k="Θ" v={g.theta.toFixed(2)} />
+              <GreekKv k="V" v={g.vega.toFixed(2)} />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function GreekKv({ k, v }: { k: string; v: string }) {
+  return (
+    <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <span style={{ color: colors.txt4, fontSize: 9, letterSpacing: "0.06em" }}>{k}</span>
+      <span className="mono-num" style={{ color: colors.txt2 }}>{v}</span>
+    </span>
+  );
+}
+
 /**
  * PositionSimulator — quick "what if I buy this option" panel.
  *
@@ -738,12 +953,14 @@ function PositionSimulator({
   row,
   spot,
   expiry,
+  isMobile,
   onClose,
 }: {
   selected: Selected;
   row: LadderRow | null;
   spot: number;
   expiry: string | null;
+  isMobile: boolean;
   onClose: () => void;
 }) {
   const quote = selected.side === "call" ? row?.call : row?.put;
@@ -774,17 +991,17 @@ function PositionSimulator({
   const accent = isCall ? colors.green : colors.red;
 
   return (
-    <div style={{ height: "100%", overflow: "auto", fontFamily: fonts.mono, fontSize: 11 }}>
+    <div style={{ height: isMobile ? "auto" : "100%", overflow: "auto", fontFamily: fonts.mono, fontSize: isMobile ? 13 : 11 }}>
       {/* Header with key stats */}
-      <div style={{ padding: "10px 12px", borderBottom: `1px solid ${colors.line}` }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-          <span style={{ color: accent, fontWeight: 700, fontSize: 13 }}>
+      <div style={{ padding: isMobile ? "14px 16px" : "10px 12px", borderBottom: `1px solid ${colors.line}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isMobile ? 10 : 6, minHeight: isMobile ? 32 : undefined }}>
+          <span style={{ color: accent, fontWeight: 700, fontSize: isMobile ? 15 : 13 }}>
             BUY {selected.side.toUpperCase()}
           </span>
-          <span style={{ color: colors.amber, fontWeight: 600 }}>
+          <span style={{ color: colors.amber, fontWeight: 600, fontSize: isMobile ? 14 : undefined }}>
             K {compact(selected.strike)}
           </span>
-          <span style={{ color: colors.txt4 }}>· {quote.exchange}</span>
+          <span style={{ color: colors.txt4, fontSize: isMobile ? 12 : undefined }}>· {quote.exchange}</span>
           <button
             onClick={onClose}
             title="Clear selection"
@@ -794,8 +1011,9 @@ function PositionSimulator({
               border: `1px solid ${colors.line2}`,
               color: colors.txt3,
               fontFamily: "inherit",
-              fontSize: 9,
-              padding: "1px 6px",
+              fontSize: isMobile ? 11 : 9,
+              padding: isMobile ? "6px 10px" : "1px 6px",
+              minHeight: isMobile ? 32 : undefined,
               cursor: "pointer",
               letterSpacing: "0.08em",
             }}
@@ -807,9 +1025,9 @@ function PositionSimulator({
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 6,
+            gap: isMobile ? "8px 14px" : 6,
             color: colors.txt3,
-            fontSize: 10,
+            fontSize: isMobile ? 12 : 10,
             lineHeight: 1.5,
           }}
         >
@@ -845,25 +1063,25 @@ function PositionSimulator({
       </div>
 
       {/* Scenarios at expiry */}
-      <div style={{ padding: "8px 12px 6px" }}>
+      <div style={{ padding: isMobile ? "12px 16px 14px" : "8px 12px 6px" }}>
         <div
           style={{
             color: colors.txt4,
-            fontSize: 9,
+            fontSize: isMobile ? 11 : 9,
             letterSpacing: "0.10em",
-            marginBottom: 6,
+            marginBottom: isMobile ? 10 : 6,
             textTransform: "uppercase",
           }}
         >
           ▸ P/L at expiry
         </div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 12 : 10 }}>
           <thead>
             <tr style={{ color: colors.txt4 }}>
-              <th style={{ ...thSim }}>Spot Δ</th>
-              <th style={{ ...thSim, textAlign: "right" }}>Spot $</th>
-              <th style={{ ...thSim, textAlign: "right" }}>P/L</th>
-              <th style={{ ...thSim, textAlign: "right" }}>ROI</th>
+              <th style={isMobile ? thSimMobile : thSim}>Spot Δ</th>
+              <th style={{ ...(isMobile ? thSimMobile : thSim), textAlign: "right" }}>Spot $</th>
+              <th style={{ ...(isMobile ? thSimMobile : thSim), textAlign: "right" }}>P/L</th>
+              <th style={{ ...(isMobile ? thSimMobile : thSim), textAlign: "right" }}>ROI</th>
             </tr>
           </thead>
           <tbody>
@@ -878,16 +1096,16 @@ function PositionSimulator({
                     background: isCenter ? "rgba(255,176,0,0.06)" : undefined,
                   }}
                 >
-                  <td style={{ ...tdSim, color: colors.txt3 }}>
+                  <td style={{ ...(isMobile ? tdSimMobile : tdSim), color: colors.txt3 }}>
                     {s.o > 0 ? "+" : ""}{(s.o * 100).toFixed(0)}%
                   </td>
-                  <td style={{ ...tdSim, textAlign: "right", color: colors.txt2 }}>
+                  <td style={{ ...(isMobile ? tdSimMobile : tdSim), textAlign: "right", color: colors.txt2 }}>
                     {s.target.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </td>
-                  <td style={{ ...tdSim, textAlign: "right", color: c, fontWeight: 600 }}>
+                  <td style={{ ...(isMobile ? tdSimMobile : tdSim), textAlign: "right", color: c, fontWeight: 600 }}>
                     {s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(0)}
                   </td>
-                  <td style={{ ...tdSim, textAlign: "right", color: c, fontWeight: 600 }}>
+                  <td style={{ ...(isMobile ? tdSimMobile : tdSim), textAlign: "right", color: c, fontWeight: 600 }}>
                     {s.roi >= 0 ? "+" : ""}{s.roi.toFixed(0)}%
                   </td>
                 </tr>
@@ -895,7 +1113,7 @@ function PositionSimulator({
             })}
           </tbody>
         </table>
-        <div style={{ marginTop: 6, color: colors.txt4, fontSize: 9 }}>
+        <div style={{ marginTop: isMobile ? 10 : 6, color: colors.txt4, fontSize: isMobile ? 11 : 9 }}>
           Max loss locked at premium (${premium.toFixed(2)}). {isCall ? "Upside unbounded." : "Max profit at $0 = $" + (selected.strike - premium).toFixed(0)}
         </div>
       </div>
@@ -924,10 +1142,22 @@ const thSim: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
+const thSimMobile: React.CSSProperties = {
+  ...thSim,
+  padding: "8px 6px",
+  fontSize: 10,
+};
+
 const tdSim: React.CSSProperties = {
   padding: "4px 6px",
   fontVariantNumeric: "tabular-nums",
   whiteSpace: "nowrap",
+};
+
+const tdSimMobile: React.CSSProperties = {
+  ...tdSim,
+  padding: "8px 6px",
+  fontSize: 12,
 };
 
 function ArbitrageList({ items }: { items: OptionsArbitrage[] }) {

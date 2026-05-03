@@ -6,6 +6,7 @@ import { PulseClient, type ServerMessage } from "../../lib/ws-client";
 import { FundingHeatmap } from "../../components/FundingHeatmap";
 import { MCPQuickAsk } from "../../components/MCPQuickAsk";
 import { fmtTimeICT } from "../../lib/time";
+import { useIsMobile } from "../../lib/use-media";
 
 interface FundingRow {
   exchange: string;
@@ -33,6 +34,7 @@ export default function DerivativesPage() {
   const [debugOpen, setDebugOpen] = useState(false);
   const clientRef = useRef<PulseClient | null>(null);
   const flipsRef = useRef<FundingFlip[]>([]);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const client = new PulseClient({
@@ -83,12 +85,12 @@ export default function DerivativesPage() {
       {/* Connection status strip — always visible at top */}
       <WsRow height="auto">
         <Panel span={12} flush>
-          <ConnectionStrip status={status} count={rows.length} lastTickTs={lastTickTs} />
+          <ConnectionStrip status={status} count={rows.length} lastTickTs={lastTickTs} isMobile={isMobile} />
         </Panel>
       </WsRow>
 
       {/* Funding heatmap — primary content */}
-      <WsRow height="auto" style={{ minHeight: 480 }}>
+      <WsRow height="auto" style={{ minHeight: isMobile ? 0 : 480 }}>
         <Panel
           span={12}
           title="FUNDING HEATMAP"
@@ -101,14 +103,14 @@ export default function DerivativesPage() {
       </WsRow>
 
       {/* Funding flips — sign changes in last 1h */}
-      <WsRow height="auto" style={{ minHeight: 200 }}>
+      <WsRow height="auto" style={{ minHeight: isMobile ? 0 : 200 }}>
         <Panel
           span={12}
           title="FUNDING FLIPS"
           badge={`SIGN CHANGES · LAST 1H · ${topFlips.length} OF ${flips.length}`}
           flush
         >
-          <FlipsTable flips={topFlips} />
+          <FlipsTable flips={topFlips} isMobile={isMobile} />
         </Panel>
       </WsRow>
 
@@ -127,9 +129,11 @@ export default function DerivativesPage() {
                 border: `1px solid ${colors.line2}`,
                 color: colors.txt2,
                 fontFamily: fonts.mono,
-                fontSize: 9,
+                fontSize: isMobile ? 11 : 9,
                 letterSpacing: "0.08em",
-                padding: "1px 8px",
+                padding: isMobile ? "8px 14px" : "1px 8px",
+                minHeight: isMobile ? 44 : undefined,
+                minWidth: isMobile ? 80 : undefined,
                 cursor: "pointer",
               }}
             >
@@ -157,10 +161,12 @@ function ConnectionStrip({
   status,
   count,
   lastTickTs,
+  isMobile,
 }: {
   status: "connecting" | "open" | "closed" | "error";
   count: number;
   lastTickTs: number | null;
+  isMobile: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -178,12 +184,13 @@ function ConnectionStrip({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 16,
-        padding: "8px 14px",
+        gap: isMobile ? 12 : 16,
+        padding: isMobile ? "10px 14px" : "8px 14px",
         background: colors.bg1,
         fontFamily: fonts.mono,
-        fontSize: 11,
+        fontSize: isMobile ? 12 : 11,
         color: colors.txt2,
+        flexWrap: isMobile ? "wrap" : "nowrap",
       }}
     >
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -211,14 +218,20 @@ function ConnectionStrip({
         </span>
       </span>
 
-      <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 10 }}>
-        {WS_URL}
-      </span>
+      {/* The full WS_URL is debugging metadata; on a 390px viewport with a
+          flex-row strip, "marginLeft:auto" + a long ws://… URL kept wrapping
+          onto a second row and pushing the status pill into a cramped layout.
+          Hide on mobile — it's always visible in the DebugStream panel. */}
+      {!isMobile && (
+        <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 10 }}>
+          {WS_URL}
+        </span>
+      )}
     </div>
   );
 }
 
-function FlipsTable({ flips }: { flips: FundingFlip[] }) {
+function FlipsTable({ flips, isMobile }: { flips: FundingFlip[]; isMobile: boolean }) {
   if (flips.length === 0) {
     return (
       <div style={{ padding: "14px 16px", fontSize: 11, color: colors.txt3, fontFamily: fonts.mono }}>
@@ -226,6 +239,65 @@ function FlipsTable({ flips }: { flips: FundingFlip[] }) {
       </div>
     );
   }
+
+  // Mobile: card-per-flip. Phase-2 pattern — the 7-col table forces horizontal
+  // scroll on phone (every cell has whiteSpace:nowrap), which is fine for a
+  // power-user but useless when the user is scrolling vertically through alerts.
+  if (isMobile) {
+    return (
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, fontFamily: fonts.mono }}>
+        {flips.map((f) => {
+          const turnedPositive = f.prev < 0 && f.curr > 0;
+          return (
+            <li
+              key={`${f.exchange}:${f.symbol}:${f.ts}`}
+              style={{
+                padding: "12px 14px",
+                borderBottom: `1px solid ${colors.line}`,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <SignalPill tone={turnedPositive ? "up" : "down"} size="xs">
+                  {turnedPositive ? "→ LONG" : "→ SHORT"}
+                </SignalPill>
+                <span style={{ color: colors.amber, fontWeight: 700, fontSize: 13 }}>
+                  {f.symbol}
+                </span>
+                <span style={{ color: colors.txt4, fontSize: 11 }}>· {f.exchange}</span>
+                <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 11 }}>
+                  {fmtTimeICT(f.ts)}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 14, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+                <span>
+                  <span style={{ color: colors.txt4, marginRight: 4 }}>prev</span>
+                  <span style={{ color: f.prev >= 0 ? colors.green : colors.red }}>
+                    {f.prev.toFixed(4)}%
+                  </span>
+                </span>
+                <span>
+                  <span style={{ color: colors.txt4, marginRight: 4 }}>curr</span>
+                  <span style={{ color: f.curr >= 0 ? colors.green : colors.red }}>
+                    {f.curr.toFixed(4)}%
+                  </span>
+                </span>
+                <span>
+                  <span style={{ color: colors.txt4, marginRight: 4 }}>Δ</span>
+                  <span style={{ color: colors.txt1 }}>
+                    {(f.delta >= 0 ? "+" : "") + f.delta.toFixed(4)}%
+                  </span>
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: fonts.mono, fontSize: 11 }}>
       <thead>

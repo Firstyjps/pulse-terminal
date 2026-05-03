@@ -90,7 +90,7 @@ interface Props {
  *   # · Asset · Last · 1h% · 24h% · 7d% · Vol·24h · Mkt Cap · 7d Trend
  *
  * Desktop: sticky-header sortable table with sparkline cell.
- * Mobile (< 720px): rendered as a list of tap-friendly cards (≥56px tall) so
+ * Mobile (< 768px): rendered as a list of tap-friendly cards (≥68px tall) so
  * thumb scrubbing actually works and you see all the key cells without
  * horizontal scroll.
  */
