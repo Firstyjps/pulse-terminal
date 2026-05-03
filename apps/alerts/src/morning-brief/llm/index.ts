@@ -149,7 +149,7 @@ export async function callLLM(
 
   switch (config.provider) {
     case "anthropic":
-      return callAnthropic(params, config.apiKey, config.model);
+      return callAnthropic(params, config.apiKey, config.model, params.timeoutMs ?? 20_000);
     case "openai":
       return callOpenAICompat(params, config.apiKey, config.model, OPENAI_BASE_URL, opts.fetchImpl, timeoutMs);
     case "groq":
