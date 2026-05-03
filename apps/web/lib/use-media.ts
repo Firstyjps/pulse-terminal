@@ -1,55 +1,64 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 /**
- * Tailwind-ish breakpoint helper.
+ * Tailwind-aligned breakpoint helper. Single source of truth for the
+ * mobile / tablet / desktop split — these match Tailwind defaults
+ * (`md:` = 768, `lg:` = 1024) so JS hooks and CSS utility classes never
+ * disagree on the 768–1024 band.
  *
- *   mobile  : < 720px       (single column, bottom-tab nav, card lists)
- *   tablet  : 720 — 1024px  (2-col grids, compact desktop)
+ *   mobile  : < 768px       (single column, bottom-tab nav, card lists)
+ *   tablet  : 768 — 1023px  (2-col grids, compact desktop)
  *   desktop : ≥ 1024px      (full Bloomberg 4-row terminal)
  *
- * Returns `null` until first `useEffect` flush (avoids SSR ↔ client mismatch).
- * Treat `null` as "desktop" while painting first frame so the server-rendered
- * markup keeps the desktop layout intact.
+ * SSR-safe: `useSyncExternalStore` accepts a server snapshot. We return
+ * `"mobile"` on the server so the first paint is mobile-first — content
+ * reflows up (mobile → desktop on hydrate) instead of down, which is the
+ * less jarring direction. iPhone Safari, the dominant phone runtime here,
+ * never sees a desktop-grid flash.
  */
 export type Viewport = "mobile" | "tablet" | "desktop";
 
-export function useViewport(): Viewport | null {
-  const [vp, setVp] = useState<Viewport | null>(null);
+const MOBILE_MAX = 768;   // < 768  → mobile  (Tailwind md: lower bound)
+const TABLET_MAX = 1024;  // < 1024 → tablet  (Tailwind lg: lower bound)
 
-  useEffect(() => {
-    const compute = (): Viewport => {
-      const w = window.innerWidth;
-      if (w < 720) return "mobile";
-      if (w < 1024) return "tablet";
-      return "desktop";
-    };
-    setVp(compute());
-    let raf = 0;
-    const onResize = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setVp(compute()));
-    };
-    window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-    };
-  }, []);
-
-  return vp;
+function compute(): Viewport {
+  if (typeof window === "undefined") return "mobile";
+  const w = window.innerWidth;
+  if (w < MOBILE_MAX) return "mobile";
+  if (w < TABLET_MAX) return "tablet";
+  return "desktop";
 }
 
-/** Convenience: `true` once mounted on a sub-720px viewport. */
+function subscribe(notify: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  let raf = 0;
+  const onResize = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(notify);
+  };
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", onResize);
+  return () => {
+    cancelAnimationFrame(raf);
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("orientationchange", onResize);
+  };
+}
+
+const getServerSnapshot = (): Viewport => "mobile";
+
+export function useViewport(): Viewport {
+  return useSyncExternalStore(subscribe, compute, getServerSnapshot);
+}
+
+/** `true` on a sub-768px viewport (Tailwind `md:` lower bound). */
 export function useIsMobile(): boolean {
-  const vp = useViewport();
-  return vp === "mobile";
+  return useViewport() === "mobile";
 }
 
-/** Convenience: `true` once mounted on tablet OR mobile. */
+/** `true` on tablet OR mobile (i.e. anything narrower than `lg:` 1024). */
 export function useIsCompact(): boolean {
   const vp = useViewport();
   return vp === "mobile" || vp === "tablet";

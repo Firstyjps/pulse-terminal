@@ -65,7 +65,7 @@
 
 * { box-sizing: border-box; }
 
-html { --ui-scale: 1; overflow: hidden; height: 100vh; width: 100vw; }
+html { --ui-scale: 1; }
 
 html, body {
   margin: 0;
@@ -81,16 +81,35 @@ html, body {
   text-rendering: geometricPrecision;
 }
 
-/* Whole-app zoom — driven by useUiScale (auto for 4K, manual via Settings).
-   Counter-size the body in CSS pixels so that after the zoom transform the
-   visible body matches the actual viewport — without that, zoom > 1 makes
-   the body 1.4×100vw wide and clips on the right. Children must use % (not
-   vw/vh) so they inherit the zoomed body's layout box. */
-body {
-  overflow: hidden;
-  width: calc(100% / var(--ui-scale, 1));
-  height: calc(100% / var(--ui-scale, 1));
-  zoom: var(--ui-scale, 1);
+/* Desktop cockpit feel — no document scroll, body counter-sized for the
+   --ui-scale zoom transform. The zoom is a desktop-only Bloomberg trick
+   (auto-applied at 4K via useUiScale); on mobile/tablet we let the document
+   scroll naturally and skip the zoom entirely (see the < 1024px rule
+   below). Children must use % (not vw/vh) so they inherit the zoomed
+   body's layout box. */
+@media (min-width: 1024px) {
+  html { overflow: hidden; height: 100vh; width: 100vw; }
+  body {
+    overflow: hidden;
+    width: calc(100% / var(--ui-scale, 1));
+    height: calc(100% / var(--ui-scale, 1));
+    zoom: var(--ui-scale, 1);
+  }
+}
+
+/* Mobile + tablet — natural document scroll. 100dvh follows iOS Safari's
+   address-bar collapse so content isn't clipped at the bottom of the viewport.
+   Suppress the desktop --ui-scale zoom and the fixed 100vw width that would
+   otherwise leak in. */
+@media (max-width: 1023px) {
+  html, body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    height: auto;
+    min-height: 100dvh;
+    width: 100%;
+    zoom: 1;
+  }
 }
 
 /* Sans variant — softens chrome, numerics stay mono */
@@ -234,14 +253,14 @@ body.sans .num, body.sans .mono, body.sans .mono-num { font-family: var(--mono);
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
-   Mobile adapter (< 720px)
+   Mobile adapter (< 768px — Tailwind md: breakpoint)
    - WsRow: 12-col grid → single-column stack, auto height
    - Panel children get full width regardless of `span`
    - Touch tap-targets meet iOS HIG (44px)
    - Larger base type for legibility on small screens
    ═════════════════════════════════════════════════════════════════════════ */
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   body { font-size: 11px; }
   table { font-size: 11px !important; }
   th, td { padding: 6px 8px !important; }
@@ -282,8 +301,8 @@ body.sans .num, body.sans .mono, body.sans .mono-num { font-family: var(--mono);
   }
 }
 
-/* ── Mid breakpoint (tablet 720..1024) — tighter rail, scaled rows ── */
-@media (min-width: 720px) and (max-width: 1023px) {
+/* ── Mid breakpoint (tablet 768..1023, Tailwind md..lg) — tighter rail, scaled rows ── */
+@media (min-width: 768px) and (max-width: 1023px) {
   .ws-row.ws-row--chart { height: 320px; }
   .ws-row.ws-row--table { height: 320px; }
   .ws-row.ws-row--feed  { height: 280px; }
