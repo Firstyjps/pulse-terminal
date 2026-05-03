@@ -139,10 +139,13 @@ describe("formatMorningBrief — 5 sections + action candidates", () => {
 
   it("funding cluster splits BTC+ETH on one line, SOL on next (avoids Telegram word-wrap)", () => {
     const out = formatMorningBrief(makeInput());
-    expect(out).toContain("BTC \\-0\\.012% · ETH \\-0\\.008%");
-    expect(out).toContain("SOL \\-0\\.005%");
-    expect(out).not.toContain("ETH \\-0\\.008% · SOL");
+    // 4-decimal precision on per-venue rates — micro-funding sub-bp moves now
+    // visible (was 3 decimals → "+0.000%" lost sign for ~0.0001% rates).
+    expect(out).toContain("BTC \\-0\\.0120% · ETH \\-0\\.0080%");
+    expect(out).toContain("SOL \\-0\\.0050%");
+    expect(out).not.toContain("ETH \\-0\\.0080% · SOL");
     expect(out).toContain("🔴 Lean: *negative*");
+    // Annualized stays 1-decimal — the ×3×365 multiplier makes it whole-percent.
     expect(out).toContain("BTC ann \\-13\\.1%");
   });
 

@@ -314,6 +314,185 @@ function wrapPrice(inner: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// BTC ETF flows bar+line combo chart (current — sent as 2nd photo)
+//
+// Mirrors the dashboard view at /fundflow:
+//   - Daily flow bars (green positive · red negative) on the left Y axis
+//   - Cumulative line (orange) on the right Y axis
+// Same width as the BTC price chart so Telegram media-album-stacks them
+// at consistent visual scale.
+// ─────────────────────────────────────────────────────────────────────────
+
+const ETF_W = 1280;
+const ETF_H = 400;
+const ETF_PAD_X = 64;
+const ETF_PAD_TOP = 50;
+const ETF_PAD_BOT = 48;
+
+const ETF_BG = "#0b0d12";
+const ETF_GRID = "#1a1d2a";
+const ETF_TEXT = "#9ca3af";
+const ETF_TITLE = "#e5e7eb";
+const ETF_GREEN = "#22c55e";
+const ETF_RED = "#ef4444";
+const ETF_ORANGE = "#f59e0b";
+
+const ETF_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
+
+/**
+ * BTC ETF daily flow bars + cumulative line. Pure / deterministic. Returns
+ * a "No data" placeholder SVG when fewer than 2 valid rows survive the
+ * NaN/Infinity guard.
+ *
+ * Last 30 rows of `flows` are used. Last bar's underlying value is also the
+ * cumulative line's right-edge endpoint by construction
+ * (`flows[last].btcCumulative`).
+ */
+export function buildBtcEtfFlowsBarChartSvg(flows: ETFFlow[]): string {
+  const slice = (flows ?? [])
+    .filter(
+      (f) => Number.isFinite(f.btc) && Number.isFinite(f.btcCumulative),
+    )
+    .slice(-30);
+
+  if (slice.length < 2) {
+    return wrapEtf(
+      `<text x="${ETF_W / 2}" y="${ETF_H / 2}" text-anchor="middle" fill="${ETF_TEXT}" font-family="${ETF_FONT}" font-size="14">No data</text>`,
+    );
+  }
+
+  // Daily-flow scale (left axis): force zero inclusion so every bar sits on
+  // a clear baseline regardless of whether the period is all-positive,
+  // all-negative, or mixed.
+  let dMin = Math.min(...slice.map((f) => f.btc), 0);
+  let dMax = Math.max(...slice.map((f) => f.btc), 0);
+  let dRange = dMax - dMin;
+  if (dRange < 1) dRange = 1;
+  const dPad = dRange * 0.08;
+  dMin -= dPad;
+  dMax += dPad;
+  dRange = dMax - dMin;
+
+  // Cumulative scale (right axis): independent of the bar scale.
+  let cMin = Math.min(...slice.map((f) => f.btcCumulative));
+  let cMax = Math.max(...slice.map((f) => f.btcCumulative));
+  let cRange = cMax - cMin;
+  if (cRange < 1) cRange = 1;
+  const cPad = cRange * 0.05;
+  cMin -= cPad;
+  cMax += cPad;
+  cRange = cMax - cMin;
+
+  const innerW = ETF_W - ETF_PAD_X * 2;
+  const innerH = ETF_H - ETF_PAD_TOP - ETF_PAD_BOT;
+
+  const dailyY = (v: number) => ETF_PAD_TOP + innerH - ((v - dMin) / dRange) * innerH;
+  const cumY = (v: number) => ETF_PAD_TOP + innerH - ((v - cMin) / cRange) * innerH;
+  const zeroY = dailyY(0);
+
+  const xStep = slice.length === 1 ? 0 : innerW / (slice.length - 1);
+  const xPos = (i: number) => ETF_PAD_X + (slice.length === 1 ? innerW / 2 : i * xStep);
+  const barWidth = Math.max(2, (xStep || innerW / slice.length) * 0.7);
+
+  const bars = slice
+    .map((f, i) => {
+      const cx = xPos(i);
+      const yPos = dailyY(f.btc);
+      const yTop = Math.min(yPos, zeroY);
+      const h = Math.max(1, Math.abs(yPos - zeroY));
+      const fill = f.btc >= 0 ? ETF_GREEN : ETF_RED;
+      return `<rect x="${(cx - barWidth / 2).toFixed(1)}" y="${yTop.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}" fill-opacity="0.85"/>`;
+    })
+    .join("\n  ");
+
+  const linePts = slice.map(
+    (f, i) => [xPos(i), cumY(f.btcCumulative)] as const,
+  );
+  const lineD = linePts
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`)
+    .join(" ");
+  const lastPt = linePts[linePts.length - 1];
+  const lineEl = `<path d="${lineD}" fill="none" stroke="${ETF_ORANGE}" stroke-width="2.5"/>`;
+  const lineDot = `<circle cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="4" fill="${ETF_ORANGE}"/>`;
+
+  // X-axis date ticks. Stride keeps labels from overlapping at any window
+  // length the brief might pass (typically 28-30 rows = every-3rd day).
+  const tickStride = slice.length > 14 ? 3 : slice.length > 7 ? 2 : 1;
+  const xTicks: string[] = [];
+  for (let i = 0; i < slice.length; i += tickStride) {
+    const f = slice[i];
+    const cx = xPos(i);
+    const label = f.date.length === 10 ? f.date.slice(5) : f.date; // MM-DD
+    xTicks.push(
+      `<text x="${cx.toFixed(1)}" y="${(ETF_H - 14).toFixed(1)}" text-anchor="middle" fill="${ETF_TEXT}" font-family="${ETF_FONT}" font-size="11">${escapeXml(label)}</text>`,
+    );
+  }
+
+  // Header: title (top-left) + 7D sum / cumulative summary (top-right).
+  const lastFlow = slice[slice.length - 1];
+  const sevenDayBtc = slice.slice(-7).reduce((a, f) => a + f.btc, 0);
+  const summary = `7D ${fmtBnSigned(sevenDayBtc)} · CUM ${fmtBnSigned(lastFlow.btcCumulative)}`;
+  const titleEl = `<text x="${ETF_PAD_X}" y="28" fill="${ETF_TITLE}" font-family="${ETF_FONT}" font-size="18" font-weight="600">BITCOIN ETF FLOWS</text>`;
+  const summaryEl = `<text x="${(ETF_W - ETF_PAD_X).toFixed(1)}" y="28" text-anchor="end" fill="${ETF_TEXT}" font-family="${ETF_FONT}" font-size="14">${escapeXml(summary)}</text>`;
+
+  // Zero baseline for the bars + light reference lines at min/max.
+  const zeroLine = `<line x1="${ETF_PAD_X}" y1="${zeroY.toFixed(1)}" x2="${(ETF_W - ETF_PAD_X).toFixed(1)}" y2="${zeroY.toFixed(1)}" stroke="${ETF_GRID}" stroke-width="1"/>`;
+
+  const leftLabels = [
+    [dMax, dailyY(dMax)] as const,
+    [0, zeroY] as const,
+    [dMin, dailyY(dMin)] as const,
+  ]
+    .map(
+      ([v, y]) =>
+        `<text x="${(ETF_PAD_X - 6).toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="${ETF_TEXT}" font-family="${ETF_FONT}" font-size="10">${escapeXml(fmtBnSigned(v))}</text>`,
+    )
+    .join("\n  ");
+
+  const rightLabels = [
+    [cMax, cumY(cMax)] as const,
+    [(cMin + cMax) / 2, cumY((cMin + cMax) / 2)] as const,
+    [cMin, cumY(cMin)] as const,
+  ]
+    .map(
+      ([v, y]) =>
+        `<text x="${(ETF_W - ETF_PAD_X + 6).toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="start" fill="${ETF_ORANGE}" font-family="${ETF_FONT}" font-size="10">${escapeXml(fmtBnSigned(v))}</text>`,
+    )
+    .join("\n  ");
+
+  const inner = [
+    zeroLine,
+    bars,
+    lineEl,
+    lineDot,
+    titleEl,
+    summaryEl,
+    leftLabels,
+    rightLabels,
+    ...xTicks,
+  ].join("\n  ");
+
+  return wrapEtf(inner);
+}
+
+function wrapEtf(inner: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ETF_W}" height="${ETF_H}" viewBox="0 0 ${ETF_W} ${ETF_H}" role="img" aria-label="BTC ETF daily flows + cumulative">
+  <rect width="${ETF_W}" height="${ETF_H}" fill="${ETF_BG}"/>
+  ${inner}
+</svg>`;
+}
+
+function fmtBnSigned(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : n > 0 ? "+" : "";
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(0)}M`;
+  if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(0)}K`;
+  return `${sign}$${abs.toFixed(0)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // SVG → PNG (shared)
 // ─────────────────────────────────────────────────────────────────────────
 

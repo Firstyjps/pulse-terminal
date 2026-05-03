@@ -369,12 +369,15 @@ describe("runMorningBrief — success path", () => {
     });
   });
 
-  it("brief sends image on weekday with valid klines (imageSent:true)", async () => {
-    const photoSpy = vi.fn(async () => ({ ok: true, result: { message_id: 99 } }));
+  it("brief sends image on weekday with valid klines + valid etf — both photos sent (imageSent + etfImageSent)", async () => {
+    let photoCallCount = 0;
     const fetchImpl = vi.fn().mockImplementation((url: string) => {
       if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
       if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
-      if (url.includes("/sendPhoto")) return Promise.resolve(jsonResponse(photoSpy()));
+      if (url.includes("/sendPhoto")) {
+        photoCallCount++;
+        return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 99 } }));
+      }
       return Promise.resolve(jsonResponse({ ok: true, result: {} }));
     });
 
@@ -394,18 +397,24 @@ describe("runMorningBrief — success path", () => {
 
     expect(r.sent).toBe(true);
     expect(r.imageSent).toBe(true);
-    expect(svgSpy).toHaveBeenCalledOnce();
-    // The SVG passed to svgToPng is the new BTC price chart
-    const svgArg = svgSpy.mock.calls[0][0];
-    expect(svgArg).toContain("BTC/USD · 7D");
-    expect(svgArg).toContain('width="1280"');
+    expect(r.etfImageSent).toBe(true);
+    // Two SVGs rendered: BTC price chart + BTC ETF flows chart
+    expect(svgSpy).toHaveBeenCalledTimes(2);
+    expect(photoCallCount).toBe(2);
+    // 1st call = BTC price chart; 2nd call = ETF flows chart
+    expect(svgSpy.mock.calls[0][0]).toContain("BTC/USD · 7D");
+    expect(svgSpy.mock.calls[0][0]).toContain('width="1280"');
+    expect(svgSpy.mock.calls[1][0]).toContain("BITCOIN ETF FLOWS");
+    expect(svgSpy.mock.calls[1][0]).toContain('width="1280"');
+    expect(svgSpy.mock.calls[1][0]).toContain('height="400"');
   });
 
-  it("brief skips image when fetchKlines returns null (imageError:'no klines')", async () => {
-    const svgSpy = vi.fn(async () => new Uint8Array([1]));
+  it("BTC price chart skipped (no klines) but ETF chart still sent — imageSent:false, etfImageSent:true", async () => {
+    const svgSpy = vi.fn(async (_svg: string) => new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
     const fetchImpl = vi.fn().mockImplementation((url: string) => {
       if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
       if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      if (url.includes("/sendPhoto")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 2 } }));
       return Promise.resolve(jsonResponse({ ok: true, result: {} }));
     });
 
@@ -423,6 +432,44 @@ describe("runMorningBrief — success path", () => {
     expect(r.sent).toBe(true);
     expect(r.imageSent).toBe(false);
     expect(r.imageError).toBe("no klines");
+    expect(r.etfImageSent).toBe(true);
+    // svgSpy called once — only for the ETF chart (BTC chart skipped pre-svg).
+    expect(svgSpy).toHaveBeenCalledTimes(1);
+    expect(svgSpy.mock.calls[0][0]).toContain("BITCOIN ETF FLOWS");
+  });
+
+  it("brief skips both images when klines null AND etf flows < 2", async () => {
+    const svgSpy = vi.fn(async () => new Uint8Array([1]));
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
+      if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      return Promise.resolve(jsonResponse({ ok: true, result: {} }));
+    });
+
+    // Single-row etf — invalid for chart (< 2 flows), but the brief still
+    // sends in weekday mode because we only skip-the-message on truly empty.
+    // Here we test the BOTH-images-skipped path inside the photo step.
+    const oneRowEtf = {
+      ...fakeEtf,
+      flows: [fakeEtf.flows[0]],
+    };
+
+    const r = await runMorningBrief({
+      now: MON, hubBase: HUB, telegramToken: TOKEN, chatId: CHAT,
+      fetchEtf: async () => oneRowEtf,
+      fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => null,
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: svgSpy,
+      fetchImpl,
+    });
+
+    expect(r.sent).toBe(true);
+    expect(r.imageSent).toBe(false);
+    expect(r.imageError).toBe("no klines");
+    expect(r.etfImageSent).toBe(false);
+    expect(r.etfImageError).toBe("etf flows < 2");
     expect(svgSpy).not.toHaveBeenCalled();
   });
 
@@ -453,11 +500,12 @@ describe("runMorningBrief — success path", () => {
     expect(r.text).toContain("as of 5m ago");
   });
 
-  it("brief skips image when fetchKlines returns < 2 rows", async () => {
-    const svgSpy = vi.fn(async () => new Uint8Array([1]));
+  it("brief skips BTC image when fetchKlines returns < 2 rows (ETF chart still attempts)", async () => {
+    const svgSpy = vi.fn(async (_svg: string) => new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
     const fetchImpl = vi.fn().mockImplementation((url: string) => {
       if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
       if (url.includes("/sendMessage")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      if (url.includes("/sendPhoto")) return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 2 } }));
       return Promise.resolve(jsonResponse({ ok: true, result: {} }));
     });
 
@@ -475,6 +523,9 @@ describe("runMorningBrief — success path", () => {
     expect(r.sent).toBe(true);
     expect(r.imageSent).toBe(false);
     expect(r.imageError).toBe("no klines");
-    expect(svgSpy).not.toHaveBeenCalled();
+    // ETF chart is independent — fakeEtf has 2 flows so it should still go through.
+    expect(r.etfImageSent).toBe(true);
+    expect(svgSpy).toHaveBeenCalledTimes(1);
+    expect(svgSpy.mock.calls[0][0]).toContain("BITCOIN ETF FLOWS");
   });
 });

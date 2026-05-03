@@ -196,14 +196,18 @@ export function formatMorningBrief(input: FormatInput): string {
   }
 
   // ── 4. Funding rate cluster (📊)
+  // 4 decimals on per-venue rates so micro-funding moves (~0.0001%) stay
+  // visible — at 3 decimals the underlying signal rounded to "+0.000%" and
+  // the user lost sign/sub-bp precision. The annualized line keeps 1 decimal
+  // because the multiplier (×3×365) makes it whole-percent already.
   lines.push(`📊 *Funding Rate Cluster \\(8h\\)*`);
   if (funding) {
     const leanEmoji = FUNDING_LEAN_EMOJI[funding.lean];
     lines.push(
-      `BTC ${escapeMarkdownV2(fmtPct(funding.btc))} · ETH ${escapeMarkdownV2(fmtPct(funding.eth))}`,
+      `BTC ${escapeMarkdownV2(fmtPct(funding.btc, 4))} · ETH ${escapeMarkdownV2(fmtPct(funding.eth, 4))}`,
     );
     lines.push(
-      `SOL ${escapeMarkdownV2(fmtPct(funding.sol))}`,
+      `SOL ${escapeMarkdownV2(fmtPct(funding.sol, 4))}`,
     );
     lines.push(
       `${leanEmoji} Lean: *${escapeMarkdownV2(funding.lean)}* \\(BTC ann ${escapeMarkdownV2(fmtPct(funding.btcAnnualized, 1))}\\)`,

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ETFFlow } from "@pulse/sources";
 import {
+  buildBtcEtfFlowsBarChartSvg,
   buildBtcEtfSparklineSvg,
   buildBtcPriceChartSvg,
   fetchBtcKlines7d,
@@ -83,6 +84,117 @@ describe("buildBtcEtfSparklineSvg", () => {
     expect(svg).toContain("&amp;");
     expect(svg).toContain("&quot;");
     expect(svg).not.toContain("<bad>");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// BTC ETF flows bar+line combo chart (current — sent as 2nd photo)
+// ──────────────────────────────────────────────────────────────────────────
+
+function makeMixedFlows(n: number): ETFFlow[] {
+  // Mixed positive + negative daily flows. Cumulative = running sum.
+  const out: ETFFlow[] = [];
+  let cum = 30_000_000_000;
+  for (let i = 0; i < n; i++) {
+    const btc = i % 3 === 0 ? -50_000_000 : 100_000_000 + i * 5_000_000;
+    cum += btc;
+    out.push({
+      date: `2026-04-${String(i + 1).padStart(2, "0")}`,
+      btc,
+      eth: 0,
+      btcCumulative: cum,
+      ethCumulative: 4_000_000_000,
+    });
+  }
+  return out;
+}
+
+function makePositiveFlows(n: number): ETFFlow[] {
+  const out: ETFFlow[] = [];
+  let cum = 30_000_000_000;
+  for (let i = 0; i < n; i++) {
+    const btc = 100_000_000 + i * 5_000_000;
+    cum += btc;
+    out.push({
+      date: `2026-04-${String(i + 1).padStart(2, "0")}`,
+      btc,
+      eth: 0,
+      btcCumulative: cum,
+      ethCumulative: 4_000_000_000,
+    });
+  }
+  return out;
+}
+
+describe("buildBtcEtfFlowsBarChartSvg", () => {
+  it("returns a 'No data' placeholder SVG when fewer than 2 flows", () => {
+    const empty = buildBtcEtfFlowsBarChartSvg([]);
+    expect(empty).toContain("No data");
+    expect(empty).toMatch(/^<svg/);
+    expect(empty.trim().endsWith("</svg>")).toBe(true);
+
+    const one = buildBtcEtfFlowsBarChartSvg([
+      {
+        date: "2026-05-01",
+        btc: 100,
+        eth: 0,
+        btcCumulative: 1,
+        ethCumulative: 0,
+      },
+    ]);
+    expect(one).toContain("No data");
+  });
+
+  it("renders only green bars when all daily flows are positive", () => {
+    const svg = buildBtcEtfFlowsBarChartSvg(makePositiveFlows(10));
+    expect(svg).toContain('fill="#22c55e"'); // green
+    expect(svg).not.toContain('fill="#ef4444"'); // no red
+    // Orange cumulative line still present
+    expect(svg).toContain('stroke="#f59e0b"');
+  });
+
+  it("renders both green and red bars + orange line when flows are mixed", () => {
+    const svg = buildBtcEtfFlowsBarChartSvg(makeMixedFlows(10));
+    expect(svg).toContain('fill="#22c55e"'); // green positive bars
+    expect(svg).toContain('fill="#ef4444"'); // red negative bars
+    expect(svg).toContain('stroke="#f59e0b"'); // orange cumulative line
+  });
+
+  it("uses the dispatch-spec width 1280 and height 400", () => {
+    const svg = buildBtcEtfFlowsBarChartSvg(makeMixedFlows(20));
+    expect(svg).toContain('width="1280"');
+    expect(svg).toContain('height="400"');
+    expect(svg).toContain('fill="#0b0d12"'); // dark bg matches BTC price chart
+    expect(svg).toContain("BITCOIN ETF FLOWS"); // title block
+  });
+
+  it("cumulative line endpoint matches flows[last].btcCumulative", () => {
+    // Build 5 flows with a known terminal cumulative; verify the line path's
+    // last L command's y position lines up with the same y the cumulative
+    // scale would produce for that final value. Easier check: ensure the
+    // header summary's CUM matches `flows[last].btcCumulative`.
+    const flows = makeMixedFlows(8);
+    const last = flows[flows.length - 1];
+    const svg = buildBtcEtfFlowsBarChartSvg(flows);
+
+    // Header summary string includes "CUM $XX.YYB" rendered with toFixed(2).
+    const cumLabel = last.btcCumulative >= 1e9
+      ? `$${(last.btcCumulative / 1e9).toFixed(2)}B`
+      : `$${(last.btcCumulative / 1e6).toFixed(0)}M`;
+    expect(svg).toContain(`CUM +${cumLabel}`);
+
+    // Sanity: the last <circle> dot for the line is the rightmost point and
+    // its cx is at or near the right inner edge (PAD_X + innerW).
+    const dotMatch = svg.match(/<circle\s+cx="([\d.]+)"\s+cy="[\d.]+"\s+r="4"\s+fill="#f59e0b"/);
+    expect(dotMatch).toBeTruthy();
+    const dotCx = parseFloat(dotMatch![1]);
+    expect(dotCx).toBeGreaterThan(1280 - 64 - 1); // ETF_W - ETF_PAD_X - tolerance
+  });
+
+  it("output is deterministic for fixed input (snapshot-friendly)", () => {
+    const a = buildBtcEtfFlowsBarChartSvg(makeMixedFlows(15));
+    const b = buildBtcEtfFlowsBarChartSvg(makeMixedFlows(15));
+    expect(a).toBe(b);
   });
 });
 

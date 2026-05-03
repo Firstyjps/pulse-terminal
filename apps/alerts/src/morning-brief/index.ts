@@ -32,6 +32,7 @@ import {
   sendTelegramPhoto,
 } from "./telegram.js";
 import {
+  buildBtcEtfFlowsBarChartSvg,
   buildBtcPriceChartSvg,
   fetchBtcKlines7d,
   svgToPng,
@@ -67,9 +68,12 @@ export interface RunMorningBriefResult {
   text?: string;
   /** "weekday" Mon-Fri BKK · "weekend" Sat/Sun BKK (drops ETF blocks). */
   mode?: "weekday" | "weekend";
-  /** True iff the photo step also succeeded. False on best-effort failure. */
+  /** True iff the BTC price photo step succeeded. False on best-effort failure. */
   imageSent?: boolean;
   imageError?: string;
+  /** True iff the BTC ETF flows photo step succeeded. Independent of imageSent. */
+  etfImageSent?: boolean;
+  etfImageError?: string;
 }
 
 function isBkkWeekend(now: number): boolean {
@@ -215,7 +219,7 @@ export async function runMorningBrief(
     return { sent: false, reason: "send_failed", error: msgRes.error, text, mode };
   }
 
-  // Best-effort image — BTC/USD 7d price chart from spot klines. Renders
+  // Best-effort image #1 — BTC/USD 7d price chart from spot klines. Renders
   // 7 days/week (BTC trades 24/7). Weekend no longer suppresses the image.
   let imageSent = false;
   let imageError: string | undefined;
@@ -243,5 +247,44 @@ export async function runMorningBrief(
     imageError = "no klines";
   }
 
-  return { sent: true, text, mode, imageSent, imageError };
+  // Best-effort image #2 — BTC ETF daily flows + cumulative line. Independent
+  // of the price chart above; either, both, or neither may succeed and the
+  // text body has already been sent.
+  let etfImageSent = false;
+  let etfImageError: string | undefined;
+  if (etf && etf.flows.length >= 2) {
+    try {
+      const etfSvg = buildBtcEtfFlowsBarChartSvg(etf.flows);
+      const etfPng = opts.svgToPngImpl
+        ? await opts.svgToPngImpl(etfSvg)
+        : await svgToPng(etfSvg);
+      if (etfPng) {
+        const etfPhotoRes = await sendTelegramPhoto(
+          opts.telegramToken,
+          opts.chatId,
+          etfPng,
+          undefined,
+          fetchImpl,
+        );
+        etfImageSent = etfPhotoRes.ok;
+        if (!etfPhotoRes.ok) etfImageError = etfPhotoRes.error;
+      } else {
+        etfImageError = "etf svg-to-png returned null";
+      }
+    } catch (err) {
+      etfImageError = (err as Error).message.slice(0, 200);
+    }
+  } else {
+    etfImageError = etf == null ? "no etf data" : "etf flows < 2";
+  }
+
+  return {
+    sent: true,
+    text,
+    mode,
+    imageSent,
+    imageError,
+    etfImageSent,
+    etfImageError,
+  };
 }
