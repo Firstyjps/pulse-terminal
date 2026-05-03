@@ -56,31 +56,49 @@ export function FearGreedGauge() {
         height: "100%",
       }}
     >
-      <svg viewBox="0 0 190 110" width="100%" style={{ maxHeight: 130 }}>
-        {Array.from({ length: segs }).map((_, i) => {
-          const s = -180 + (i * 180) / segs;
-          const e = -180 + ((i + 1) * 180) / segs - 1.5;
-          return <path key={i} d={arc(s, e)} stroke={segColors[i]} strokeWidth="10" fill="none" opacity="0.5" />;
-        })}
-        <g transform={`rotate(${ang} ${cx} ${cy})`}>
-          <line x1={cx} y1={cy} x2={cx} y2={cy - r + 4} stroke={colors.txt1} strokeWidth="2" />
-          <circle cx={cx} cy={cy - r + 4} r="3" fill={colors.txt1} />
-        </g>
-        <circle cx={cx} cy={cy} r="4" fill={colors.bg0} stroke={colors.amber} strokeWidth="1.5" />
-      </svg>
-
+      {/* Gauge group — value is absolutely positioned over the SVG so the
+          layout no longer depends on a fragile `marginTop: -36` hack that
+          collided with the panel chrome on narrow mobile widths. */}
       <div
-        className="mono-num"
         style={{
-          fontFamily: fonts.mono,
-          fontSize: 38,
-          fontWeight: 500,
-          marginTop: -36,
-          letterSpacing: "-0.02em",
-          color: zoneColor(value),
+          position: "relative",
+          width: "100%",
+          maxWidth: 240,
+          display: "flex",
+          justifyContent: "center",
         }}
       >
-        {fg ? value : "—"}
+        <svg viewBox="0 0 190 110" width="100%" style={{ maxHeight: 130, display: "block" }}>
+          {Array.from({ length: segs }).map((_, i) => {
+            const s = -180 + (i * 180) / segs;
+            const e = -180 + ((i + 1) * 180) / segs - 1.5;
+            return <path key={i} d={arc(s, e)} stroke={segColors[i]} strokeWidth="10" fill="none" opacity="0.5" />;
+          })}
+          <g transform={`rotate(${ang} ${cx} ${cy})`}>
+            <line x1={cx} y1={cy} x2={cx} y2={cy - r + 4} stroke={colors.txt1} strokeWidth="2" />
+            <circle cx={cx} cy={cy - r + 4} r="3" fill={colors.txt1} />
+          </g>
+          <circle cx={cx} cy={cy} r="4" fill={colors.bg0} stroke={colors.amber} strokeWidth="1.5" />
+        </svg>
+        <div
+          className="mono-num"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 2,
+            textAlign: "center",
+            fontFamily: fonts.mono,
+            fontSize: 32,
+            fontWeight: 500,
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            color: zoneColor(value),
+            pointerEvents: "none",
+          }}
+        >
+          {fg ? value : "—"}
+        </div>
       </div>
       <div
         style={{
@@ -88,7 +106,7 @@ export function FearGreedGauge() {
           fontSize: 11,
           textTransform: "uppercase",
           letterSpacing: "0.12em",
-          marginTop: 2,
+          marginTop: 6,
           color: zoneColor(value),
         }}
       >

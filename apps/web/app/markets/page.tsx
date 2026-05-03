@@ -5,16 +5,20 @@ import { Panel, WsRow, Workspace } from "@pulse/ui";
 import { MarketsTable } from "../../components/MarketsTable";
 import { CandlestickPanel } from "../../components/CandlestickPanel";
 import { MCPQuickAsk } from "../../components/MCPQuickAsk";
+import { useIsMobile } from "../../lib/use-media";
 
 /**
  * Markets — Bloomberg shell.
  *
  *   Row 1 (h-chart, 360px): MARKETS · Top 20 c-5 · CANDLESTICK c-7
- *   Row 2 (h-table, 340px): MARKETS · Full Top 20 list c-12
+ *   Row 2 (h-table, 340px): MARKETS · Full Top 20 list c-12  (desktop only —
+ *     on mobile the c-5 table from Row 1 already covers full width via the
+ *     12-col → 1-col collapse, so rendering it twice is just duplicate scroll.)
  */
 export default function MarketsPage() {
   const [symbol, setSymbol] = useState("BTC");
   const tradingPair = `${symbol}USDT`;
+  const isMobile = useIsMobile();
 
   return (
     <Workspace>
@@ -34,20 +38,22 @@ export default function MarketsPage() {
           actions={<MCPQuickAsk endpoint={`/api/klines?symbol=${tradingPair}&interval=1h`} label="Ask Claude" />}
           flush
         >
-          <CandlestickPanel symbol={tradingPair} label={`${symbol} · 1h candles`} hideControls={false} />
+          <CandlestickPanel symbol={tradingPair} label={`${symbol} · 1h candles`} hideControls={isMobile} />
         </Panel>
       </WsRow>
 
-      <WsRow height="table">
-        <Panel
-          span={12}
-          title={`${symbol} · DETAILED VIEW`}
-          badge="CLICK ROW TO SWITCH"
-          flush
-        >
-          <MarketsTable selectedSymbol={symbol} onSelect={setSymbol} />
-        </Panel>
-      </WsRow>
+      {!isMobile && (
+        <WsRow height="table">
+          <Panel
+            span={12}
+            title={`${symbol} · DETAILED VIEW`}
+            badge="CLICK ROW TO SWITCH"
+            flush
+          >
+            <MarketsTable selectedSymbol={symbol} onSelect={setSymbol} />
+          </Panel>
+        </WsRow>
+      )}
     </Workspace>
   );
 }

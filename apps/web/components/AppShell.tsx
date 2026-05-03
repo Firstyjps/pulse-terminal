@@ -51,13 +51,18 @@ function Frame({ children }: { children: React.ReactNode }) {
   useUiScale();
 
   if (isMobile) {
+    // Pin the shell to the dynamic viewport (100dvh follows iOS Safari's
+    // address-bar collapse) so the inner <main> scrolls and the BottomTabNav
+    // stays anchored at the bottom edge. After Phase 0 loosened html/body to
+    // natural document scroll, using `height: 100%` here let the shell grow
+    // to content height and pushed the tab nav off-screen during scroll.
     return (
       <div
         className="crt"
         style={{
           display: "grid",
           gridTemplateRows: "22px 26px 1fr 56px",
-          height: "100%",
+          height: "100dvh",
           width: "100%",
           background: "var(--bg)",
           color: "var(--fg)",

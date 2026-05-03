@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Panel, WsRow, Workspace, SignalPill, colors, fonts } from "@pulse/ui";
 import { useFlow } from "../../lib/use-flow";
+import { useIsMobile } from "../../lib/use-media";
 
 /**
  * Morning Brief — question-driven single-screen dashboard.
@@ -41,8 +43,15 @@ export default function MorningPage() {
 /* ──────────────────────────────────────────────────────────────────────── */
 
 function OvernightDigest() {
+  const isMobile = useIsMobile();
+  // Mobile reading: bump body to 14px and example block to 13px so the
+  // ~150-word digest paragraph stops being a wall of 10–11px Mono on phone.
+  // Line-height also opens up slightly for breathing room.
+  const bodyFs = isMobile ? 14 : 11;
+  const exampleFs = isMobile ? 13 : 10;
+  const bodyLh = isMobile ? 1.55 : 1.65;
   return (
-    <div style={{ fontFamily: fonts.mono, fontSize: 11, lineHeight: 1.65, color: colors.txt2, display: "flex", flexDirection: "column", gap: 10, height: "100%" }}>
+    <div style={{ fontFamily: fonts.mono, fontSize: bodyFs, lineHeight: bodyLh, color: colors.txt2, display: "flex", flexDirection: "column", gap: 10, height: "100%" }}>
       <p style={{ margin: 0 }}>
         <span style={{ color: colors.amber }}>▸</span>{" "}
         <span style={{ color: colors.txt4, fontStyle: "italic" }}>
@@ -52,8 +61,8 @@ function OvernightDigest() {
           <code style={{ color: colors.cyan }}>apps/alerts/data/digest-YYYY-MM-DD.md</code>.
         </span>
       </p>
-      <div style={{ padding: "8px 10px", background: colors.bg2, border: `1px dashed ${colors.line2}`, color: colors.txt3, fontSize: 10 }}>
-        <div style={{ color: colors.txt4, marginBottom: 4, letterSpacing: "0.08em" }}>── EXAMPLE OUTPUT (NOT LIVE) ──</div>
+      <div style={{ padding: "8px 10px", background: colors.bg2, border: `1px dashed ${colors.line2}`, color: colors.txt3, fontSize: exampleFs, lineHeight: bodyLh }}>
+        <div style={{ color: colors.txt4, marginBottom: 4, letterSpacing: "0.08em", fontSize: isMobile ? 10 : 9 }}>── EXAMPLE OUTPUT (NOT LIVE) ──</div>
         Markets traded sideways overnight with BTC pinned around $—.—K and ETH
         showing modest weakness against the cross. Funding compressed across all
         three majors — Binance perp now at —bps vs. —bps yesterday — pointing to
@@ -200,6 +209,7 @@ function rankSignals(records: AlertRecord[]): RankedSignal[] {
 
 function SignalFeed() {
   const { data, loading, error } = useFlow<RecentResp>("/api/alerts/recent?limit=100");
+  const isMobile = useIsMobile();
 
   if (loading && !data) {
     return <SignalEmpty>Loading signals…</SignalEmpty>;
@@ -212,6 +222,57 @@ function SignalFeed() {
   }
 
   const ranked = rankSignals(data?.records ?? []);
+
+  // Mobile: render the top-5 as stacked cards. The 5-column table at fontSize:10
+  // pinch-shrinks the SIGNAL column to ~3 chars per cell on a 390px viewport;
+  // cards give signal text the full width and surface SCORE/AGE on a single
+  // metadata row that doesn't fight for column space.
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
+          {ranked.length === 0 ? (
+            <div style={{ padding: 16, fontFamily: fonts.mono, fontSize: 11, color: colors.txt4 }}>
+              No findings in last {data?.count ?? 0} alert scans · scanner running clean
+            </div>
+          ) : (
+            ranked.map((s, i) => (
+              <div
+                key={`${s.symbol}-${s.ts}-${i}`}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  padding: "10px 12px",
+                  borderBottom: `1px solid ${colors.line}`,
+                  fontFamily: fonts.mono,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <SignalPill tone={s.tag} size="xs">{s.tag}</SignalPill>
+                  <span style={{ color: colors.txt2, fontSize: 12, fontWeight: 600, letterSpacing: "0.04em" }}>
+                    {s.symbol}
+                  </span>
+                  <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 10 }}>
+                    {s.ageStr}
+                  </span>
+                </div>
+                <div style={{ color: colors.txt2, fontSize: 12, lineHeight: 1.4 }}>
+                  {s.signal}
+                </div>
+                <div style={{ color: colors.txt4, fontSize: 9, fontVariantNumeric: "tabular-nums" }}>
+                  score {s.score.toFixed(2)} · severity {s.severity}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <div style={{ padding: "6px 10px", borderTop: `1px solid ${colors.line}`, fontSize: 9, color: colors.txt4, fontFamily: fonts.mono }}>
+          Composite score = severity({SEVERITY_W.high}/{SEVERITY_W.med}/{SEVERITY_W.low}) × novelty(1.0/0.5) × recency(exp(-h/12))
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -275,18 +336,30 @@ function ActionItems() {
   const toneFor = (k: Action["kind"]) =>
     k === "DECIDE" ? "amber" : k === "WATCH" ? "info" : k === "REBALANCE" ? "OI" : "muted";
 
+  // Once these become real tappable rows (post-signal-scorer wire-up) the row
+  // needs to *read* like a tap target on phone. iOS HIG = 44px min; we add
+  // cursor:pointer + a hover background so the affordance is visible even
+  // before the rows do anything.
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: fonts.mono, fontSize: 10 }}>
       {actions.map((a, i) => (
         <div
           key={i}
+          onMouseEnter={() => setHoverIdx(i)}
+          onMouseLeave={() => setHoverIdx(null)}
           style={{
             display: "grid",
             gridTemplateColumns: "70px 1fr",
-            alignItems: "start",
+            alignItems: "center",
             gap: 8,
-            padding: "8px 10px",
+            padding: "10px 10px",
+            minHeight: 44,
             borderTop: i === 0 ? "none" : `1px solid ${colors.line}`,
+            background: hoverIdx === i ? colors.bg2 : "transparent",
+            cursor: "pointer",
+            transition: "background 120ms ease",
           }}
         >
           <SignalPill tone={toneFor(a.kind)} size="xs">{a.kind}</SignalPill>

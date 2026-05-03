@@ -14,6 +14,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: "overview",    label: "OVERVIEW", glyph: "◆", href: "/",            fkey: "F1"  },
+  { id: "morning",     label: "MORNING",  glyph: "☀", href: "/morning",     fkey: "F11" },
   { id: "markets",     label: "MARKETS",  glyph: "▦", href: "/markets",     fkey: "F2"  },
   { id: "intel",       label: "INTEL",    glyph: "ℹ", href: "/intel",       fkey: "F4"  },
   { id: "derivatives", label: "DERIV",    glyph: "Ξ", href: "/derivatives", fkey: "F6"  },
@@ -22,7 +23,8 @@ const TABS: TabDef[] = [
 ];
 
 /**
- * BottomTabNav — fixed-bottom 56px tab bar for mobile (< 720px).
+ * BottomTabNav — fixed-bottom 56px tab bar for mobile (< 768px,
+ * Tailwind `md:` lower bound aligned in Phase 0).
  *
  * Replaces the 140px left rail when the viewport is too narrow.
  * Each tap-target is 56×≥56px (exceeds the 44px iOS HIG minimum).

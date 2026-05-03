@@ -150,7 +150,8 @@ export function AssetInspector({ activeId }: Props) {
           fill
           color={ch7 >= 0 ? colors.green : colors.red}
           height={48}
-          width={300}
+          width={600}
+          style={{ width: "100%" }}
         />
       </div>
     </div>

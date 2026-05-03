@@ -5,6 +5,7 @@ import { SignalPill, colors, fonts } from "@pulse/ui";
 import type { SignalTone } from "@pulse/ui";
 import type { AnomalyScan, AnomalyFinding } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
+import { useIsMobile } from "../lib/use-media";
 import { fmtTimeICT } from "../lib/time";
 
 /**
@@ -53,6 +54,7 @@ export function AlertsFeed({ symbol = "BTCUSDT", embed = "panel" }: AlertsFeedPr
   const [refresh, setRefresh] = useState(0);
   const { data, loading, error } = useFlow<AnomalyScan>(`/api/alerts/scan?symbol=${symbol}`, refresh);
   const slim = embed === "strip";
+  const isMobile = useIsMobile();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -137,6 +139,41 @@ export function AlertsFeed({ symbol = "BTCUSDT", embed = "panel" }: AlertsFeedPr
           data.findings.map((f, i) => {
             const tag = CAT_DISPLAY[f.category];
             const sev = f.severity;
+
+            // Mobile card layout — drops the timestamp/tag/signal/severity row
+            // grid (which collapses to ~50px tall and clips evidence text on a
+            // 390px viewport) for a stacked card with full-width signal text.
+            if (isMobile) {
+              return (
+                <div
+                  key={`${f.category}:${i}`}
+                  className="feed-row"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                    padding: "8px 10px",
+                    borderBottom: `1px solid ${colors.line}`,
+                    fontFamily: fonts.mono,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <SignalPill tone={tag} size="xs">{tag}</SignalPill>
+                    <SignalPill tone={SEV_TONE[sev]} size="xs">{sev}</SignalPill>
+                    <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 9 }}>
+                      {fmtTime(data.generatedAt)}
+                    </span>
+                  </div>
+                  <div style={{ color: colors.txt2, fontSize: 11, lineHeight: 1.35 }}>
+                    {f.signal}
+                  </div>
+                  <div style={{ color: colors.txt4, fontSize: 9, lineHeight: 1.4 }}>
+                    [{evidenceShort(f.evidence)}]
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={`${f.category}:${i}`}
