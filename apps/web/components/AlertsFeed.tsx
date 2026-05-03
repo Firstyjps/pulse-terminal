@@ -151,23 +151,23 @@ export function AlertsFeed({ symbol = "BTCUSDT", embed = "panel" }: AlertsFeedPr
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: 4,
-                    padding: "8px 10px",
+                    gap: 6,
+                    padding: "12px 14px",
                     borderBottom: `1px solid ${colors.line}`,
                     fontFamily: fonts.mono,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <SignalPill tone={tag} size="xs">{tag}</SignalPill>
                     <SignalPill tone={SEV_TONE[sev]} size="xs">{sev}</SignalPill>
-                    <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 9 }}>
+                    <span style={{ marginLeft: "auto", color: colors.txt4, fontSize: 10 }}>
                       {fmtTime(data.generatedAt)}
                     </span>
                   </div>
-                  <div style={{ color: colors.txt2, fontSize: 11, lineHeight: 1.35 }}>
+                  <div style={{ color: colors.txt2, fontSize: 12, lineHeight: 1.4 }}>
                     {f.signal}
                   </div>
-                  <div style={{ color: colors.txt4, fontSize: 9, lineHeight: 1.4 }}>
+                  <div style={{ color: colors.txt4, fontSize: 10, lineHeight: 1.4 }}>
                     [{evidenceShort(f.evidence)}]
                   </div>
                 </div>

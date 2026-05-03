@@ -261,8 +261,8 @@ body.sans .num, body.sans .mono, body.sans .mono-num { font-family: var(--mono);
    ═════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 767px) {
-  body { font-size: 11px; }
-  table { font-size: 11px !important; }
+  body { font-size: 12px; }
+  table { font-size: 12px !important; }
   th, td { padding: 6px 8px !important; }
 
   /* Ticker — drop the slow desktop animation to a faster cycle on mobile */
@@ -285,10 +285,15 @@ body.sans .num, body.sans .mono, body.sans .mono-num { font-family: var(--mono);
     grid-column: 1 / -1 !important;
   }
 
-  /* Per-row min heights so charts/tables don't squish to nothing on phones */
-  .ws-row.ws-row--chart > *  { min-height: 280px; }
-  .ws-row.ws-row--table > *  { min-height: 320px; }
-  .ws-row.ws-row--feed  > *  { min-height: 220px; }
+  /* Phase 2 rescale: drop the fixed per-row floor heights. The previous
+     280/320/220 floors trapped components like MacroOverlay (whose rows use
+     flex:1) into too-small panels — content overflowed the flex slot and the
+     next row's labels got painted over by the previous row's sparkline.
+     Letting panels grow to their natural content height removes the trap;
+     each component now decides its own mobile height. */
+  .ws-row.ws-row--chart > *  { min-height: 0; }
+  .ws-row.ws-row--table > *  { min-height: 0; }
+  .ws-row.ws-row--feed  > *  { min-height: 0; }
   .ws-row.ws-row--stats > *  { min-height: 0; }
 
   /* Hairline scrollbars overlap content less on phones */

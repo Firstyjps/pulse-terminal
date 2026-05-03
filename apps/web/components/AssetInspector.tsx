@@ -3,6 +3,7 @@
 import { Sparkbar, colors, fonts } from "@pulse/ui";
 import { formatUSD, formatPercent } from "@pulse/sources";
 import { useFlow } from "../lib/use-flow";
+import { useIsMobile } from "../lib/use-media";
 
 interface CoinRow {
   id: string;
@@ -33,6 +34,7 @@ interface Props {
 export function AssetInspector({ activeId }: Props) {
   const { data } = useFlow<CoinRow[]>("/api/markets");
   const coin = activeId ? data?.find((c) => c.id === activeId) : undefined;
+  const isMobile = useIsMobile();
 
   if (!coin) {
     return (
@@ -61,6 +63,98 @@ export function AssetInspector({ activeId }: Props) {
   const low = coin.low_24h ?? coin.current_price * 0.98;
   const supply = coin.circulating_supply ?? coin.market_cap / coin.current_price;
   const volMcap = (coin.total_volume / coin.market_cap) * 100;
+
+  // Mobile: pure document flow — header, then stats grid, then sparkline,
+  // each as its own block with explicit gaps. Phase 1's flex:1 KV grid +
+  // flex-shrink:0 sparkline footer overlapped when the panel was smaller
+  // than (header + 8 KVs + sparkline). Stacking with no flex-1 means each
+  // section keeps its own space and the panel grows to fit them all.
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", padding: "12px 14px", gap: 14, fontFamily: fonts.mono }}>
+        {/* Header */}
+        <div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{ color: colors.amber, fontSize: 16, fontWeight: 700 }}>
+              {coin.symbol.toUpperCase()}
+            </span>
+            <span style={{ color: colors.txt3, fontSize: 12 }}>{coin.name}</span>
+            <span
+              style={{
+                color: colors.txt4,
+                fontSize: 10,
+                marginLeft: "auto",
+                letterSpacing: "0.08em",
+              }}
+            >
+              RANK #{coin.market_cap_rank ?? "—"}
+            </span>
+          </div>
+          <div style={{ marginTop: 6, display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span
+              className="mono-num"
+              style={{ fontSize: 26, color: colors.txt1, letterSpacing: "-0.01em", fontWeight: 500 }}
+            >
+              {formatUSD(coin.current_price, { compact: false, decimals: coin.current_price < 1 ? 4 : 2 })}
+            </span>
+            <span
+              className="mono-num"
+              style={{
+                fontSize: 14,
+                color: ch24 >= 0 ? colors.green : colors.red,
+                fontWeight: 600,
+              }}
+            >
+              {ch24 >= 0 ? "▲" : "▼"} {formatPercent(ch24)}
+            </span>
+          </div>
+        </div>
+
+        {/* KV stats — own block, full width, 2-col, no flex compression */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "6px 14px",
+          }}
+        >
+          <Kv k="Mkt Cap" v={formatUSD(coin.market_cap, { compact: true, decimals: 2 })} mobile />
+          <Kv k="Vol 24h" v={formatUSD(coin.total_volume, { compact: true, decimals: 2 })} mobile />
+          <Kv k="High 24h" v={formatUSD(high, { compact: false, decimals: high < 1 ? 4 : 2 })} mobile />
+          <Kv k="Low 24h" v={formatUSD(low, { compact: false, decimals: low < 1 ? 4 : 2 })} mobile />
+          <Kv k="Vol/Mcap" v={`${volMcap.toFixed(2)}%`} mobile />
+          <Kv k="Circ Supply" v={fmtCompactNum(supply)} mobile />
+          <Kv k="7d" v={formatPercent(ch7)} vColor={ch7 >= 0 ? colors.green : colors.red} mobile />
+          <Kv k="1h" v={formatPercent(ch1)} vColor={ch1 >= 0 ? colors.green : colors.red} mobile />
+        </div>
+
+        {/* Sparkline — own block, clear gap above, no overlap with stats */}
+        <div>
+          <div
+            style={{
+              fontFamily: fonts.mono,
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: colors.txt3,
+              marginBottom: 8,
+            }}
+          >
+            7D Sparkline
+          </div>
+          <Sparkbar
+            data={coin.sparkline_in_7d?.price ?? []}
+            asLine
+            fill
+            color={ch7 >= 0 ? colors.green : colors.red}
+            height={96}
+            width={600}
+            style={{ width: "100%" }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -158,15 +252,15 @@ export function AssetInspector({ activeId }: Props) {
   );
 }
 
-function Kv({ k, v, vColor }: { k: string; v: React.ReactNode; vColor?: string }) {
+function Kv({ k, v, vColor, mobile }: { k: string; v: React.ReactNode; vColor?: string; mobile?: boolean }) {
   return (
     <div
       style={{
         display: "flex",
         justifyContent: "space-between",
-        padding: "3px 0",
+        padding: mobile ? "5px 0" : "3px 0",
         borderBottom: `1px dashed ${colors.line}`,
-        fontSize: 11,
+        fontSize: mobile ? 13 : 11,
         fontFamily: fonts.mono,
       }}
     >
@@ -174,7 +268,7 @@ function Kv({ k, v, vColor }: { k: string; v: React.ReactNode; vColor?: string }
         style={{
           color: colors.txt3,
           textTransform: "uppercase",
-          fontSize: 9,
+          fontSize: mobile ? 10 : 9,
           letterSpacing: "0.06em",
         }}
       >

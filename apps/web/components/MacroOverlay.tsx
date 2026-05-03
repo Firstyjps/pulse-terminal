@@ -17,10 +17,40 @@ import { useIsMobile } from "../lib/use-media";
  */
 export function MacroOverlay() {
   const { data } = useFlow<MacroResponse>("/api/macro");
+  const isMobile = useIsMobile();
   const rows: { s: MacroSeries; corr: number }[] = [];
   if (data?.dxy) rows.push({ s: data.dxy, corr: data.dxy.change24h < 0 ? 0.45 : -0.55 });
   if (data?.spx) rows.push({ s: data.spx, corr: 0.62 });
   if (data?.gold) rows.push({ s: data.gold, corr: 0.18 });
+
+  // Mobile: drop the flex:1 wrapper. Phase 1 had Section A as flex:1 with each
+  // Row also flex:1 — when 3 rows of ~100px content tried to share Section A's
+  // 120-180px flex slot, the grid contents overflowed each row's box and the
+  // sparklines from row N painted over row N+1's labels (the "labels missing"
+  // bug the user reported). Pure document flow on mobile = each row keeps its
+  // own height, no overlap. Correlation footer also dropped on mobile to keep
+  // the panel focused on the symbol+value+chart.
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", fontFamily: fonts.mono }}>
+        {rows.map((r) => (
+          <Row key={r.s.symbol} s={r.s} />
+        ))}
+        {rows.length === 0 && (
+          <div
+            style={{
+              padding: 16,
+              fontSize: 11,
+              textAlign: "center",
+              color: colors.txt3,
+            }}
+          >
+            <span className="blink">▒ MACRO FEED LOADING ▒</span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -77,11 +107,12 @@ function Row({ s }: { s: MacroSeries }) {
   const series = s.history.map((p) => p.value);
   const isMobile = useIsMobile();
 
-  // Mobile: stack symbol+sublabel and value+chg in a 2-row header, then full-
-  // width sparkline below. The desktop 4-col grid (72px 1fr 96px 72px) collapses
-  // to ~150px sparkline on a 390px viewport with the sub-label "DOLLAR INDEX"
-  // wrapping under "DXY" and crashing into the next row's sparkline — this
-  // layout gives the sparkline the full panel width and never wraps the label.
+  // Mobile: stack header (symbol+value, sublabel+chg) above a full-width
+  // sparkline. Phase 2 fix: dropped `flex: 1; min-height: 0` from this Row
+  // because in a flex-column parent that ALSO had flex:1, it forced each row
+  // to share the parent's height — content overflowed and the sparkline of
+  // row N painted over row N+1's labels. This row now sizes to its own
+  // content (no flex), with an explicit minHeight floor for breathing room.
   if (isMobile) {
     return (
       <div
@@ -89,39 +120,38 @@ function Row({ s }: { s: MacroSeries }) {
         style={{
           display: "grid",
           gridTemplateColumns: "1fr auto",
-          gap: "2px 12px",
-          padding: "10px 12px",
+          gap: "4px 14px",
+          padding: "12px 14px",
+          minHeight: 96,
           borderBottom: `1px solid ${colors.line}`,
           fontFamily: fonts.mono,
-          flex: 1,
-          minHeight: 0,
         }}
       >
-        <span style={{ color: colors.amber, fontWeight: 700, fontSize: 14, letterSpacing: "0.06em" }}>
+        <span style={{ color: colors.amber, fontWeight: 700, fontSize: 16, letterSpacing: "0.06em" }}>
           {s.symbol}
         </span>
         <span
           className="mono-num"
-          style={{ textAlign: "right", color: colors.txt1, fontWeight: 500, fontSize: 14 }}
+          style={{ textAlign: "right", color: colors.txt1, fontWeight: 600, fontSize: 16 }}
         >
           {s.current.toLocaleString(undefined, { maximumFractionDigits: s.current < 10 ? 3 : 2 })}
         </span>
-        <span style={{ color: colors.txt4, fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+        <span style={{ color: colors.txt4, fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase" }}>
           {s.label}
         </span>
         <span
           className="mono-num"
-          style={{ textAlign: "right", color, fontWeight: 600, fontSize: 11 }}
+          style={{ textAlign: "right", color, fontWeight: 600, fontSize: 13 }}
         >
           {formatPercent(s.change24h)}
         </span>
-        <div style={{ gridColumn: "1 / -1", minWidth: 0, marginTop: 6 }}>
+        <div style={{ gridColumn: "1 / -1", minWidth: 0, marginTop: 8 }}>
           <Sparkbar
             data={series}
             asLine
             fill
             color={color}
-            height={36}
+            height={48}
             width={600}
             style={{ width: "100%" }}
           />

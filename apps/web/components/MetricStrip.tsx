@@ -43,8 +43,13 @@ export function MetricStrip({ refreshKey }: Props) {
 
   const active = o?.activeCryptocurrencies?.toLocaleString() ?? "—";
 
+  // Mobile: single column. Phase 1's 2×3 grid at minHeight 264 = 88px per
+  // tile, which clipped large values like "$2.79T" because the StatBlock's
+  // label + value + delta + sub at default line-height 1.4 needs ~90–95px.
+  // Single column gives each metric the full panel width and lets the panel
+  // grow to ~6×80 = 480px tall on phone.
   const cols =
-    vp === "mobile" ? "repeat(2, 1fr)" :
+    vp === "mobile" ? "1fr" :
     vp === "tablet" ? "repeat(3, 1fr)" :
     "repeat(6, 1fr)";
 
@@ -53,10 +58,11 @@ export function MetricStrip({ refreshKey }: Props) {
       style={{
         display: "grid",
         gridTemplateColumns: cols,
+        gridAutoRows: vp === "mobile" ? "minmax(72px, auto)" : undefined,
         gap: 1,
         background: colors.line,
-        height: "100%",
-        minHeight: vp === "mobile" ? 264 : vp === "tablet" ? 192 : "100%",
+        height: vp === "mobile" ? "auto" : "100%",
+        minHeight: vp === "mobile" ? "auto" : vp === "tablet" ? 192 : "100%",
       }}
     >
       <StatBlock

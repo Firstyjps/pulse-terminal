@@ -2,6 +2,7 @@
 
 import { colors, fonts } from "@pulse/ui";
 import { useFlow } from "../lib/use-flow";
+import { useIsMobile } from "../lib/use-media";
 import type { MarketOverview } from "@pulse/sources";
 
 /**
@@ -17,6 +18,7 @@ export function FearGreedGauge() {
   const fg = overview.data?.fearGreedIndex;
   const value = fg?.value ?? 50;
   const label = fg?.classification ?? "—";
+  const isMobile = useIsMobile();
 
   const ang = -90 + (value / 100) * 180;
 
@@ -44,6 +46,70 @@ export function FearGreedGauge() {
   function arc(s: number, e: number) {
     const [x1, y1] = polar(s), [x2, y2] = polar(e);
     return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  }
+
+  // Mobile: stack the SVG, then the value as a normal block element below the
+  // arc with a generous 28px font. Phase 1's absolute-positioned-over-SVG
+  // approach broke when the SVG's aspect-ratio + maxHeight interaction
+  // collapsed the wrapper height — value text ended up clipped or off-screen.
+  // Stacked layout has zero positioning fragility.
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "16px 12px 20px",
+          gap: 10,
+        }}
+      >
+        <svg
+          viewBox="0 0 190 110"
+          width="100%"
+          style={{ maxWidth: 280, height: "auto", display: "block" }}
+        >
+          {Array.from({ length: segs }).map((_, i) => {
+            const s = -180 + (i * 180) / segs;
+            const e = -180 + ((i + 1) * 180) / segs - 1.5;
+            return <path key={i} d={arc(s, e)} stroke={segColors[i]} strokeWidth="10" fill="none" opacity="0.5" />;
+          })}
+          <g transform={`rotate(${ang} ${cx} ${cy})`}>
+            <line x1={cx} y1={cy} x2={cx} y2={cy - r + 4} stroke={colors.txt1} strokeWidth="2" />
+            <circle cx={cx} cy={cy - r + 4} r="3" fill={colors.txt1} />
+          </g>
+          <circle cx={cx} cy={cy} r="4" fill={colors.bg0} stroke={colors.amber} strokeWidth="1.5" />
+        </svg>
+        <div
+          className="mono-num"
+          style={{
+            fontFamily: fonts.mono,
+            fontSize: 40,
+            fontWeight: 600,
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            color: zoneColor(value),
+          }}
+        >
+          {fg ? value : "—"}
+        </div>
+        <div
+          style={{
+            fontFamily: fonts.mono,
+            fontSize: 13,
+            textTransform: "uppercase",
+            letterSpacing: "0.14em",
+            color: zoneColor(value),
+            fontWeight: 600,
+          }}
+        >
+          {label.toUpperCase()}
+        </div>
+        <div style={{ fontFamily: fonts.mono, fontSize: 10, color: colors.txt4, letterSpacing: "0.08em" }}>
+          ALTERNATIVE.ME · 24H
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -199,11 +199,11 @@ export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSe
                   style={{
                     display: "grid",
                     gridTemplateColumns: "auto 1fr auto",
-                    columnGap: 10,
-                    rowGap: 4,
+                    columnGap: 12,
+                    rowGap: 6,
                     alignItems: "center",
-                    padding: "10px 12px",
-                    minHeight: 60,
+                    padding: "14px 16px",
+                    minHeight: 68,
                     borderBottom: `1px solid ${colors.line}`,
                     background: isActive ? "rgba(255,176,0,0.08)" : "transparent",
                     cursor: "pointer",
@@ -211,14 +211,14 @@ export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSe
                   }}
                 >
                   <span style={{ gridRow: "1 / span 2", display: "inline-flex" }}>
-                    <CoinAvatar url={c.image} symbol={c.symbol} size={24} />
+                    <CoinAvatar url={c.image} symbol={c.symbol} size={28} />
                   </span>
 
                   <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
-                    <span style={{ color: colors.amber, fontWeight: 600, fontSize: 12 }}>
+                    <span style={{ color: colors.amber, fontWeight: 700, fontSize: 13 }}>
                       {c.symbol.toUpperCase()}
                     </span>
-                    <span style={{ color: colors.txt4, fontSize: 10, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ color: colors.txt4, fontSize: 11, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {c.name}
                     </span>
                     <span style={{ color: colors.txt4, fontSize: 10, marginLeft: "auto" }}>
@@ -226,25 +226,25 @@ export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSe
                     </span>
                   </span>
 
-                  <span style={{ display: "flex", justifyContent: "flex-end", color: colors.txt1, fontSize: 12, fontWeight: 500, gridRow: 1 }}>
+                  <span style={{ display: "flex", justifyContent: "flex-end", color: colors.txt1, fontSize: 13, fontWeight: 500, gridRow: 1 }}>
                     {formatUSD(c.current_price, { compact: false, decimals: c.current_price < 1 ? 4 : 2 })}
                   </span>
 
-                  <span style={{ display: "flex", gap: 12, fontSize: 10, color: colors.txt4, gridColumn: "2 / 3" }}>
+                  <span style={{ display: "flex", gap: 14, fontSize: 11, color: colors.txt4, gridColumn: "2 / 3" }}>
                     <span>
-                      <span style={{ color: colors.txt4, marginRight: 3 }}>24h</span>
+                      <span style={{ color: colors.txt4, marginRight: 4 }}>24h</span>
                       <span style={{ color: ch24 >= 0 ? colors.green : colors.red, fontWeight: 600 }}>
                         {formatPercent(ch24)}
                       </span>
                     </span>
                     <span>
-                      <span style={{ color: colors.txt4, marginRight: 3 }}>7d</span>
+                      <span style={{ color: colors.txt4, marginRight: 4 }}>7d</span>
                       <span style={{ color: ch7 >= 0 ? colors.green : colors.red }}>
                         {formatPercent(ch7)}
                       </span>
                     </span>
                     <span>
-                      <span style={{ color: colors.txt4, marginRight: 3 }}>vol</span>
+                      <span style={{ color: colors.txt4, marginRight: 4 }}>vol</span>
                       <span>{formatUSD(c.total_volume, { compact: true, decimals: 1 })}</span>
                     </span>
                   </span>
@@ -256,8 +256,8 @@ export function MoversTable({ activeId, onPick, query: extQuery, setQuery: extSe
                         color={ch7 >= 0 ? colors.green : colors.red}
                         asLine
                         fill
-                        height={18}
-                        width={70}
+                        height={20}
+                        width={80}
                       />
                     )}
                   </span>
