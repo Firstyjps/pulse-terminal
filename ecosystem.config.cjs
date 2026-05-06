@@ -18,6 +18,7 @@ const path = require("node:path");
 const tsxLoader = (appCwd) =>
   "file://" +
   path.resolve(__dirname, appCwd, "node_modules/tsx/dist/loader.mjs").replace(/\\/g, "/");
+const alertsLogPath = path.resolve(__dirname, "apps/alerts/data/alerts.jsonl");
 
 module.exports = {
   apps: [
@@ -30,6 +31,7 @@ module.exports = {
         NODE_ENV: "production",
         NEXT_PUBLIC_WS_URL: "ws://localhost:8080",
         PULSE_HUB_URL: "http://127.0.0.1:8081",
+        ALERT_LOG_PATH: alertsLogPath,
       },
       autorestart: true,
       max_memory_restart: "512M",
@@ -66,7 +68,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         ALERT_INTERVAL_MS: "240000",
-        ALERT_LOG_PATH: "./data/alerts.jsonl",
+        ALERT_LOG_PATH: alertsLogPath,
         ALERT_MIN_SEVERITY: "med",
         ALERT_FUNDING_SYMBOL: "BTCUSDT",
       },

@@ -6,7 +6,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileP = promisify(execFile);
-const TIMEOUT_MS = 2_000;
+const TIMEOUT_MS = Number(process.env.PULSE_STATUS_TIMEOUT_MS ?? 7_000);
+const PULSE_PROCESS_NAMES = new Set(["pulse-web", "pulse-realtime", "pulse-alerts"]);
 
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
@@ -65,7 +66,9 @@ async function main() {
       console.log(`${DIM}pm2: no processes registered${RESET}`);
     } else {
       console.log(`${BOLD}pm2 processes${RESET}`);
-      for (const proc of pm2) {
+      const pulse = pm2.filter((proc) => PULSE_PROCESS_NAMES.has(proc.name));
+      const extraCount = pm2.length - pulse.length;
+      for (const proc of pulse) {
         const status = proc.pm2_env?.status ?? "unknown";
         const ok = status === "online";
         const mem = (proc.monit?.memory ?? 0) / 1024 / 1024;
@@ -76,6 +79,9 @@ async function main() {
         console.log(
           `  ${badge(ok, proc.name)} ${DIM}status=${status} mem=${mem.toFixed(0)}MB cpu=${cpu}% restarts=${restarts} up=${uptimeMin}min${RESET}`,
         );
+      }
+      if (extraCount > 0) {
+        console.log(`  ${DIM}${extraCount} non-Pulse pm2 process(es) omitted · env values never printed${RESET}`);
       }
     }
   } else {
@@ -112,6 +118,12 @@ async function main() {
     }
     if (r.body?.snapshotAgeSec != null) {
       console.log(`      ${DIM}snapshotAge=${r.body.snapshotAgeSec}s · funding=${r.body.fundingChannelsFresh ?? "?"} channels · oi=${r.body.oiChannels ?? "?"} channels${RESET}`);
+    }
+    if (r.body?.apr) {
+      const apr = r.body.apr;
+      const lastWrite =
+        apr.lastWriteMs == null ? "never" : `${Math.round(apr.lastWriteMs / 1000)}s ago`;
+      console.log(`      ${DIM}apr=${apr.storeOk ? "ok" : "down"} · lastWrite=${lastWrite} · samples24h=${apr.samplesLast24h ?? "?"}${RESET}`);
     }
   }
 

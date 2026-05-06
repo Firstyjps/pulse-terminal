@@ -24,6 +24,22 @@ function truncate() {
   }
 }
 
+async function rmTempDirWithRetry(dir: string) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    }
+  }
+
+  console.warn("[dual-assets store test] temp cleanup skipped:", (lastError as Error)?.message ?? String(lastError));
+}
+
 const baseSnap = (overrides: Partial<DualAssetSnapshot> = {}): DualAssetSnapshot => ({
   timestamp_utc: "2026-04-28T05:00:00.000Z",
   timestamp_ict: "2026-04-28T12:00:00.000+07:00",
@@ -40,9 +56,9 @@ const baseSnap = (overrides: Partial<DualAssetSnapshot> = {}): DualAssetSnapshot
   ...overrides,
 });
 
-afterAll(() => {
+afterAll(async () => {
   closeDb();
-  rmSync(TMP_DIR, { recursive: true, force: true });
+  await rmTempDirWithRetry(TMP_DIR);
 });
 
 describe("dual-assets store", () => {

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { fetchJson, type FuturesData } from "@pulse/sources";
+import { resolveAlertsLogPath } from "../../../lib/alerts-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,10 +23,7 @@ interface PatternStats {
   samples: number;
 }
 
-// Web's CWD is `apps/web/`; the alerts log lives next door at `apps/alerts/data/`.
-const LOG_PATH = resolve(
-  process.env.ALERT_LOG_PATH ?? resolve(process.cwd(), "../alerts/data/alerts.jsonl"),
-);
+const LOG_PATH = resolveAlertsLogPath();
 // "Expected direction" per pattern category — used to score the alert
 const EXPECTED_DIRECTION: Record<string, "down" | "up"> = {
   etf: "down",        // outflow → expect down
@@ -126,7 +123,7 @@ export async function GET(req: Request) {
   if (!scans.length) {
     return Response.json({
       configured: false,
-      message: `No alert log at ${LOG_PATH}. Run \`pnpm --filter @pulse/alerts dev\` for a while to populate.`,
+      message: "No alert log found. Run `pnpm --filter @pulse/alerts dev` for a while to populate.",
       summary: { totalScans: 0, scoredScans: 0, oldestTs: null, newestTs: null, lookaheadHours: lookaheadH } satisfies BacktestSummary,
       stats: [] as PatternStats[],
     });

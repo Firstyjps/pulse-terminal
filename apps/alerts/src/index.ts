@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { scanAnomalies } from "@pulse/sources/server";
 import { AlertStore, type ScanRecord } from "./storage.js";
 import { Notifier } from "./notifier.js";
@@ -10,10 +11,32 @@ import { startPortfolioSnapshotCron } from "./portfolio-snapshot/index.js";
 import { runMorningBrief } from "./morning-brief/index.js";
 
 const INTERVAL_MS = Number(process.env.ALERT_INTERVAL_MS ?? 240_000);
-const LOG_PATH = resolve(process.env.ALERT_LOG_PATH ?? "./data/alerts.jsonl");
+const LOG_PATH = resolveAlertsLogPath(process.env.ALERT_LOG_PATH);
 const WEBHOOK_URL = process.env.ALERT_WEBHOOK_URL;
 const MIN_SEVERITY = (process.env.ALERT_MIN_SEVERITY ?? "med") as "low" | "med" | "high";
 const SYMBOL = process.env.ALERT_FUNDING_SYMBOL ?? "BTCUSDT";
+
+function findRepoRoot(start: string): string {
+  let dir = start;
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(resolve(dir, "pnpm-workspace.yaml"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return start;
+}
+
+function resolveAlertsLogPath(raw?: string): string {
+  const repoRoot = findRepoRoot(process.cwd());
+  if (!raw) return resolve(process.cwd(), "data/alerts.jsonl");
+  if (isAbsolute(raw)) return raw;
+
+  const normalized = raw.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (normalized.startsWith("apps/alerts/")) return resolve(repoRoot, normalized);
+
+  return resolve(process.cwd(), raw);
+}
 
 const store = new AlertStore(LOG_PATH);
 const notifier = new Notifier(WEBHOOK_URL, MIN_SEVERITY);

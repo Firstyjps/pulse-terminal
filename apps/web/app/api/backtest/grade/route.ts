@@ -1,5 +1,5 @@
-import { resolve } from "node:path";
 import { runGradedBacktest } from "@pulse/sources/server";
+import { resolveAlertsLogPath } from "../../../../lib/alerts-log";
 
 // Phase 4 — graded backtest endpoint.
 //
@@ -21,8 +21,7 @@ export async function GET(req: Request): Promise<Response> {
   const lookbackDays = clampInt(url.searchParams.get("lookback"), 1, 365, 30);
   const allowSynthetic = url.searchParams.get("synthetic") !== "false";
 
-  // Web's CWD is `apps/web/`; alerts log lives next door.
-  const logPath = resolve(process.cwd(), "../alerts/data/alerts.jsonl");
+  const logPath = resolveAlertsLogPath();
 
   try {
     const sinceMs = Date.now() - lookbackDays * 24 * 3_600_000;

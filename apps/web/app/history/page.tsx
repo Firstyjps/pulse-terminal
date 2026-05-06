@@ -137,8 +137,13 @@ export default function HistoryPage() {
 
   async function clearAll() {
     if (!window.confirm("Clear ALL snapshot history? This cannot be undone.")) return;
+    const token = window.prompt("Admin token required");
+    if (!token) return;
     try {
-      const res = await fetch("/api/snapshot/history/clear", { method: "POST" });
+      const res = await fetch("/api/snapshot/history/clear", {
+        method: "POST",
+        headers: { "x-pulse-admin-token": token },
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setRefreshKey((k) => k + 1);
       toast.push({ tone: "info", title: "History cleared", body: "All snapshots removed. Cron will start fresh tonight." });

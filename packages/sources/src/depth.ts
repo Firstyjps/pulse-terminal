@@ -17,13 +17,12 @@ interface BinanceDepthResp {
   lastUpdateId: number;
 }
 
-const HUB = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
-
 async function fromHub(symbol: string): Promise<DepthBook | null> {
+  const hub = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 800);
-    const res = await fetch(`${HUB}/depth?symbol=${symbol}`, { signal: ctrl.signal });
+    const res = await fetch(`${hub}/depth?symbol=${symbol}`, { signal: ctrl.signal });
     clearTimeout(t);
     if (!res.ok) return null;
     return (await res.json()) as DepthBook;

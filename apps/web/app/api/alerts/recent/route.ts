@@ -1,13 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolveAlertsLogPath } from "../../../../lib/alerts-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Web's CWD is `apps/web/`; the alerts log lives next door at `apps/alerts/data/`.
-const LOG_PATH = resolve(
-  process.env.ALERT_LOG_PATH ?? resolve(process.cwd(), "../alerts/data/alerts.jsonl"),
-);
+const LOG_PATH = resolveAlertsLogPath();
 
 interface ScanRecord {
   ts: string;
@@ -39,15 +36,13 @@ export async function GET(request: Request) {
     return Response.json({
       configured: true,
       count: records.length,
-      logPath: LOG_PATH,
       records,
     });
   } catch {
     return Response.json({
       configured: false,
       count: 0,
-      logPath: LOG_PATH,
-      message: `No alert log at ${LOG_PATH}. Start the worker: pnpm --filter @pulse/alerts dev`,
+      message: "No alert log found. Start the worker: pnpm --filter @pulse/alerts dev",
       records: [] as ScanRecord[],
     });
   }

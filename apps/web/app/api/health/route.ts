@@ -16,12 +16,13 @@ interface CheckResult {
   err?: string;
 }
 
-const TIMEOUT_MS = 2_000;
+const TIMEOUT_MS = 2_500;
+const HUB_TIMEOUT_MS = 1_200;
 
-async function ping(url: string): Promise<CheckResult> {
+async function ping(url: string, timeoutMs = TIMEOUT_MS): Promise<CheckResult> {
   const started = performance.now();
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
     return { ok: res.ok, ms: Math.round(performance.now() - started) };
@@ -37,14 +38,16 @@ async function ping(url: string): Promise<CheckResult> {
 }
 
 export async function GET() {
-  const [coingecko, defillama, binance, yahoo] = await Promise.all([
+  const hubUrl = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
+  const [coingecko, defillama, binance, yahoo, hub] = await Promise.all([
     ping("https://api.coingecko.com/api/v3/ping"),
     ping("https://api.llama.fi/v2/historicalChainTvl"),
     ping("https://fapi.binance.com/fapi/v1/ping"),
     ping("https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=1d&interval=1d"),
+    ping(`${hubUrl}/health`, HUB_TIMEOUT_MS),
   ]);
 
-  const checks = { coingecko, defillama, binance, yahoo };
+  const checks = { coingecko, defillama, binance, yahoo, hub };
   const failed = Object.values(checks).filter((c) => !c.ok).length;
   const status = failed === 0 ? "healthy" : failed <= 2 ? "degraded" : "unhealthy";
 
