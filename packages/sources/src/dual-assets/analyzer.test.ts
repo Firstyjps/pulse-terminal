@@ -9,7 +9,7 @@ const TMP_DIR = mkdtempSync(join(tmpdir(), "dual-assets-analyzer-test-"));
 const TMP_DB = join(TMP_DIR, "test.sqlite");
 process.env.DUAL_ASSETS_DB_PATH = TMP_DB;
 
-const { saveSnapshot, closeDb } = await import("./store.js");
+const { saveSnapshot, updateDailySummary, closeDb } = await import("./store.js");
 const { generateHourlyReport } = await import("./analyzer.js");
 
 function truncate() {
@@ -80,6 +80,19 @@ describe("generateHourlyReport", () => {
     expect(report.best_hours[0].hour_ict).toBe(12);
     expect(report.coin_pair).toBe("SOL-USDT");
     expect(report.target_price).toBe(78);
+    expect(report.confidence.score).toBeGreaterThan(0);
+  });
+
+  it("adds APR trend from daily summaries", () => {
+    saveSnapshot(snap({ timestamp_utc: "2026-04-28T05:00:00.000Z", timestamp_ict: "2026-04-28T12:00:00.000+07:00", apr_pct: 80 }));
+    saveSnapshot(snap({ timestamp_utc: "2026-04-29T05:00:00.000Z", timestamp_ict: "2026-04-29T12:00:00.000+07:00", apr_pct: 140 }));
+    updateDailySummary("2026-04-28");
+    updateDailySummary("2026-04-29");
+
+    const report = generateHourlyReport({ coinPair: "SOL-USDT", targetPrice: 78, days: 365 });
+    if ("error" in report) throw new Error("expected report");
+    expect(report.trend.direction).toBe("rising");
+    expect(report.trend.latest_avg_apr).toBe(140);
   });
 
   it("classifies hot/cold hours by 1.1x / 0.9x of overall avg", () => {

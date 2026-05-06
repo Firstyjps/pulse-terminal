@@ -85,12 +85,15 @@ const stopPortfolioSnapshotCron = startPortfolioSnapshotCron();
 // ─────────────────────────────────────────────────────────────────
 
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
+const TG_CHAT_RAW = process.env.TELEGRAM_CHAT_ID;
+const TG_CHAT_IDS = TG_CHAT_RAW
+  ? TG_CHAT_RAW.split(",").map((s) => s.trim()).filter(Boolean)
+  : [];
 const HUB_BASE = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
 const DASHBOARD_URL = process.env.PULSE_DASHBOARD_URL ?? "http://localhost:3000/morning";
 
 let stopMorningBrief: () => void = () => {};
-if (TG_TOKEN && TG_CHAT) {
+if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
   let lastFiredDate: string | null = null;
   const tick = async () => {
     const bkkNow = new Date(Date.now() + 7 * 60 * 60_000);
@@ -103,15 +106,21 @@ if (TG_TOKEN && TG_CHAT) {
         now: Date.now(),
         hubBase: HUB_BASE,
         telegramToken: TG_TOKEN,
-        chatId: TG_CHAT,
+        chatIds: TG_CHAT_IDS,
         dashboardUrl: DASHBOARD_URL,
       });
       if (r.sent) {
-        console.log(
-          `[alerts] morning brief sent (${dateStr}) — image:${r.imageSent ? "ok" : `skip(${r.imageError ?? "?"})`}`,
-        );
+        const tag = r.recipients
+          ? `recipients:${r.recipients.filter((x) => x.sent).length}/${r.recipients.length}`
+          : `image:${r.imageSent ? "ok" : `skip(${r.imageError ?? "?"})`}`;
+        console.log(`[alerts] morning brief sent (${dateStr}) — ${tag}`);
       } else {
-        console.log(`[alerts] morning brief skipped (${dateStr}) — ${r.reason ?? "?"}${r.error ? `: ${r.error}` : ""}`);
+        const partial = r.recipients?.some((x) => x.sent)
+          ? ` (partial: ${r.recipients.filter((x) => x.sent).length}/${r.recipients.length})`
+          : "";
+        console.log(
+          `[alerts] morning brief skipped (${dateStr}) — ${r.reason ?? "?"}${r.error ? `: ${r.error}` : ""}${partial}`,
+        );
       }
     } catch (err) {
       console.warn(`[alerts] morning brief threw:`, (err as Error).message);
@@ -121,7 +130,7 @@ if (TG_TOKEN && TG_CHAT) {
   void tick(); // probe immediately so a 09:00-late start still fires today
   stopMorningBrief = () => clearInterval(timer);
   console.log(
-    `[alerts] morning brief armed — 09:00 BKK daily, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}`,
+    `[alerts] morning brief armed — 09:00 BKK daily, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}, recipients ${TG_CHAT_IDS.length}`,
   );
 } else {
   console.log("[alerts] morning brief disabled — set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable");

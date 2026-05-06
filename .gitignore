@@ -21,6 +21,12 @@ option-dashboard/
 
 # Claude Code worktrees (ephemeral)
 .claude/worktrees/
+.claude/*.lock
+
+# Local orchestration/bootstrap scratch files
+IC-Plain/
+Setup-Agent.md
+scripts/fire-morning-brief.mjs
 
 # Bundled MCP archive (rebuild via `pnpm --filter @pulse/mcp pack-dxt`)
 apps/mcp/pulse-terminal.dxt

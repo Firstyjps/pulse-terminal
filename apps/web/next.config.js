@@ -1,6 +1,9 @@
+const path = require("node:path");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: path.resolve(__dirname, "../.."),
   transpilePackages: ["@pulse/ui", "@pulse/sources", "@pulse/charts"],
   typedRoutes: false,
   // better-sqlite3 is a native module — must NOT be webpack-bundled.

@@ -39,6 +39,7 @@ export type {
   VenueSummary,
   VenueBalance,
   AssetSummary,
+  PortfolioRiskExposure,
 } from "./portfolio/aggregate.js";
 export { parseWallets, getEvmWallets, getSolanaWallets } from "./_wallets.js";
 export type { ParsedWallet, WalletChain } from "./_wallets.js";

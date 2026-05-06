@@ -45,7 +45,10 @@ export interface RunMorningBriefOpts {
   now: number;
   hubBase: string;
   telegramToken: string;
-  chatId: string;
+  /** Single chat id. For broadcast use `chatIds` instead (takes precedence). */
+  chatId?: string;
+  /** Comma-split env list of chat ids. Renders text + images once, sends per chat. */
+  chatIds?: string[];
   /** Optional: PULSE_DASHBOARD_URL. Default localhost:3000/morning. */
   dashboardUrl?: string;
 
@@ -60,7 +63,19 @@ export interface RunMorningBriefOpts {
   svgToPngImpl?: (svg: string) => Promise<Uint8Array | null>;
 }
 
+/** Per-chat result. Populated when broadcasting to multiple chat ids. */
+export interface RecipientResult {
+  chatId: string;
+  sent: boolean;
+  error?: string;
+  imageSent: boolean;
+  imageError?: string;
+  etfImageSent: boolean;
+  etfImageError?: string;
+}
+
 export interface RunMorningBriefResult {
+  /** True iff every recipient's text message was sent. Mirrors recipients[0] for back-compat single-chat callers. */
   sent: boolean;
   skipped?: boolean;
   reason?: "proxy_data" | "no_etf_data" | "send_failed";
@@ -68,12 +83,13 @@ export interface RunMorningBriefResult {
   text?: string;
   /** "weekday" Mon-Fri BKK · "weekend" Sat/Sun BKK (drops ETF blocks). */
   mode?: "weekday" | "weekend";
-  /** True iff the BTC price photo step succeeded. False on best-effort failure. */
+  /** Primary recipient (recipients[0]) image status. */
   imageSent?: boolean;
   imageError?: string;
-  /** True iff the BTC ETF flows photo step succeeded. Independent of imageSent. */
   etfImageSent?: boolean;
   etfImageError?: string;
+  /** Per-recipient breakdown — only populated when broadcasting (chatIds.length > 1). */
+  recipients?: RecipientResult[];
 }
 
 function isBkkWeekend(now: number): boolean {
@@ -144,6 +160,16 @@ export async function runMorningBrief(
   const fetchImpl = opts.fetchImpl ?? fetch;
   const mode: "weekday" | "weekend" = isBkkWeekend(opts.now) ? "weekend" : "weekday";
 
+  const recipients: string[] =
+    opts.chatIds && opts.chatIds.length > 0
+      ? opts.chatIds
+      : opts.chatId
+        ? [opts.chatId]
+        : [];
+  if (recipients.length === 0) {
+    return { sent: false, reason: "send_failed", error: "no chat ids configured", mode };
+  }
+
   // Parallel fan-out: ETF (required weekday, best-effort weekend), regime
   // + funding best-effort, klines best-effort (BTC 7d price chart for image).
   const [etfR, regimeR, fundingR, klinesR] = await Promise.allSettled([
@@ -208,83 +234,111 @@ export async function runMorningBrief(
   const dashboardUrl = opts.dashboardUrl ?? DEFAULT_DASHBOARD;
   const keyboard = buildMorningBriefKeyboard(dashboardUrl);
 
-  const msgRes = await sendTelegram(
-    opts.telegramToken,
-    opts.chatId,
-    text,
-    { replyMarkup: keyboard },
-    fetchImpl,
-  );
-  if (!msgRes.ok) {
-    return { sent: false, reason: "send_failed", error: msgRes.error, text, mode };
-  }
-
-  // Best-effort image #1 — BTC/USD 7d price chart from spot klines. Renders
-  // 7 days/week (BTC trades 24/7). Weekend no longer suppresses the image.
-  let imageSent = false;
-  let imageError: string | undefined;
+  // Render PNGs once — reused across all recipients in the broadcast.
+  let pricePng: Uint8Array | null = null;
+  let priceRenderError: string | undefined;
   if (klines && klines.length >= 2) {
     try {
       const svg = buildBtcPriceChartSvg(klines);
-      const png = opts.svgToPngImpl ? await opts.svgToPngImpl(svg) : await svgToPng(svg);
-      if (png) {
-        const photoRes = await sendTelegramPhoto(
-          opts.telegramToken,
-          opts.chatId,
-          png,
-          undefined,
-          fetchImpl,
-        );
-        imageSent = photoRes.ok;
-        if (!photoRes.ok) imageError = photoRes.error;
-      } else {
-        imageError = "svg-to-png returned null";
-      }
+      pricePng = opts.svgToPngImpl ? await opts.svgToPngImpl(svg) : await svgToPng(svg);
+      if (!pricePng) priceRenderError = "svg-to-png returned null";
     } catch (err) {
-      imageError = (err as Error).message.slice(0, 200);
+      priceRenderError = (err as Error).message.slice(0, 200);
     }
   } else {
-    imageError = "no klines";
+    priceRenderError = "no klines";
   }
 
-  // Best-effort image #2 — BTC ETF daily flows + cumulative line. Independent
-  // of the price chart above; either, both, or neither may succeed and the
-  // text body has already been sent.
-  let etfImageSent = false;
-  let etfImageError: string | undefined;
+  let etfPng: Uint8Array | null = null;
+  let etfRenderError: string | undefined;
   if (etf && etf.flows.length >= 2) {
     try {
       const etfSvg = buildBtcEtfFlowsBarChartSvg(etf.flows);
-      const etfPng = opts.svgToPngImpl
-        ? await opts.svgToPngImpl(etfSvg)
-        : await svgToPng(etfSvg);
-      if (etfPng) {
-        const etfPhotoRes = await sendTelegramPhoto(
-          opts.telegramToken,
-          opts.chatId,
-          etfPng,
-          undefined,
-          fetchImpl,
-        );
-        etfImageSent = etfPhotoRes.ok;
-        if (!etfPhotoRes.ok) etfImageError = etfPhotoRes.error;
-      } else {
-        etfImageError = "etf svg-to-png returned null";
-      }
+      etfPng = opts.svgToPngImpl ? await opts.svgToPngImpl(etfSvg) : await svgToPng(etfSvg);
+      if (!etfPng) etfRenderError = "etf svg-to-png returned null";
     } catch (err) {
-      etfImageError = (err as Error).message.slice(0, 200);
+      etfRenderError = (err as Error).message.slice(0, 200);
     }
   } else {
-    etfImageError = etf == null ? "no etf data" : "etf flows < 2";
+    etfRenderError = etf == null ? "no etf data" : "etf flows < 2";
+  }
+
+  // Fan out: one sendMessage + up to two sendPhoto per recipient.
+  // Each recipient is independent — a failure on one does not stop others.
+  const perChat: RecipientResult[] = [];
+  for (const chatId of recipients) {
+    const result: RecipientResult = {
+      chatId,
+      sent: false,
+      imageSent: false,
+      imageError: priceRenderError,
+      etfImageSent: false,
+      etfImageError: etfRenderError,
+    };
+
+    const msgRes = await sendTelegram(
+      opts.telegramToken,
+      chatId,
+      text,
+      { replyMarkup: keyboard },
+      fetchImpl,
+    );
+    result.sent = msgRes.ok;
+    if (!msgRes.ok) {
+      result.error = msgRes.error;
+      perChat.push(result);
+      continue;
+    }
+
+    if (pricePng) {
+      const photoRes = await sendTelegramPhoto(
+        opts.telegramToken,
+        chatId,
+        pricePng,
+        undefined,
+        fetchImpl,
+      );
+      result.imageSent = photoRes.ok;
+      result.imageError = photoRes.ok ? undefined : photoRes.error;
+    }
+
+    if (etfPng) {
+      const etfPhotoRes = await sendTelegramPhoto(
+        opts.telegramToken,
+        chatId,
+        etfPng,
+        undefined,
+        fetchImpl,
+      );
+      result.etfImageSent = etfPhotoRes.ok;
+      result.etfImageError = etfPhotoRes.ok ? undefined : etfPhotoRes.error;
+    }
+
+    perChat.push(result);
+  }
+
+  const primary = perChat[0];
+  const broadcastMeta = perChat.length > 1 ? { recipients: perChat } : {};
+
+  if (!primary.sent) {
+    return {
+      sent: false,
+      reason: "send_failed",
+      error: primary.error,
+      text,
+      mode,
+      ...broadcastMeta,
+    };
   }
 
   return {
-    sent: true,
+    sent: perChat.every((r) => r.sent),
     text,
     mode,
-    imageSent,
-    imageError,
-    etfImageSent,
-    etfImageError,
+    imageSent: primary.imageSent,
+    imageError: primary.imageError,
+    etfImageSent: primary.etfImageSent,
+    etfImageError: primary.etfImageError,
+    ...broadcastMeta,
   };
 }

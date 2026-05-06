@@ -52,6 +52,18 @@ export interface AnomalyFinding {
   severity: AnomalySeverity;
   signal: string;
   evidence: Record<string, unknown>;
+  score?: AnomalyScore;
+}
+
+export interface AnomalyScore {
+  /** 0-100 estimate that the signal is not noise. */
+  confidence: number;
+  /** 0-100 estimate of potential market impact if the signal plays out. */
+  impact: number;
+  /** Combined priority = confidence * impact / 100, rounded to 0-100. */
+  priority: number;
+  label: "watch" | "actionable" | "urgent";
+  drivers: string[];
 }
 
 export interface AnomalyScan {
@@ -211,8 +223,86 @@ export function deriveAnomalies(
     if (apr) findings.push(apr);
   }
 
-  findings.sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
-  return findings;
+  const scored = findings.map((finding) => ({ ...finding, score: scoreFinding(finding) }));
+  scored.sort((a, b) => {
+    const sev = SEV_RANK[a.severity] - SEV_RANK[b.severity];
+    if (sev !== 0) return sev;
+    return (b.score?.priority ?? 0) - (a.score?.priority ?? 0);
+  });
+  return scored;
+}
+
+export function scoreFinding(finding: AnomalyFinding): AnomalyScore {
+  const drivers: string[] = [];
+  const severityBase = { high: 82, med: 64, low: 44 } satisfies Record<AnomalySeverity, number>;
+  const impactBase: Record<AnomalyCategory, number> = {
+    etf: 82,
+    stablecoin: 68,
+    funding: 62,
+    futures: 78,
+    tvl: 55,
+    dex: 45,
+    options: 72,
+    bybit: 50,
+  };
+
+  let confidence = severityBase[finding.severity];
+  let impact = impactBase[finding.category];
+  const evidence = finding.evidence;
+
+  const add = (amount: number, reason: string) => {
+    confidence += amount;
+    drivers.push(reason);
+  };
+
+  const absNumber = (key: string): number | null => {
+    const v = evidence[key];
+    return typeof v === "number" && Number.isFinite(v) ? Math.abs(v) : null;
+  };
+
+  const btc7d = absNumber("btc7dSumUSD") ?? absNumber("etfBtc7dSum");
+  if (btc7d != null) {
+    if (btc7d >= 1_000_000_000) add(10, "large ETF flow magnitude");
+    else if (btc7d >= 300_000_000) add(6, "meaningful ETF flow magnitude");
+  }
+
+  const stablecoinChange = absNumber("change7dPercent");
+  if (stablecoinChange != null && stablecoinChange >= 1.5) add(6, "large 7d percentage move");
+
+  const fundingAvg = absNumber("avgPercent") ?? absNumber("fundingRate");
+  if (fundingAvg != null && fundingAvg >= 0.05) add(7, "funding beyond trigger threshold");
+
+  const spread = absNumber("spreadPercent");
+  if (spread != null && spread >= 0.06) add(5, "wide cross-venue spread");
+
+  const z = absNumber("zScore");
+  if (z != null && z >= 3) add(10, "statistical outlier above 3 sigma");
+  else if (z != null && z >= 2) add(6, "statistical outlier above 2 sigma");
+
+  const deltaPp = absNumber("deltaPp");
+  if (deltaPp != null && deltaPp >= 5) add(8, "large options skew inversion");
+
+  if (finding.category === "futures" && finding.signal.includes("paired")) {
+    add(8, "cross-source confirmation");
+    impact += 8;
+  }
+
+  confidence = clampScore(confidence);
+  impact = clampScore(impact);
+  const priority = clampScore(Math.round((confidence * impact) / 100));
+  const label = priority >= 72 ? "urgent" : priority >= 52 ? "actionable" : "watch";
+
+  return {
+    confidence,
+    impact,
+    priority,
+    label,
+    drivers: drivers.length ? drivers : [`${finding.severity} severity baseline`],
+  };
+}
+
+function clampScore(n: number): number {
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 // ────────────────────────────────────────────────────────────────────────

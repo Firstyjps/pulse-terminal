@@ -3,12 +3,14 @@
 // JSON body carries the per-check verdict.
 //
 // status:
-//   healthy    — all checks pass
-//   degraded   — 1-2 checks fail
-//   unhealthy  — 3+ checks fail
+//   healthy    — core checks pass and all external checks pass
+//   degraded   — core checks pass, 1+ external checks fail
+//   unhealthy  — core checks fail
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type HealthStatus = "healthy" | "degraded" | "unhealthy";
 
 interface CheckResult {
   ok: boolean;
@@ -47,13 +49,29 @@ export async function GET() {
     ping(`${hubUrl}/health`, HUB_TIMEOUT_MS),
   ]);
 
-  const checks = { coingecko, defillama, binance, yahoo, hub };
-  const failed = Object.values(checks).filter((c) => !c.ok).length;
-  const status = failed === 0 ? "healthy" : failed <= 2 ? "degraded" : "unhealthy";
+  const coreChecks = { hub };
+  const externalChecks = { coingecko, defillama, binance, yahoo };
+  const coreStatus = statusFromChecks(coreChecks, true);
+  const externalStatus = statusFromChecks(externalChecks, false);
+  const status: HealthStatus =
+    coreStatus === "unhealthy"
+      ? "unhealthy"
+      : externalStatus === "healthy"
+        ? "healthy"
+        : "degraded";
 
   return Response.json({
     status,
-    checks,
+    core: { status: coreStatus, checks: coreChecks },
+    external: { status: externalStatus, checks: externalChecks },
+    checks: { ...externalChecks, ...coreChecks },
     ts: new Date().toISOString(),
   });
+}
+
+function statusFromChecks(checks: Record<string, CheckResult>, core: boolean): HealthStatus {
+  const failed = Object.values(checks).filter((c) => !c.ok).length;
+  if (failed === 0) return "healthy";
+  if (core) return "unhealthy";
+  return failed <= 2 ? "degraded" : "unhealthy";
 }

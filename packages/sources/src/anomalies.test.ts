@@ -4,6 +4,7 @@ import {
   detectAprRegimeChange,
   detectMaxOiShift,
   detectSkewFlip,
+  scoreFinding,
 } from "./anomalies.js";
 import type { FundflowSnapshot } from "./types.js";
 import type { OptionData } from "./options/types.js";
@@ -55,6 +56,7 @@ describe("deriveAnomalies", () => {
     const findings = deriveAnomalies(snap, [], "BTCUSDT");
     expect(findings[0].category).toBe("etf");
     expect(findings[0].severity).toBe("high");
+    expect(findings[0].score?.label).toBe("urgent");
   });
 
   it("flags overheated long funding when avg > 0.05%", () => {
@@ -111,6 +113,25 @@ describe("deriveAnomalies", () => {
     }
   });
 
+  it("adds confidence/impact score to every finding", () => {
+    const findings = deriveAnomalies(empty({
+      stablecoins: {
+        history: [],
+        summary: {
+          currentTotal: 100,
+          change7d: 2,
+          change30d: 3,
+          change7dPercent: 2,
+          change30dPercent: 3,
+          dominance: [],
+        },
+      },
+    }), [], "BTCUSDT");
+    expect(findings[0].score?.confidence).toBeGreaterThan(0);
+    expect(findings[0].score?.impact).toBeGreaterThan(0);
+    expect(findings[0].score?.priority).toBeGreaterThan(0);
+  });
+
   it("ignores options + APR context when not provided (back-compat)", () => {
     // Same call as before — no ctx, no options/bybit findings expected.
     const findings = deriveAnomalies(empty(), [], "BTCUSDT");
@@ -143,6 +164,19 @@ describe("deriveAnomalies", () => {
       },
     });
     expect(findings.some((f) => f.category === "bybit")).toBe(true);
+  });
+});
+
+describe("scoreFinding", () => {
+  it("raises priority for cross-source futures confirmation", () => {
+    const score = scoreFinding({
+      category: "futures",
+      severity: "high",
+      signal: "BTC ETF outflow paired with hot funding — leveraged longs vulnerable",
+      evidence: { etfBtc7dSum: -500_000_000, fundingRate: 0.06 },
+    });
+    expect(score.priority).toBeGreaterThanOrEqual(80);
+    expect(score.drivers).toContain("cross-source confirmation");
   });
 });
 

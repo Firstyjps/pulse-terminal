@@ -41,6 +41,7 @@ export type {
   VenueBalance,
   AssetSummary,
   PortfolioSourceTag,
+  PortfolioRiskExposure,
 } from "./portfolio/aggregate.js";
 export type { CoinStatsPortfolio, CoinStatsAsset } from "./coinstats.js";
 export type { ParsedWallet, WalletChain } from "./_wallets.js";

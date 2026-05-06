@@ -38,6 +38,16 @@ export interface AssetSummary {
 
 export type PortfolioSourceTag = "coinstats" | "multi-cex" | "none";
 
+export interface PortfolioRiskExposure {
+  topAssetPct: number;
+  topVenuePct: number;
+  stablecoinPct: number;
+  lpPct: number;
+  borrowUsd: number;
+  concentration: "low" | "medium" | "high";
+  notes: string[];
+}
+
 export interface AggregateSnapshot {
   totalUsd: number;
   byVenue: VenueSummary[];
@@ -47,6 +57,8 @@ export interface AggregateSnapshot {
   asOf: number;
   /** Which upstream produced the data. */
   _source: PortfolioSourceTag;
+  /** Concentration and exposure summary for repeated risk review. */
+  risk: PortfolioRiskExposure;
   /** Per-source failures collected from CEX status + DeFi error arrays. */
   errors?: string[];
 }
@@ -94,6 +106,7 @@ function coinStatsToAggregate(p: CoinStatsPortfolio): AggregateSnapshot {
     lp: [],
     asOf: Date.parse(p.asOf) || Date.now(),
     _source: "coinstats",
+    risk: computeRisk(p.totalUsd, byVenue, byAsset, []),
   };
 }
 
@@ -219,8 +232,72 @@ async function fallbackAggregate(): Promise<AggregateSnapshot> {
     lp,
     asOf: Date.now(),
     _source,
+    risk: computeRisk(totalUsd, byVenue, byAsset, lp),
     ...(errors.length ? { errors } : {}),
   };
 }
 
-export const _internal = { CEX_SOURCES, cexBalancesToPositions, coinStatsToAggregate, fallbackAggregate };
+const STABLECOINS = new Set(["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDE", "SUSDE", "USDS", "BUSD"]);
+
+function computeRisk(
+  totalUsd: number,
+  byVenue: VenueSummary[],
+  byAsset: AssetSummary[],
+  lp: Position[],
+): PortfolioRiskExposure {
+  if (totalUsd <= 0) {
+    return {
+      topAssetPct: 0,
+      topVenuePct: 0,
+      stablecoinPct: 0,
+      lpPct: 0,
+      borrowUsd: 0,
+      concentration: "low",
+      notes: ["portfolio empty or not configured"],
+    };
+  }
+
+  const stablecoinUsd = byAsset
+    .filter((a) => STABLECOINS.has(a.ticker.toUpperCase()))
+    .reduce((s, a) => s + Math.max(0, a.totalUsd), 0);
+  const lpUsd = lp.reduce((s, p) => s + Math.max(0, p.usdValue), 0);
+  const borrowUsd = byVenue
+    .flatMap((v) => v.balances)
+    .filter((b) => b.type === "borrow" || b.usdValue < 0)
+    .reduce((s, b) => s + Math.abs(b.usdValue), 0);
+
+  const topAssetPct = ((byAsset[0]?.totalUsd ?? 0) / totalUsd) * 100;
+  const topVenuePct = ((byVenue[0]?.totalUsd ?? 0) / totalUsd) * 100;
+  const stablecoinPct = (stablecoinUsd / totalUsd) * 100;
+  const lpPct = (lpUsd / totalUsd) * 100;
+
+  const notes: string[] = [];
+  if (topAssetPct >= 60) notes.push("single-asset concentration > 60%");
+  if (topVenuePct >= 70) notes.push("single-venue concentration > 70%");
+  if (stablecoinPct < 10) notes.push("low stablecoin buffer < 10%");
+  if (borrowUsd > totalUsd * 0.1) notes.push("borrow exposure > 10% of NAV");
+  if (lpPct > 35) notes.push("LP exposure > 35% of NAV");
+
+  const concentration =
+    topAssetPct >= 65 || topVenuePct >= 75 || borrowUsd > totalUsd * 0.2
+      ? "high"
+      : topAssetPct >= 45 || topVenuePct >= 55 || lpPct > 25
+        ? "medium"
+        : "low";
+
+  return {
+    topAssetPct: roundPct(topAssetPct),
+    topVenuePct: roundPct(topVenuePct),
+    stablecoinPct: roundPct(stablecoinPct),
+    lpPct: roundPct(lpPct),
+    borrowUsd: +borrowUsd.toFixed(2),
+    concentration,
+    notes: notes.length ? notes : ["no major concentration flags"],
+  };
+}
+
+function roundPct(n: number): number {
+  return +n.toFixed(2);
+}
+
+export const _internal = { CEX_SOURCES, cexBalancesToPositions, coinStatsToAggregate, fallbackAggregate, computeRisk };

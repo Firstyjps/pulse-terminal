@@ -153,6 +153,7 @@ Now reboot your machine — services should come back up automatically.
 
 ```bash
 pnpm pulse:status         # health overview
+pnpm pulse:smoke          # production endpoint smoke test
 pnpm pulse:logs           # tail all logs (Ctrl-C to exit)
 pnpm pulse:restart        # restart everything (after env changes)
 pnpm pulse:stop           # stop everything
@@ -193,6 +194,7 @@ Run `pnpm typecheck` to see all errors at once. Most likely cause: `index.ts` (b
 - [README.md](../README.md) — project overview + tabs map
 - [AGENTS.md](../AGENTS.md) — work delegation, current phase, contracts
 - [SECURITY.md](../SECURITY.md) — keys, locks, incident response
+- [docs/RUNBOOK.md](./RUNBOOK.md) — deploy, rollback, env changes, smoke checks
 - [SYNC.md](../SYNC.md) — cross-session sync template (if running multiple Claude sessions)
 - [docs/ADR-001-mcp-first.md](./ADR-001-mcp-first.md) — why MCP-first, not API-first
 - [packages/sources/README.md](../packages/sources/README.md) — public API: browser-safe vs server-only entry points

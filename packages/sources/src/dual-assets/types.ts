@@ -46,6 +46,17 @@ export interface DualAssetReport {
   target_price: number;
   coin_pair: string;
   overall_avg_apr: number;
+  confidence: {
+    score: number;
+    label: "low" | "medium" | "high";
+    reasons: string[];
+  };
+  trend: {
+    direction: "rising" | "falling" | "flat" | "insufficient";
+    latest_avg_apr: number | null;
+    previous_avg_apr: number | null;
+    change_pct: number | null;
+  };
   best_hours: HourlyAprStat[];
   hot_hours: number[];
   cold_hours: number[];

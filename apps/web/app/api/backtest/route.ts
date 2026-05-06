@@ -9,18 +9,40 @@ interface ScanRecord {
   ts: string;
   scan_id: string;
   symbol: string;
-  findings: Array<{ category: string; severity: "low" | "med" | "high"; signal: string; evidence: Record<string, unknown> }>;
+  findings: Array<{
+    category: string;
+    severity: "low" | "med" | "high";
+    signal: string;
+    evidence: Record<string, unknown>;
+    score?: { confidence?: number; impact?: number; priority?: number; label?: string };
+  }>;
   marker: { btcPrice?: number; ethPrice?: number };
 }
 
 interface PatternStats {
   pattern: string;
+  category: string;
+  signal: string;
+  expectedDirection: "down" | "up";
   count: number;
   /** % of times BTC moved in the "expected" direction within the lookahead window. */
   hitRate: number;
   /** Average BTC % move in the lookahead window. */
   avgMove: number;
+  avgConfidence: number;
+  avgImpact: number;
+  avgPriority: number;
   samples: number;
+}
+
+interface CategoryStats {
+  category: string;
+  count: number;
+  samples: number;
+  expectedDirection: "down" | "up";
+  hitRate: number;
+  avgMove: number;
+  avgPriority: number;
 }
 
 const LOG_PATH = resolveAlertsLogPath();
@@ -43,8 +65,11 @@ async function loadScans(): Promise<ScanRecord[]> {
   }
 }
 
-async function computeHitRates(scans: ScanRecord[], lookaheadH: number): Promise<PatternStats[]> {
-  if (!scans.length) return [];
+async function computeHitRates(scans: ScanRecord[], lookaheadH: number): Promise<{
+  patterns: PatternStats[];
+  categories: CategoryStats[];
+}> {
+  if (!scans.length) return { patterns: [], categories: [] };
 
   // Get current BTC for "open" scans whose lookahead hasn't elapsed yet.
   // We only score scans that have aged at least `lookaheadH` hours.
@@ -71,7 +96,24 @@ async function computeHitRates(scans: ScanRecord[], lookaheadH: number): Promise
   }
 
   // Group findings by pattern signal (concat category + signal)
-  const groups = new Map<string, { hits: number; total: number; moves: number[] }>();
+  const groups = new Map<string, {
+    category: string;
+    signal: string;
+    expectedDirection: "down" | "up";
+    hits: number;
+    total: number;
+    moves: number[];
+    confidence: number[];
+    impact: number[];
+    priority: number[];
+  }>();
+  const categories = new Map<string, {
+    expectedDirection: "down" | "up";
+    hits: number;
+    total: number;
+    moves: number[];
+    priority: number[];
+  }>();
 
   for (const scan of scored) {
     const baseHour = Math.floor(new Date(scan.ts).getTime() / 3_600_000) * 3_600_000;
@@ -85,27 +127,69 @@ async function computeHitRates(scans: ScanRecord[], lookaheadH: number): Promise
       const key = `${f.category}:${f.signal}`;
       const expected = EXPECTED_DIRECTION[f.category] ?? "down";
       const hit = (expected === "down" && movePct < 0) || (expected === "up" && movePct > 0);
-      const g = groups.get(key) ?? { hits: 0, total: 0, moves: [] };
+      const g = groups.get(key) ?? {
+        category: f.category,
+        signal: f.signal,
+        expectedDirection: expected,
+        hits: 0,
+        total: 0,
+        moves: [],
+        confidence: [],
+        impact: [],
+        priority: [],
+      };
       g.total += 1;
       if (hit) g.hits += 1;
       g.moves.push(movePct);
+      g.confidence.push(normalizeScore(f.score?.confidence, f.severity));
+      g.impact.push(normalizeScore(f.score?.impact, f.severity));
+      g.priority.push(normalizeScore(f.score?.priority, f.severity));
       groups.set(key, g);
+
+      const c = categories.get(f.category) ?? { expectedDirection: expected, hits: 0, total: 0, moves: [], priority: [] };
+      c.total += 1;
+      if (hit) c.hits += 1;
+      c.moves.push(movePct);
+      c.priority.push(normalizeScore(f.score?.priority, f.severity));
+      categories.set(f.category, c);
     }
   }
 
-  const stats: PatternStats[] = [];
+  const patterns: PatternStats[] = [];
   for (const [key, g] of groups.entries()) {
     if (g.total === 0) continue;
-    stats.push({
+    patterns.push({
       pattern: key,
+      category: g.category,
+      signal: g.signal,
+      expectedDirection: g.expectedDirection,
       count: g.total,
       samples: g.total,
       hitRate: (g.hits / g.total) * 100,
       avgMove: g.moves.reduce((s, n) => s + n, 0) / g.moves.length,
+      avgConfidence: avg(g.confidence),
+      avgImpact: avg(g.impact),
+      avgPriority: avg(g.priority),
     });
   }
-  stats.sort((a, b) => b.count - a.count);
-  return stats;
+  patterns.sort((a, b) => b.count - a.count || b.avgPriority - a.avgPriority);
+
+  const categoryStats: CategoryStats[] = [];
+  for (const [category, c] of categories.entries()) {
+    if (c.total === 0) continue;
+    categoryStats.push({
+      category,
+      count: c.total,
+      samples: c.total,
+      expectedDirection: c.expectedDirection,
+      hitRate: (c.hits / c.total) * 100,
+      avgMove: avg(c.moves),
+      avgPriority: avg(c.priority),
+    });
+  }
+  categoryStats.sort((a, b) => b.count - a.count || b.avgPriority - a.avgPriority);
+
+  return { patterns, categories: categoryStats };
 }
 
 interface BacktestSummary {
@@ -126,11 +210,12 @@ export async function GET(req: Request) {
       message: "No alert log found. Run `pnpm --filter @pulse/alerts dev` for a while to populate.",
       summary: { totalScans: 0, scoredScans: 0, oldestTs: null, newestTs: null, lookaheadHours: lookaheadH } satisfies BacktestSummary,
       stats: [] as PatternStats[],
+      categories: [] as CategoryStats[],
     });
   }
   const cutoffMs = Date.now() - lookaheadH * 3_600_000;
   const scored = scans.filter((s) => new Date(s.ts).getTime() <= cutoffMs);
-  const stats = await computeHitRates(scans, lookaheadH);
+  const { patterns, categories } = await computeHitRates(scans, lookaheadH);
   return Response.json({
     configured: true,
     summary: {
@@ -140,9 +225,21 @@ export async function GET(req: Request) {
       newestTs: scans[scans.length - 1]?.ts ?? null,
       lookaheadHours: lookaheadH,
     } satisfies BacktestSummary,
-    stats,
+    expectations: EXPECTED_DIRECTION,
+    stats: patterns,
+    categories,
   });
 }
 
 // FuturesData re-export shut up unused import warning at build time
 void (null as unknown as FuturesData);
+
+function avg(values: number[]): number {
+  if (!values.length) return 0;
+  return values.reduce((s, n) => s + n, 0) / values.length;
+}
+
+function normalizeScore(value: number | undefined, severity: "low" | "med" | "high"): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return severity === "high" ? 75 : severity === "med" ? 55 : 35;
+}

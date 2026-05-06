@@ -98,7 +98,11 @@ The following sections are **NOT** in the brief (per user decision in
 
    ```dotenv
    TELEGRAM_BOT_TOKEN=123456789:ABCdef-...
+   # Single recipient — your chat id, OR a group id (negative int)
    TELEGRAM_CHAT_ID=987654321
+   # Or comma-separate to broadcast to multiple chats. Each recipient must have
+   # /start-ed the bot first; the brief renders once and fan-outs sequentially.
+   # TELEGRAM_CHAT_ID=987654321,123456789,-1009876543210
 
    # Optional — LLM for action candidates (rules fallback if unset).
    # See "Action candidates" section below for the 6-provider table.
@@ -311,7 +315,7 @@ even registered when the env is missing — zero overhead.
 | Live economic-calendar API       | v3         | `catalysts.json` hand-edited weekly is enough for now                |
 | Snooze persistence               | v3         | Callback handler is log-only; needs disk/SQLite + skip check in cron |
 | Chart re-render on demand        | v3         | `chart_btc` callback is log-only; wire to chart endpoint             |
-| Multi-channel broadcast          | v3         | One `chat_id` only; group ids work but require bot-in-group          |
+| Multi-channel broadcast          | shipped    | `TELEGRAM_CHAT_ID` accepts comma-separated ids — render once, fan-out per recipient |
 | Localization (Thai/English)      | won't do   | English-only per CLAUDE.md (project pivot 2026-04-30)                |
 
 ## Env var reference
@@ -319,7 +323,7 @@ even registered when the env is missing — zero overhead.
 | Var                  | Default                        | Required | Purpose                                  |
 |----------------------|--------------------------------|----------|------------------------------------------|
 | `TELEGRAM_BOT_TOKEN` | —                              | ✅       | BotFather HTTP API token                 |
-| `TELEGRAM_CHAT_ID`   | —                              | ✅       | destination chat id                      |
+| `TELEGRAM_CHAT_ID`   | —                              | ✅       | destination chat id; comma-separated for broadcast (`id1,id2,-100…`) |
 | `LLM_PROVIDER`       | `none`                         | optional | `none`/`anthropic`/`openai`/`groq`/`openrouter`/`gemini` |
 | `LLM_MODEL`          | (per-provider default)         | optional | override the provider's default model    |
 | `LLM_API_KEY`        | —                              | optional | required when `LLM_PROVIDER` ≠ `none`    |

@@ -56,6 +56,7 @@ describe("getAggregatePortfolio — totals", () => {
     expect(snap.lp).toEqual([]);
     expect(snap.errors).toBeUndefined();
     expect(snap._source).toBe("none");
+    expect(snap.risk.concentration).toBe("low");
   });
 
   it("sums totalUsd across CEX + DeFi", async () => {
@@ -95,6 +96,8 @@ describe("getAggregatePortfolio — totals", () => {
 
     const snap = await getAggregatePortfolio();
     expect(snap.totalUsd).toBe(50_000 + 3000 + 950 + 5000 - 1500); // 57,450
+    expect(snap.risk.borrowUsd).toBe(1500);
+    expect(snap.risk.lpPct).toBeGreaterThan(0);
   });
 });
 
@@ -376,6 +379,7 @@ describe("getAggregatePortfolio — _source dispatch", () => {
     expect(snap.byVenue).toHaveLength(1);
     expect(snap.byVenue[0].name).toBe("coinstats");
     expect(snap.byAsset.map((a) => a.ticker)).toEqual(["ETH", "USDC", "SOL"]);
+    expect(snap.risk.stablecoinPct).toBeGreaterThan(0);
     // CEX/DeFi fallback should NOT have been called
     expect(mockMulti).not.toHaveBeenCalled();
     expect(mockMeteora).not.toHaveBeenCalled();

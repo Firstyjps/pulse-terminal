@@ -409,6 +409,47 @@ describe("runMorningBrief — success path", () => {
     expect(svgSpy.mock.calls[1][0]).toContain('height="400"');
   });
 
+  it("broadcasts text + photos to each chat while rendering PNGs once", async () => {
+    const sentMessages: string[] = [];
+    const sentPhotos: string[] = [];
+    const fetchImpl = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith("/regime")) return Promise.resolve(jsonResponse(fakeRegime));
+      if (url.includes("/sendMessage")) {
+        const body = JSON.parse((init?.body as string) ?? "{}");
+        sentMessages.push(body.chat_id);
+        return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 1 } }));
+      }
+      if (url.includes("/sendPhoto")) {
+        const form = init?.body as FormData;
+        sentPhotos.push(String(form.get("chat_id")));
+        return Promise.resolve(jsonResponse({ ok: true, result: { message_id: 2 } }));
+      }
+      return Promise.resolve(jsonResponse({ ok: true, result: {} }));
+    });
+    const svgSpy = vi.fn(async () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+
+    const r = await runMorningBrief({
+      now: MON,
+      hubBase: HUB,
+      telegramToken: TOKEN,
+      chatIds: ["111", "222"],
+      fetchEtf: async () => fakeEtf,
+      fetchFunding: async () => fakeFunding,
+      fetchKlines: async () => makeKlines(168),
+      loadCatalysts: () => [],
+      llmComplete: async () => "• idea\nRisk: x",
+      svgToPngImpl: svgSpy,
+      fetchImpl,
+    });
+
+    expect(r.sent).toBe(true);
+    expect(r.recipients).toHaveLength(2);
+    expect(r.recipients?.every((x) => x.sent && x.imageSent && x.etfImageSent)).toBe(true);
+    expect(sentMessages).toEqual(["111", "222"]);
+    expect(sentPhotos).toEqual(["111", "111", "222", "222"]);
+    expect(svgSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("BTC price chart skipped (no klines) but ETF chart still sent — imageSent:false, etfImageSent:true", async () => {
     const svgSpy = vi.fn(async (_svg: string) => new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
     const fetchImpl = vi.fn().mockImplementation((url: string) => {
