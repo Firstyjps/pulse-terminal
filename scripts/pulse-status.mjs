@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // `pnpm pulse:status` — combines pm2 process list + body-level health checks
-// into a pretty terminal report. Exit 0 if all healthy, 1 otherwise.
+// into a pretty terminal report. Exit nonzero only for core probe failures or
+// unhealthy services; third-party degraded checks stay visible but non-fatal.
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -58,6 +59,7 @@ function badge(ok, label) {
 
 async function main() {
   console.log(`\n${BOLD}${CYAN}Pulse Terminal · status${RESET} ${DIM}${new Date().toISOString()}${RESET}\n`);
+  let hasCriticalFailure = false;
 
   // pm2 processes
   const pm2 = await getPm2List();
@@ -68,9 +70,11 @@ async function main() {
       console.log(`${BOLD}pm2 processes${RESET}`);
       const pulse = pm2.filter((proc) => PULSE_PROCESS_NAMES.has(proc.name));
       const extraCount = pm2.length - pulse.length;
+      const missing = [...PULSE_PROCESS_NAMES].filter((name) => !pulse.some((proc) => proc.name === name));
       for (const proc of pulse) {
         const status = proc.pm2_env?.status ?? "unknown";
         const ok = status === "online";
+        if (!ok) hasCriticalFailure = true;
         const mem = (proc.monit?.memory ?? 0) / 1024 / 1024;
         const cpu = proc.monit?.cpu ?? 0;
         const restarts = proc.pm2_env?.restart_time ?? 0;
@@ -83,8 +87,13 @@ async function main() {
       if (extraCount > 0) {
         console.log(`  ${DIM}${extraCount} non-Pulse pm2 process(es) omitted · env values never printed${RESET}`);
       }
+      if (missing.length > 0) {
+        hasCriticalFailure = true;
+        console.log(`  ${RED}✗ missing Pulse process(es): ${missing.join(", ")}${RESET}`);
+      }
     }
   } else {
+    hasCriticalFailure = true;
     console.log(`${YELLOW}pm2 unavailable: ${pm2._error}${RESET}`);
   }
 
@@ -92,11 +101,10 @@ async function main() {
 
   // Body-level health probes
   console.log(`${BOLD}health probes${RESET}`);
-  let allHealthy = true;
   for (const ep of ENDPOINTS) {
     const r = await probe(ep.url);
     if (!r.ok) {
-      allHealthy = false;
+      hasCriticalFailure = true;
       console.log(
         `  ${badge(false, ep.name)} ${DIM}${r.status ?? "—"} (${r.ms}ms)${r.err ? ` ${r.err}` : ""}${RESET}`,
       );
@@ -104,7 +112,7 @@ async function main() {
     }
     const status = r.body?.status ?? "ok";
     const tone = status === "healthy" ? GREEN : status === "degraded" ? YELLOW : RED;
-    if (status !== "healthy") allHealthy = false;
+    if (status === "unhealthy") hasCriticalFailure = true;
     console.log(
       `  ${badge(true, ep.name)} ${tone}${status}${RESET} ${DIM}(${r.ms}ms)${RESET}`,
     );
@@ -135,7 +143,7 @@ async function main() {
   // Closing the global undici dispatcher releases keep-alive sockets;
   // unref'ing stdio lets the event loop drain to zero by itself.
   await closeFetchSockets();
-  process.exitCode = allHealthy ? 0 : 1;
+  process.exitCode = hasCriticalFailure ? 1 : 0;
 }
 
 /** Close the global undici dispatcher (Node ≥ 18) so keep-alive sockets exit. */
