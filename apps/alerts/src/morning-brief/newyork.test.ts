@@ -47,20 +47,20 @@ describe("formatNewyorkBrief", () => {
   it("renders the fixed header and section set", () => {
     const out = formatNewyorkBrief(makeInput());
 
-    expect(out).toContain("*Pulse Newyork Brief*");
+    expect(out).toContain("🗽 *Pulse Newyork Brief*");
     expect(out).toContain("2026\\-05\\-07 20:30 BKK");
 
     for (const heading of [
-      "NY Session Bias",
-      "US Market Setup",
-      "Support / Resistance",
-      "ETF / Flow Watch",
-      "Crypto Leverage",
-      "NY Catalysts",
-      "Action Candidates",
+      "🎯 NY Session Bias",
+      "🇺🇸 US Market Setup",
+      "💰 ETF / Flow Watch",
+      "📊 Crypto Leverage",
+      "⚠️ NY Catalysts",
+      "🎯 Action Candidates",
     ]) {
       expect(out).toContain(`*${heading}*`);
     }
+    expect(out).toContain("📍 *Support / Resistance*");
   });
 
   it("renders BTC, ETH, and SOL S/R levels with S1/S2/R1/R2 and required tags", () => {
@@ -192,7 +192,7 @@ describe("runNewyorkBrief", () => {
 
     expect(r.sent).toBe(false);
     expect(r.reason).toBe("dry_run");
-    expect(r.text).toContain("*Pulse Newyork Brief*");
+    expect(r.text).toContain("🗽 *Pulse Newyork Brief*");
     expect(r.text).toContain("BTC 63,200");
     expect(r.text).toContain("20:30 BKK");
     expect(r.text).not.toContain("08:00 BKK");

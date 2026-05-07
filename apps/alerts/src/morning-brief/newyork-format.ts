@@ -90,7 +90,7 @@ function renderLevel(label: string, level: NewyorkLevelValue): string {
 }
 
 function renderLevels(lines: string[], input: NewyorkBriefInput): void {
-  lines.push(`*${escapeMarkdownV2("Support / Resistance")}*`);
+  lines.push(`📍 *${escapeMarkdownV2("Support / Resistance")}*`);
 
   for (const asset of ASSETS) {
     const lv = input.levels?.[asset];
@@ -123,16 +123,16 @@ function trimTelegram(text: string): string {
 export function formatNewyorkBrief(input: NewyorkBriefInput): string {
   const lines: string[] = [];
 
-  lines.push(`*${escapeMarkdownV2("Pulse Newyork Brief")}*`);
+  lines.push(`🗽 *${escapeMarkdownV2("Pulse Newyork Brief")}*`);
   lines.push(escapeMarkdownV2(formatBkkTimestamp(input.asOf)));
   lines.push("");
 
-  renderSection(lines, "NY Session Bias", sentence(input.nySessionBias, "Neutral until US cash open confirms."));
-  renderSection(lines, "US Market Setup", sentence(input.usMarketSetup, "Watch DXY, yields, and Nasdaq breadth into NY open."));
+  renderSection(lines, "🎯 NY Session Bias", sentence(input.nySessionBias, "Neutral until US cash open confirms."));
+  renderSection(lines, "🇺🇸 US Market Setup", sentence(input.usMarketSetup, "Watch DXY, yields, and Nasdaq breadth into NY open."));
   renderLevels(lines, input);
   renderSection(
     lines,
-    "ETF / Flow Watch",
+    "💰 ETF / Flow Watch",
     `${sentence(
       input.etfFlowWatch,
       "Use finalized BTC/ETH ETF prints for direction.",
@@ -140,12 +140,12 @@ export function formatNewyorkBrief(input: NewyorkBriefInput): string {
   );
   renderSection(
     lines,
-    "Crypto Leverage",
+    "📊 Crypto Leverage",
     sentence(input.cryptoLeverage, "Funding and OI need confirmation before chasing breakouts."),
   );
 
   const catalysts = input.nyCatalysts?.filter((x) => x.trim()) ?? [];
-  renderSection(lines, "NY Catalysts", catalysts.length ? catalysts.map((x) => `- ${x}`) : "No major NY catalysts loaded.");
+  renderSection(lines, "⚠️ NY Catalysts", catalysts.length ? catalysts.map((x) => `- ${x}`) : "No major NY catalysts loaded.");
 
   const candidates = normalizeCandidates(input.actionCandidates)
     .map((x) => x.trim())
@@ -154,7 +154,7 @@ export function formatNewyorkBrief(input: NewyorkBriefInput): string {
     .map((x) => (x.startsWith("-") ? x : `- ${x}`));
   renderSection(
     lines,
-    "Action Candidates",
+    "🎯 Action Candidates",
     candidates.length ? candidates : "No action candidates until levels and leverage align.",
   );
 
