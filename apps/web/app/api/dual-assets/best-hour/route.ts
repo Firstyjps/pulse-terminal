@@ -1,18 +1,36 @@
-import { generateHourlyReport, getAprIvCorrelation } from "@pulse/sources/server";
+import {
+  generateHourlyReport,
+  getAprIvCorrelation,
+  loadDualAssetsConfig,
+  parseDirections,
+  parseDurations,
+} from "@pulse/sources/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+  const config = loadDualAssetsConfig();
   const coinPair = url.searchParams.get("coin_pair") ?? "SOL-USDT";
-  const targetPrice = Number(url.searchParams.get("target") ?? 78);
+  const targetParam = url.searchParams.get("target");
+  const targetPrice = targetParam ? Number(targetParam) : undefined;
   const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days") ?? 7)));
   const includeCorr = url.searchParams.get("correlation") === "1";
-  const duration = url.searchParams.get("duration") ?? undefined;
+  const durationParam = url.searchParams.get("duration");
+  const directionParam = url.searchParams.get("direction");
+  const durations = parseDurations(durationParam, config.durations);
+  const directions = parseDirections(directionParam, config.directions);
 
   try {
-    const report = generateHourlyReport({ coinPair, targetPrice, days, duration });
+    const report = generateHourlyReport({
+      coinPair,
+      targetPrice,
+      days,
+      durations,
+      directions,
+      minAprPct: config.minTrackAprPct,
+    });
     if (includeCorr && !("error" in report)) {
       return Response.json({ ...report, correlation: getAprIvCorrelation(days) });
     }

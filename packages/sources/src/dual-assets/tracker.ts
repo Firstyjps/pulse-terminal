@@ -1,40 +1,27 @@
-// Bybit Dual Assets — fetcher + tick processor.
-//
-// Endpoints (V5 public, no auth — Bybit launched Advanced-Earn DualAssets on 2026-03-24,
-// retiring the previous /v5/earn/dual-asset/product-list paths):
-//   GET /v5/earn/advance/product?category=DualAssets&coin={coin}
-//     → list of productId + duration + status + isVipProduct + settlementTime
-//   GET /v5/earn/advance/product-extra-info?category=DualAssets&productId={id}
-//     → currentPrice + buyLowPrice[]/sellHighPrice[] (each: selectPrice, apyE8, ...)
-// BYBIT_API_KEY/SECRET only needed for place-order endpoints (not used in current path).
-
 import { fetchJson } from "../_helpers.js";
-import { saveSnapshot, updateDailySummary } from "./store.js";
-import type { DualAssetDirection, DualAssetProduct, DualAssetSnapshot } from "./types.js";
+import {
+  DUAL_ASSET_DIRECTIONS,
+  DUAL_ASSET_DURATIONS,
+  loadDualAssetsConfig,
+  normalizeDuration,
+} from "./config.js";
+import {
+  recordTickRun,
+  saveSnapshots,
+  updateDailySummary,
+} from "./store.js";
+import type {
+  DualAssetDirection,
+  DualAssetDuration,
+  DualAssetProduct,
+  DualAssetSnapshot,
+  DualAssetsConfig,
+  DualAssetsFetchBatch,
+  DualAssetsTickResult,
+} from "./types.js";
 
 const BYBIT_BASE = "https://api.bybit.com";
 const DERIBIT_BASE = "https://www.deribit.com/api/v2";
-
-// Defaults — overridable via env
-const DEFAULT_PAIRS = (process.env.DUAL_ASSETS_PAIRS ?? "SOL-USDT").split(",");
-const DEFAULT_DIRECTIONS = ((process.env.DUAL_ASSETS_DIRECTIONS ?? "BuyLow,SellHigh").split(",")) as DualAssetDirection[];
-// DUAL_ASSETS_TARGETS:
-//   - "all" (default) → no filter, save every strike Bybit serves (near-spot products
-//     have much higher APR than far-OTM ones; the 696%/347% rates on the web are
-//     8H near-spot products that filter-by-fixed-target would miss).
-//   - "78,80" or any comma list → only save those exact strikes (legacy behavior).
-const DEFAULT_TARGETS_RAW = (process.env.DUAL_ASSETS_TARGETS ?? "all").trim();
-const DEFAULT_TARGETS: number[] | null = DEFAULT_TARGETS_RAW.toLowerCase() === "all" || DEFAULT_TARGETS_RAW === ""
-  ? null
-  : DEFAULT_TARGETS_RAW.split(",").map((s) => parseFloat(s.trim())).filter((n) => Number.isFinite(n));
-// DUAL_ASSETS_DURATIONS: Bybit returns "8h" / "1d" / "3d" / "8d" / "29d".
-//   - "all" (default) → save every duration.
-//   - "8h,1d" → focus on the high-APR short-duration menu (recommended for active traders).
-const DEFAULT_DURATIONS_RAW = (process.env.DUAL_ASSETS_DURATIONS ?? "all").trim().toLowerCase();
-const DEFAULT_DURATIONS: string[] | null = DEFAULT_DURATIONS_RAW === "all" || DEFAULT_DURATIONS_RAW === ""
-  ? null
-  : DEFAULT_DURATIONS_RAW.split(",").map((s) => s.trim()).filter(Boolean);
-const TIMEZONE = "Asia/Bangkok"; // ICT, UTC+7
 
 interface BybitResp<T> {
   retCode: number;
@@ -47,31 +34,31 @@ interface BybitProductListItem {
   productId: string;
   baseCoin: string;
   quoteCoin: string;
-  duration: string;        // "8h" | "1d" | "9d" …
-  status: string;          // "Available" | "NotAvailable" | "SoldOut"
+  duration: string;
+  status: string;
   isVipProduct: boolean;
-  settlementTime: string;  // ms timestamp
+  settlementTime: string;
 }
 
 interface BybitStrikeQuote {
-  selectPrice: string;          // strike (decimal string)
-  apyE8: string;                // APR × 1e8 — e.g. "77585476" = 77.585476%
+  selectPrice: string;
+  apyE8: string;
   maxInvestmentAmount: string;
   expiredAt: string;
 }
 
 interface BybitProductExtraInfoItem {
   productId: string;
-  currentPrice: string;         // index price (decimal string)
-  buyLowPrice: BybitStrikeQuote[];
-  sellHighPrice: BybitStrikeQuote[];
+  currentPrice: string;
+  buyLowPrice?: BybitStrikeQuote[];
+  sellHighPrice?: BybitStrikeQuote[];
 }
 
 async function publicGet<T>(path: string, params: Record<string, string> = {}): Promise<T | null> {
   const queryString = new URLSearchParams(params).toString();
-  const url = `${BYBIT_BASE}${path}${queryString ? "?" + queryString : ""}`;
+  const url = `${BYBIT_BASE}${path}${queryString ? `?${queryString}` : ""}`;
   try {
-    const json = await fetchJson<BybitResp<T>>(url, { revalidate: 30 });
+    const json = await fetchJson<BybitResp<T>>(url, { revalidate: 30, retries: 1 });
     if (json.retCode !== 0) {
       console.warn(`[dual-assets] Bybit error ${json.retCode}: ${json.retMsg}`);
       return null;
@@ -83,143 +70,216 @@ async function publicGet<T>(path: string, params: Record<string, string> = {}): 
   }
 }
 
+async function getBybitProductList(coin: string): Promise<BybitProductListItem[]> {
+  const rows: BybitProductListItem[] = [];
+  let cursor = "";
+  for (let page = 0; page < 10; page++) {
+    const result = await publicGet<{ list?: BybitProductListItem[]; nextPageCursor?: string }>(
+      "/v5/earn/advance/product",
+      {
+        category: "DualAssets",
+        coin,
+        limit: "100",
+        ...(cursor ? { cursor } : {}),
+      },
+    );
+    rows.push(...(result?.list ?? []));
+    cursor = result?.nextPageCursor ?? "";
+    if (!cursor) break;
+  }
+  return rows;
+}
+
 /**
- * Fetch Dual Assets products. Two-step (both endpoints public, no signing):
- *   1. /v5/earn/advance/product → productIds for {coin}, filter Available + matching quoteCoin
- *   2. /v5/earn/advance/product-extra-info per productId → currentPrice + strikes + APR
- * Each (productId × direction × strike) flattens into one DualAssetProduct row.
+ * Public Bybit Dual Assets product flattening.
+ * Bybit's `apyE8` is APR as a decimal scaled by 1e8, so percent = apyE8 / 1e6.
  */
-export async function getDualAssetProducts(coin = "SOL", quoteCoin = "USDT"): Promise<DualAssetProduct[]> {
-  const list = await publicGet<{ list?: BybitProductListItem[] }>("/v5/earn/advance/product", {
-    category: "DualAssets",
-    coin,
+export async function getDualAssetProducts(
+  coin = "SOL",
+  quoteCoin = "USDT",
+  opts: {
+    directions?: DualAssetDirection[];
+    durations?: DualAssetDuration[];
+  } = {},
+): Promise<DualAssetProduct[]> {
+  const directions = opts.directions ?? DUAL_ASSET_DIRECTIONS;
+  const durations = opts.durations ?? DUAL_ASSET_DURATIONS;
+  const list = await getBybitProductList(coin);
+  const products = list.filter((product) => {
+    const duration = normalizeDuration(product.duration);
+    return (
+      product.quoteCoin === quoteCoin &&
+      product.status === "Available" &&
+      duration != null &&
+      durations.includes(duration)
+    );
   });
-  const products = (list?.list ?? []).filter(
-    (p) => p.quoteCoin === quoteCoin && p.status === "Available",
-  );
   if (!products.length) return [];
 
   const flat: DualAssetProduct[] = [];
-  await Promise.all(products.map(async (p) => {
+  await Promise.all(products.map(async (product) => {
+    const duration = normalizeDuration(product.duration);
+    if (!duration) return;
     const extra = await publicGet<{ list?: BybitProductExtraInfoItem[] }>(
       "/v5/earn/advance/product-extra-info",
-      { category: "DualAssets", productId: p.productId },
+      { category: "DualAssets", productId: product.productId },
     );
     const item = extra?.list?.[0];
     if (!item) return;
-    const indexPrice = parseFloat(item.currentPrice);
-    const settlementMs = Number(p.settlementTime);
+
+    const indexPrice = Number(item.currentPrice);
+    const settlementMs = Number(product.settlementTime);
     const settlementTime = Number.isFinite(settlementMs) && settlementMs > 0
       ? new Date(settlementMs).toISOString()
       : "";
 
-    const push = (q: BybitStrikeQuote, direction: DualAssetDirection) => {
+    const push = (quote: BybitStrikeQuote, direction: DualAssetDirection) => {
+      if (!directions.includes(direction)) return;
+      const targetPrice = Number(quote.selectPrice);
+      const apr = Number(quote.apyE8) / 1_000_000;
+      if (!Number.isFinite(targetPrice) || !Number.isFinite(apr)) return;
       flat.push({
-        coin: p.baseCoin,
-        quoteCoin: p.quoteCoin,
+        productId: product.productId,
+        coin: product.baseCoin,
+        quoteCoin: product.quoteCoin,
         direction,
-        duration: p.duration,
-        targetPrice: parseFloat(q.selectPrice),
-        apr: Number(q.apyE8) / 1e6,   // apyE8 = APR_decimal × 1e8 → percent = / 1e6
+        duration,
+        targetPrice,
+        apr,
         indexPrice,
-        isVipOnly: p.isVipProduct,
+        isVipOnly: Boolean(product.isVipProduct),
         settlementTime,
       });
     };
-    item.buyLowPrice.forEach((q) => push(q, "BuyLow"));
-    item.sellHighPrice.forEach((q) => push(q, "SellHigh"));
+
+    for (const quote of item.buyLowPrice ?? []) push(quote, "BuyLow");
+    for (const quote of item.sellHighPrice ?? []) push(quote, "SellHigh");
   }));
 
   return flat;
 }
 
-/** Fetch SOL implied volatility from Deribit — average mark_iv of top-5-by-volume options. */
 export async function getSolImpliedVol(): Promise<number | null> {
   try {
     const json = await fetchJson<{ result?: { mark_iv?: number; volume?: number }[] }>(
       `${DERIBIT_BASE}/public/get_book_summary_by_currency?currency=SOL&kind=option`,
-      { revalidate: 120 },
+      { revalidate: 120, retries: 1 },
     );
-    const rows = (json.result ?? []).filter((o) => o.mark_iv && o.mark_iv > 0);
+    const rows = (json.result ?? []).filter((row) => row.mark_iv && row.mark_iv > 0);
     if (!rows.length) return null;
     const top = rows.sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, 5);
-    const avg = top.reduce((s, o) => s + (o.mark_iv ?? 0), 0) / top.length;
+    const avg = top.reduce((sum, row) => sum + (row.mark_iv ?? 0), 0) / top.length;
     return +avg.toFixed(2);
   } catch {
     return null;
   }
 }
 
-interface TickResult {
-  saved: number;
-  skipped: number;
-  hot: DualAssetSnapshot[];
-  ts: string;
-}
-
-/**
- * Run one tick: fetch products + IV, save snapshots dedup'd to 5-minute buckets,
- * update daily summary, return list of "hot" findings (APR > threshold) for notifier.
- */
-export async function runDualAssetTick(opts: {
-  pairs?: string[];
-  directions?: DualAssetDirection[];
-  /** null/undefined = save all targets Bybit serves; array = whitelist only those. */
-  targets?: number[] | null;
-  aprAlertThreshold?: number;
-} = {}): Promise<TickResult> {
-  const pairs = opts.pairs ?? DEFAULT_PAIRS;
-  const directions = opts.directions ?? DEFAULT_DIRECTIONS;
-  const targets: number[] | null = opts.targets !== undefined ? opts.targets : DEFAULT_TARGETS;
-  const threshold = opts.aprAlertThreshold ?? Number(process.env.DUAL_ASSETS_APR_ALERT ?? 100);
-
-  const nowUtc = new Date();
-  // Round to nearest 5-minute bucket (mimic tracker.py:process_and_save).
+function bucketNow(nowUtc = new Date()): { bucket: Date; ictBucket: Date } {
   const bucket = new Date(nowUtc);
   bucket.setUTCSeconds(0, 0);
   bucket.setUTCMinutes(Math.floor(bucket.getUTCMinutes() / 5) * 5);
-  // Express same bucket in ICT (UTC+7) for hour_ict.
-  const ictBucket = new Date(bucket.getTime() + 7 * 60 * 60 * 1000);
+  return { bucket, ictBucket: new Date(bucket.getTime() + 7 * 60 * 60 * 1000) };
+}
 
-  const ivPct = await getSolImpliedVol();
+export async function fetchDualAssetSnapshotBatch(
+  opts: Partial<DualAssetsConfig> & { now?: Date } = {},
+): Promise<DualAssetsFetchBatch> {
+  const config = { ...loadDualAssetsConfig(), ...opts };
+  const start = Date.now();
+  const { bucket, ictBucket } = bucketNow(opts.now);
+  const solIvPct = await getSolImpliedVol();
+  const snapshots: DualAssetSnapshot[] = [];
+  let rawRows = 0;
+  let trackSkipped = 0;
 
-  let saved = 0;
-  let skipped = 0;
-  const hot: DualAssetSnapshot[] = [];
-
-  for (const pair of pairs) {
+  for (const pair of config.pairs ?? ["SOL-USDT"]) {
     const [coin, quoteCoin] = pair.split("-");
-    const products = await getDualAssetProducts(coin, quoteCoin);
-    for (const p of products) {
-      if (targets !== null && !targets.includes(p.targetPrice)) continue;
-      if (DEFAULT_DURATIONS !== null && !DEFAULT_DURATIONS.includes(p.duration.toLowerCase())) continue;
-      if (!directions.includes(p.direction)) continue;
+    if (!coin || !quoteCoin) continue;
+    const products = await getDualAssetProducts(coin, quoteCoin, {
+      directions: config.directions ?? DUAL_ASSET_DIRECTIONS,
+      durations: config.durations ?? DUAL_ASSET_DURATIONS,
+    });
 
-      const snap: DualAssetSnapshot = {
+    for (const product of products) {
+      if (config.targets !== null && config.targets !== undefined && !config.targets.includes(product.targetPrice)) continue;
+      rawRows += 1;
+      if (product.apr < (config.minTrackAprPct ?? 55)) {
+        trackSkipped += 1;
+        continue;
+      }
+
+      snapshots.push({
         timestamp_utc: bucket.toISOString(),
         timestamp_ict: ictBucket.toISOString().replace("Z", "+07:00"),
         hour_ict: ictBucket.getUTCHours(),
-        coin_pair: `${p.coin}-${p.quoteCoin}`,
-        direction: p.direction,
-        target_price: p.targetPrice,
-        apr_pct: p.apr,
-        duration: p.duration,
-        settlement_utc: p.settlementTime || null,
-        index_price: p.indexPrice || null,
-        is_vip_only: p.isVipOnly ? 1 : 0,
-        sol_iv_pct: ivPct,
-      };
-
-      if (saveSnapshot(snap)) saved += 1;
-      else skipped += 1;
-
-      if (snap.apr_pct >= threshold) hot.push(snap);
+        product_id: product.productId,
+        coin_pair: `${product.coin}-${product.quoteCoin}`,
+        direction: product.direction,
+        target_price: product.targetPrice,
+        apr_pct: +product.apr.toFixed(6),
+        duration: product.duration,
+        settlement_utc: product.settlementTime || null,
+        index_price: Number.isFinite(product.indexPrice) ? product.indexPrice : null,
+        is_vip_only: product.isVipOnly ? 1 : 0,
+        sol_iv_pct: solIvPct,
+      });
     }
   }
 
-  // Update daily rollup for today (UTC).
-  updateDailySummary(bucket.toISOString().slice(0, 10));
+  return {
+    snapshots,
+    rawRows,
+    trackSkipped,
+    apiLatencyMs: Date.now() - start,
+    solIvPct,
+  };
+}
 
-  void TIMEZONE; // referenced in comments; kept for clarity
-  return { saved, skipped, hot, ts: nowUtc.toISOString() };
+export async function runDualAssetTick(opts: Partial<DualAssetsConfig> = {}): Promise<DualAssetsTickResult> {
+  const config = { ...loadDualAssetsConfig(), ...opts };
+  try {
+    const batch = await fetchDualAssetSnapshotBatch(config);
+    const result = saveSnapshots(batch.snapshots);
+    const hot = batch.snapshots.filter((snapshot) => snapshot.apr_pct >= (config.aprAlertPct ?? 100));
+    const touchedPairs = [...new Set(batch.snapshots.map((snapshot) => snapshot.coin_pair))];
+    const today = new Date().toISOString().slice(0, 10);
+    for (const pair of touchedPairs) {
+      updateDailySummary(today, pair, {
+        durations: config.durations,
+        directions: config.directions,
+        minAprPct: config.minTrackAprPct,
+      });
+    }
+    const tickResult: DualAssetsTickResult = {
+      saved: result.saved,
+      skipped: result.skipped + batch.trackSkipped,
+      dbSkipped: result.skipped,
+      trackSkipped: batch.trackSkipped,
+      rawRows: batch.rawRows,
+      hot,
+      ts: new Date().toISOString(),
+      apiLatencyMs: batch.apiLatencyMs,
+    };
+    recordTickRun({
+      timestamp_utc: tickResult.ts,
+      saved: tickResult.saved,
+      skipped: tickResult.skipped,
+      dbSkipped: tickResult.dbSkipped,
+      trackSkipped: tickResult.trackSkipped,
+      rawRows: tickResult.rawRows,
+      hot: tickResult.hot.length,
+      apiLatencyMs: tickResult.apiLatencyMs,
+      status: "ok",
+    });
+    return tickResult;
+  } catch (err) {
+    recordTickRun({
+      saved: 0,
+      skipped: 0,
+      status: "error",
+      error: (err as Error).message,
+    });
+    throw err;
+  }
 }

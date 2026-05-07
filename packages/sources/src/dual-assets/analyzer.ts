@@ -1,24 +1,27 @@
 // Hourly APR analysis — generates report consumable by both MCP tools and web UI.
 
 import { getHourlyAvg, getBestHours, getDailySummaries } from "./store.js";
-import type { DualAssetReport } from "./types.js";
+import type { DualAssetDirection, DualAssetDuration, DualAssetReport } from "./types.js";
 
 export function generateHourlyReport(opts: {
   coinPair?: string;
   targetPrice?: number;
   days?: number;
   duration?: string;
+  durations?: DualAssetDuration[];
+  directions?: DualAssetDirection[];
+  minAprPct?: number;
 } = {}): DualAssetReport | { error: string } {
-  const { coinPair = "SOL-USDT", targetPrice = 78, days = 7, duration } = opts;
-  const hourly = getHourlyAvg({ coinPair, targetPrice, days, duration });
+  const { coinPair = "SOL-USDT", targetPrice, days = 7, duration, durations, directions, minAprPct } = opts;
+  const hourly = getHourlyAvg({ coinPair, targetPrice, days, duration, durations, directions, minAprPct });
   if (!hourly.length) return { error: "No data available yet — wait for cron to populate." };
 
-  const best = getBestHours({ coinPair, targetPrice, days, topN: 3, duration });
+  const best = getBestHours({ coinPair, targetPrice, days, topN: 3, duration, durations, directions, minAprPct });
   const avgAll = hourly.reduce((s, h) => s + h.avg_apr, 0) / hourly.length;
   const totalSamples = hourly.reduce((s, h) => s + h.samples, 0);
   const bestEdgePct = best[0] && avgAll > 0 ? ((best[0].avg_apr - avgAll) / avgAll) * 100 : 0;
   const confidence = buildConfidence(totalSamples, hourly.length, bestEdgePct);
-  const trend = buildTrend(coinPair, targetPrice, days);
+  const trend = buildTrend({ coinPair, targetPrice, days, durations, directions, minAprPct });
 
   const hotHours = hourly.filter((h) => h.avg_apr >= avgAll * 1.1).map((h) => h.hour_ict);
   const coldHours = hourly.filter((h) => h.avg_apr <= avgAll * 0.9).map((h) => h.hour_ict);
@@ -32,7 +35,7 @@ export function generateHourlyReport(opts: {
 
   return {
     period_days: days,
-    target_price: targetPrice,
+    target_price: targetPrice ?? null,
     coin_pair: coinPair,
     overall_avg_apr: +avgAll.toFixed(2),
     confidence,
@@ -79,12 +82,15 @@ function buildConfidence(
   };
 }
 
-function buildTrend(
-  coinPair: string,
-  targetPrice: number,
-  days: number,
-): DualAssetReport["trend"] {
-  const rows = getDailySummaries({ coinPair, targetPrice, days })
+function buildTrend(opts: {
+  coinPair: string;
+  targetPrice?: number;
+  days: number;
+  durations?: DualAssetDuration[];
+  directions?: DualAssetDirection[];
+  minAprPct?: number;
+}): DualAssetReport["trend"] {
+  const rows = getDailySummaries(opts)
     .filter((r) => r.avg_apr != null)
     .sort((a, b) => a.date.localeCompare(b.date));
   if (rows.length < 2) {

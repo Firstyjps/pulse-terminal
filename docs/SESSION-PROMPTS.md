@@ -30,7 +30,7 @@
 ตอนนี้สถานะ:
 - Phase 5A deployed บน production (https://cryptopulse.buzz)
 - Bloomberg amber preview อยู่ที่ /bloomberg-preview (รอ user ตัดสิน)
-- รอ user ใส่ BYBIT_API_KEY เพื่อให้ dual-assets cron populate DB
+- dual-assets cron ใช้ Bybit public endpoints แล้ว ไม่ต้องรอ BYBIT_API_KEY/SECRET สำหรับ read-only tracking
 
 หลังอ่านเสร็จ ตอบกลับ: "Code ready. Read STATUS as of <timestamp>. ไม่มี/มี locks ที่กระทบงานปัจจุบัน"
 ```

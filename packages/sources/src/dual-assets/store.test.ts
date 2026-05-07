@@ -44,11 +44,12 @@ const baseSnap = (overrides: Partial<DualAssetSnapshot> = {}): DualAssetSnapshot
   timestamp_utc: "2026-04-28T05:00:00.000Z",
   timestamp_ict: "2026-04-28T12:00:00.000+07:00",
   hour_ict: 12,
+  product_id: "prod-1",
   coin_pair: "SOL-USDT",
   direction: "BuyLow",
   target_price: 78,
   apr_pct: 120,
-  duration: "1D",
+  duration: "1d",
   settlement_utc: "2026-04-29T05:00:00.000Z",
   index_price: 80,
   is_vip_only: 0,
@@ -107,6 +108,28 @@ describe("dual-assets store", () => {
         );
       }
       expect(getRecentSnapshots(3)).toHaveLength(3);
+    });
+
+    it("filters visible rows by min APR, direction, and duration", () => {
+      saveSnapshot(baseSnap({ apr_pct: 54, direction: "BuyLow", duration: "8h" }));
+      saveSnapshot(baseSnap({ product_id: "prod-2", apr_pct: 56, direction: "BuyLow", duration: "8h" }));
+      saveSnapshot(baseSnap({ product_id: "prod-3", apr_pct: 120, direction: "SellHigh", duration: "1d" }));
+      const rows = getRecentSnapshots({
+        limit: 10,
+        minAprPct: 55,
+        directions: ["BuyLow"],
+        durations: ["8h"],
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].apr_pct).toBe(56);
+      expect(rows[0].direction).toBe("BuyLow");
+      expect(rows[0].duration).toBe("8h");
+    });
+
+    it("returns no rows when duration or direction toggles are empty", () => {
+      saveSnapshot(baseSnap({ apr_pct: 120, duration: "8h" }));
+      expect(getRecentSnapshots({ limit: 10, durations: [], directions: ["BuyLow"] })).toEqual([]);
+      expect(getRecentSnapshots({ limit: 10, durations: ["8h"], directions: [] })).toEqual([]);
     });
   });
 

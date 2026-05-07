@@ -70,11 +70,19 @@ export type { TermStructurePoint, OptionsTermStructure } from "./options/term-st
 // Phase 5A — dual-assets types (browser-safe; SQLite store stays server-only)
 export type {
   DualAssetDirection,
+  DualAssetDuration,
   DualAssetProduct,
   DualAssetSnapshot,
+  DualAssetsConfig,
+  DualAssetsSettings,
+  DualAssetSnapshotQuery,
   HourlyAprStat,
   DualAssetReport,
   AprIvCorrelation,
+  DailySummary,
+  DualAssetsTickResult,
+  DualAssetsFetchBatch,
+  AlertEvent,
 } from "./dual-assets/types.js";
 
 // Phase 4 — pure rubric builder for the MCP `grade_signal` tool. No I/O, safe in any context.

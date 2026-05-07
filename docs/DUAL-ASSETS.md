@@ -1,121 +1,98 @@
-# Bybit Dual Assets — Operator Guide
+# Pulse Dual Assets
 
-> Time-series tracker for Bybit's Dual Assets product. Captures APR snapshots every 5 min,
-> rolls up daily summaries, exposes them via API + MCP, fires Discord alerts on hot APR.
+Pulse Terminal owns the Bybit Dual Assets runtime. The standalone `Dual-assets_MD`
+project was ported into the existing Pulse stack; Pulse does not iframe, link out
+to, or require a second app for `/dual-assets`.
 
-## What it is
+## Scope
 
-Bybit Dual Assets = a structured product where you commit USDT/SOL at a target strike for a duration,
-and earn yield (APR) that varies by strike, duration, and time of day.
+- Data source: real Bybit public Advanced Earn DualAssets endpoints
+- Default pair: `SOL-USDT`
+- Default directions: `BuyLow,SellHigh`
+- Default durations: `8h,1d`
+- UI labels: `8 Hours`, `1 Day`, `Buy Low`, `Sell High`
+- Track APY visibility threshold: `55%`
+- Hot APR alert threshold: `100%`
+- SQLite DB: `apps/alerts/data/dual-assets.sqlite`
 
-The tracker answers:
+`DUAL_ASSETS_MIN_TRACK_APR` is the ingest/API/UI/MCP visibility filter. It is not
+the alert threshold. Existing historical rows below the threshold remain in
+SQLite, but default read paths hide them.
 
-- **"When in the day is APR best?"** → 24-bucket hour-of-day analysis with Thai recommendation
-- **"What was the average APR last week?"** → daily summaries
-- **"Did APR move with implied volatility?"** → APR ↔ SOL IV correlation
-- **"Notify me when APR > X%"** → Discord webhook on hot entries
+`DUAL_ASSETS_APR_ALERT` only controls hot APR webhook alerts.
 
-## Required env vars
+## Runtime Path
 
-| Var | Required | Default | Notes |
-|---|---|---|---|
-| `BYBIT_API_KEY` | ✅ yes | — | Read-only key, no trade/withdrawal scope |
-| `BYBIT_API_SECRET` | ✅ yes | — | |
-| `DUAL_ASSETS_PAIRS` | no | `SOL-USDT` | Comma-separated pairs to track |
-| `DUAL_ASSETS_DIRECTIONS` | no | `BuyLow` | `BuyLow` / `SellHigh` (comma-separated) |
-| `DUAL_ASSETS_TARGETS` | no | `78,80` | Target strikes (comma-separated) |
-| `DUAL_ASSETS_INTERVAL_MS` | no | `300000` | Tick cadence (5 min) |
-| `DUAL_ASSETS_APR_ALERT` | no | `100` | Hot threshold % for webhook |
-| `DUAL_ASSETS_DB_PATH` | no | `<repo>/apps/alerts/data/dual-assets.sqlite` | Override (use absolute path) |
-| `DUAL_ASSETS_ROLLUP_PAIRS` | no | `SOL-USDT` | Pairs to roll up daily |
-| `ALERT_WEBHOOK_URL` | no | — | Discord/Slack webhook for hot alerts |
-
-Without `BYBIT_API_KEY` / `BYBIT_API_SECRET`, the tracker logs a warning and stays disabled.
-The store still serves graceful empty responses.
-
-## How it runs
-
-Three independent loops in `apps/alerts/src/index.ts`:
-
-| Loop | Cadence | Purpose |
-|---|---|---|
-| Anomaly scan | every `ALERT_INTERVAL_MS` (default 15 min) | Cross-source ETF/funding/flow anomalies |
-| **Dual Assets tick** | every `DUAL_ASSETS_INTERVAL_MS` (default 5 min) | Pull current strikes, write `apr_snapshots`, fire webhook on hot APR |
-| **Daily rollup** | once at 00:05 ICT | Aggregate yesterday's rows into `daily_summary` |
-
-## Schema
-
-`apr_snapshots` — per-tick raw rows
-```sql
-id, timestamp_utc, timestamp_ict, hour_ict (0-23),
-coin_pair, direction, target_price, apr_pct, duration,
-settlement_utc, index_price, is_vip_only, sol_iv_pct,
-created_at
-UNIQUE (timestamp_ict, coin_pair, target_price, duration, direction)
+```text
+Bybit public endpoints
+  -> packages/sources/src/dual-assets/tracker.ts
+  -> apps/alerts/data/dual-assets.sqlite
+  -> apps/web/app/api/dual-assets/*
+  -> /dual-assets UI + apps/mcp/src/tools/dual-assets.ts
 ```
 
-`daily_summary` — aggregated per (date × coin_pair × target_price)
-```sql
-id, date, coin_pair, target_price,
-avg_apr, max_apr, min_apr,
-best_hour_ict, worst_hour_ict,
-avg_index_price, sample_count, created_at
-UNIQUE (date, coin_pair, target_price)
+The alerts worker is the writer. Web API routes and MCP tools read the same
+SQLite contract from `@pulse/sources/server`.
+
+No `BYBIT_API_KEY` or `BYBIT_API_SECRET` is required for read-only tracking.
+Those keys are only reserved for a future write/place-order path.
+
+## API
+
+- `GET /api/dual-assets/settings`
+- `GET /api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=8h&limit=100`
+- `GET /api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=1d&limit=100`
+- `GET /api/dual-assets/best-hour?coin_pair=SOL-USDT&duration=8h,1d&direction=BuyLow,SellHigh&days=7`
+- `GET /api/dual-assets/summary?coin_pair=SOL-USDT&duration=8h,1d&direction=BuyLow,SellHigh&days=30`
+
+Expected settings defaults:
+
+```json
+{
+  "minTrackAprPct": 55,
+  "aprAlertPct": 100,
+  "authRequiredForTracking": false
+}
 ```
 
-## Endpoints
+Default snapshot reads apply `apr_pct >= 55` and dedupe visible rows to the best
+APR row per time, pair, direction, target, and duration. Use `duration=none` or
+`direction=none` to intentionally return an empty result, matching the UI
+multi-toggle behavior.
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/dual-assets/snapshots?limit=100` | Recent raw rows newest-first |
-| GET | `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=78&days=7&correlation=1` | Hourly analysis + Thai recommendation |
-| GET | `/api/dual-assets/summary?coin_pair=SOL-USDT&target=78&days=30` | Daily aggregated rollups |
+## MCP Tools
 
-All return graceful empty (`count: 0`) when DB is empty (no data yet) or unavailable.
+- `get_dual_assets_settings`
+- `get_dual_assets_apr`
+- `get_best_dual_assets_hour`
+- `get_dual_assets_daily_summary`
 
-## MCP tools (Claude Desktop)
+MCP defaults match the API: `SOL-USDT`, `8h,1d`, `BuyLow,SellHigh`, and Track
+APY `>=55`.
 
-- `get_dual_assets_apr` — recent snapshots
-- `get_best_dual_assets_hour` — hourly analysis with Thai recommendation
-- `get_dual_assets_daily_summary` — daily rollups
-
-## Ops
-
-### One-shot tick (manual run, useful for testing)
-```bash
-node --import tsx scripts/dual-assets-tick.mjs              # tick once
-node --import tsx scripts/dual-assets-tick.mjs --rollup     # tick + rollup yesterday & today
-node --import tsx scripts/dual-assets-tick.mjs --rollup-only 2026-04-27   # rollup specific date only
-```
-
-### Inspect the SQLite directly
-```bash
-sqlite3 apps/alerts/data/dual-assets.sqlite "SELECT date, target_price, avg_apr, best_hour_ict FROM daily_summary ORDER BY date DESC LIMIT 10"
-```
-
-### Verify the cron is alive
-```bash
-pm2 logs pulse-alerts --lines 20 --nostream | grep dual-assets
-```
-
-You should see ticks every 5 min:
-```
-[dual-assets] tick done in 412ms — saved=2 skipped=0 hot=1
-```
-
-## Tests
+## Local Verification
 
 ```bash
-pnpm --filter @pulse/sources test -- dual-assets
+pnpm typecheck
+pnpm test
+pnpm build
+curl "http://localhost:3000/api/dual-assets/settings"
+curl "http://localhost:3000/api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=8h&limit=100"
+curl "http://localhost:3000/api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=1d&limit=100"
 ```
-- 11 store tests (saveSnapshot dedup, getRecentSnapshots ordering, getHourlyAvg grouping, getBestHours, getAprIvCorrelation strong-positive / not-enough-data, updateDailySummary)
-- 4 analyzer tests (no-data error, Thai recommendation shape, hot/cold threshold, insufficient-data fallback)
 
-Tests use a temp SQLite at `os.tmpdir()/dual-assets-test-*` — never touches the production DB.
+Expected:
 
-## Architecture notes
+- settings include `minTrackAprPct:55` and `aprAlertPct:100`
+- snapshot rows do not include `apr_pct < 55`
+- both `BuyLow` and `SellHigh` can appear
+- `8h` and `1d` filters return independent rows
 
-- **Why SQLite, not JSONL?** Time-series queries (`GROUP BY hour_ict`) need real indexes. See `docs/ADR-004-sqlite-bybit-apr.md` for the migration trigger.
-- **Why bake the path resolution?** When Next.js (web) imports the store from `apps/web`, CWD differs from `apps/alerts`. The store walks up to `pnpm-workspace.yaml` to anchor on the repo root.
-- **Why `tryGetDb()` swallows open errors?** Web routes must return graceful empty arrays even when no BYBIT keys → no DB exists yet.
-- **Webhook is fire-and-forget** — failures log a warn, never crash the cron.
+## Production Verification
+
+```bash
+curl https://cryptopulse.buzz/api/health
+curl https://cryptopulse.buzz/api/dual-assets/settings
+curl "https://cryptopulse.buzz/api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=8h&limit=100"
+curl "https://cryptopulse.buzz/api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=1d&limit=100"
+```

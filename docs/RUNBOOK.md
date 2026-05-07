@@ -44,7 +44,10 @@ Never paste `pm2 jlist` raw output into chat or tickets; it can include env valu
 - `GET /api/alerts/recent?limit=1` should return `configured:true` in production.
 - `GET /api/portfolio/aggregate` should return `configured:true` when portfolio keys are set.
 - `GET /api/depth?symbol=BTCUSDT` must return non-empty bids and asks.
-- `GET /api/dual-assets/summary?coin_pair=SOL-USDT&days=30` must return the summary shape.
+- `GET /api/dual-assets/settings` must include `minTrackAprPct:55`, `aprAlertPct:100`, and `authRequiredForTracking:false`.
+- `GET /api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=8h&limit=100` must not return rows below `apr_pct:55`.
+- `GET /api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=1d&limit=100` must not return rows below `apr_pct:55`.
+- `GET /api/dual-assets/summary?coin_pair=SOL-USDT&duration=8h,1d&days=30` must return direction/duration-separated summary rows.
 - `GET http://127.0.0.1:8081/regime` must return a regime and score.
 
 ## Admin Token

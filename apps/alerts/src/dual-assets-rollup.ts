@@ -6,7 +6,9 @@
 //   - The tick writes raw rows; the rollup reads them and computes aggregates.
 //   - Rollup runs once per day after midnight, so it sees the full ICT calendar day.
 
-import { updateDailySummary } from "@pulse/sources/server";
+import { loadDualAssetsConfig, updateDailySummary } from "@pulse/sources/server";
+
+const CONFIG = loadDualAssetsConfig();
 
 // ICT = UTC+7 — compute "yesterday" relative to ICT for correct calendar boundaries.
 function yesterdayInIct(): string {
@@ -34,7 +36,11 @@ function rollup() {
   const date = yesterdayInIct();
   for (const pair of COIN_PAIRS) {
     try {
-      updateDailySummary(date, pair);
+      updateDailySummary(date, pair, {
+        durations: CONFIG.durations,
+        directions: CONFIG.directions,
+        minAprPct: CONFIG.minTrackAprPct,
+      });
       console.log(`[dual-assets-rollup] ${date} ${pair} — done`);
     } catch (err) {
       console.warn(`[dual-assets-rollup] ${date} ${pair} failed:`, (err as Error).message);
@@ -43,13 +49,12 @@ function rollup() {
 }
 
 export function startDualAssetsRollup(): () => void {
-  const hasKeys = process.env.BYBIT_API_KEY && process.env.BYBIT_API_SECRET;
-  if (!hasKeys) {
-    console.log("[dual-assets-rollup] BYBIT_API_KEY/SECRET missing — rollup disabled");
+  if (!CONFIG.schedulerEnabled) {
+    console.log("[dual-assets-rollup] scheduler disabled by DUAL_ASSETS_SCHEDULER=0");
     return () => {};
   }
   // Fire once on boot in case the previous day's rollup was missed.
-  console.log(`[dual-assets-rollup] starting — pairs: ${COIN_PAIRS.join(",")}, rolls at 00:05 ICT`);
+  console.log(`[dual-assets-rollup] starting — pairs: ${COIN_PAIRS.join(",")}, durations=${CONFIG.durations.join(",")}, rolls at 00:05 ICT`);
   rollup();
 
   let timeout: NodeJS.Timeout;

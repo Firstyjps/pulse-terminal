@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Panel, WsRow, Workspace, StatBlock, colors, fonts } from "@pulse/ui";
 import { useFlow } from "../../lib/use-flow";
 
@@ -16,7 +16,7 @@ interface HourlyAprStat {
 
 interface BestHourReport {
   period_days: number;
-  target_price: number;
+  target_price: number | null;
   coin_pair: string;
   overall_avg_apr: number;
   best_hours: HourlyAprStat[];
@@ -27,9 +27,11 @@ interface BestHourReport {
 }
 
 interface Snapshot {
+  id?: number;
   timestamp_utc: string;
   timestamp_ict: string;
   hour_ict: number;
+  product_id: string;
   coin_pair: string;
   direction: string;
   target_price: number;
@@ -44,6 +46,8 @@ interface Snapshot {
 interface DailySummary {
   date: string;
   coin_pair: string;
+  direction: string;
+  duration: string;
   target_price: number;
   avg_apr: number | null;
   max_apr: number | null;
@@ -52,6 +56,15 @@ interface DailySummary {
   worst_hour_ict: number | null;
   avg_index_price: number | null;
   sample_count: number;
+}
+
+interface Settings {
+  minTrackAprPct: number;
+  aprAlertPct: number;
+  durations: Duration[];
+  directions: Direction[];
+  durationLabels: Record<Duration, string>;
+  authRequiredForTracking: false;
 }
 
 /**
@@ -66,15 +79,31 @@ interface DailySummary {
  * down to the most recent ~50 rows for the picker so we always reflect the
  * live product menu.
  */
-const DURATIONS = ["8h", "1d"] as const;
-type Duration = (typeof DURATIONS)[number];
+const DURATIONS = [
+  { value: "8h", label: "8 Hours" },
+  { value: "1d", label: "1 Day" },
+] as const;
+const DIRECTIONS = [
+  { value: "BuyLow", label: "Buy Low" },
+  { value: "SellHigh", label: "Sell High" },
+] as const;
+type Duration = (typeof DURATIONS)[number]["value"];
+type Direction = (typeof DIRECTIONS)[number]["value"];
 
 export default function DualAssetsPage() {
   const [days, setDays] = useState<7 | 14 | 30>(7);
-  const [duration, setDuration] = useState<Duration>("8h");
+  const [selectedDurations, setSelectedDurations] = useState<Duration[]>(["8h", "1d"]);
+  const [selectedDirections, setSelectedDirections] = useState<Direction[]>(["BuyLow", "SellHigh"]);
+  const [target, setTarget] = useState<number | null>(null);
+  const disabled = selectedDurations.length === 0 || selectedDirections.length === 0;
+
+  const durationParam = selectedDurations.length ? selectedDurations.join(",") : "none";
+  const directionParam = selectedDirections.length ? selectedDirections.join(",") : "none";
+
+  const settings = useFlow<Settings>("/api/dual-assets/settings");
 
   const snapshots = useFlow<{ count: number; records: Snapshot[] }>(
-    `/api/dual-assets/snapshots?limit=300`,
+    `/api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=${durationParam}&direction=${directionParam}&limit=500`,
   );
 
   // Dynamic target list — distinct strikes from recent snapshots filtered by
@@ -83,28 +112,31 @@ export default function DualAssetsPage() {
     if (!snapshots.data) return [];
     const set = new Set<number>();
     for (const r of snapshots.data.records) {
-      if (r.duration.toLowerCase() === duration) set.add(r.target_price);
+      set.add(r.target_price);
     }
     return [...set].sort((a, b) => b - a);
-  }, [snapshots.data, duration]);
+  }, [snapshots.data]);
 
-  const [target, setTarget] = useState<number | null>(null);
   // Default target = nearest-to-spot strike on first load.
-  useMemo(() => {
-    if (target === null && availableTargets.length > 0 && snapshots.data?.records[0]) {
+  useEffect(() => {
+    if (disabled) {
+      setTarget(null);
+      return;
+    }
+    if ((target === null || !availableTargets.includes(target)) && availableTargets.length > 0 && snapshots.data?.records[0]) {
       const spot = snapshots.data.records[0].index_price ?? availableTargets[0];
       const nearest = availableTargets.reduce((a, b) =>
         Math.abs(b - spot) < Math.abs(a - spot) ? b : a,
       );
       setTarget(nearest);
     }
-  }, [availableTargets, target, snapshots.data]);
+  }, [availableTargets, disabled, target, snapshots.data]);
 
   const bestHour = useFlow<BestHourReport | { error: string }>(
-    `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=${target ?? 0}&days=${days}&duration=${duration}`,
+    `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=${target ?? 0}&days=${days}&duration=${durationParam}&direction=${directionParam}`,
   );
   const summary = useFlow<{ count: number; summaries: DailySummary[] }>(
-    `/api/dual-assets/summary?coin_pair=SOL-USDT&target=${target ?? 0}&days=30`,
+    `/api/dual-assets/summary?coin_pair=SOL-USDT&target=${target ?? 0}&days=30&duration=${durationParam}&direction=${directionParam}`,
   );
 
   const report =
@@ -120,11 +152,11 @@ export default function DualAssetsPage() {
   }, [report]);
 
   const filteredSnapshots = useMemo(() => {
-    if (!snapshots.data || target == null) return [];
+    if (disabled || !snapshots.data || target == null) return [];
     return snapshots.data.records
-      .filter((r) => r.target_price === target && r.duration.toLowerCase() === duration)
+      .filter((r) => r.target_price === target)
       .slice(0, 30);
-  }, [snapshots.data, target, duration]);
+  }, [disabled, snapshots.data, target]);
 
   const latestSnapshot = filteredSnapshots[0];
   const maxHourlyApr = report
@@ -132,36 +164,81 @@ export default function DualAssetsPage() {
     : 0.001;
 
   const spot = snapshots.data?.records[0]?.index_price ?? null;
+  const toggleDuration = (duration: Duration) => {
+    setSelectedDurations((prev) =>
+      prev.includes(duration) ? prev.filter((item) => item !== duration) : [...prev, duration],
+    );
+  };
+  const toggleDirection = (direction: Direction) => {
+    setSelectedDirections((prev) =>
+      prev.includes(direction) ? prev.filter((item) => item !== direction) : [...prev, direction],
+    );
+  };
+
   const durationToggle = (
-    <span style={{ display: "flex", gap: 1, background: colors.line, marginRight: 8 }}>
-      {DURATIONS.map((d) => (
-        <button
-          key={d}
-          onClick={() => {
-            setDuration(d);
-            setTarget(null); // re-pick nearest target for the new duration
-          }}
-          style={{
-            background: duration === d ? colors.bg2 : colors.bg1,
-            border: "none",
-            color: duration === d ? colors.amberBright : colors.txt3,
-            padding: "3px 12px",
-            fontFamily: fonts.mono,
-            fontSize: 9,
-            letterSpacing: "0.10em",
-            fontWeight: duration === d ? 700 : 400,
-            cursor: "pointer",
-            textTransform: "uppercase",
-          }}
-        >
-          {d.toUpperCase()}
-        </button>
-      ))}
+    <span style={{ display: "flex", gap: 1, background: colors.line }}>
+      {DURATIONS.map((d) => {
+        const active = selectedDurations.includes(d.value);
+        return (
+          <button
+            key={d.value}
+            onClick={() => {
+              toggleDuration(d.value);
+              setTarget(null);
+            }}
+            style={{
+              background: active ? colors.bg2 : colors.bg1,
+              border: "none",
+              color: active ? colors.amberBright : colors.txt3,
+              padding: "3px 12px",
+              fontFamily: fonts.mono,
+              fontSize: 9,
+              letterSpacing: "0.10em",
+              fontWeight: active ? 700 : 400,
+              cursor: "pointer",
+              textTransform: "uppercase",
+            }}
+          >
+            {d.label}
+          </button>
+        );
+      })}
+    </span>
+  );
+  const directionToggle = (
+    <span style={{ display: "flex", gap: 1, background: colors.line }}>
+      {DIRECTIONS.map((d) => {
+        const active = selectedDirections.includes(d.value);
+        return (
+          <button
+            key={d.value}
+            onClick={() => {
+              toggleDirection(d.value);
+              setTarget(null);
+            }}
+            style={{
+              background: active ? colors.bg2 : colors.bg1,
+              border: "none",
+              color: active ? (d.value === "BuyLow" ? colors.green : colors.red) : colors.txt3,
+              padding: "3px 12px",
+              fontFamily: fonts.mono,
+              fontSize: 9,
+              letterSpacing: "0.10em",
+              fontWeight: active ? 700 : 400,
+              cursor: "pointer",
+              textTransform: "uppercase",
+            }}
+          >
+            {d.label}
+          </button>
+        );
+      })}
     </span>
   );
   const headerActions = (
-    <span style={{ display: "flex", alignItems: "center" }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
       {durationToggle}
+      {directionToggle}
       <span
         style={{
           display: "flex",
@@ -211,7 +288,7 @@ export default function DualAssetsPage() {
         <Panel
           span={12}
           title="DUAL ASSETS · BYBIT"
-          badge={`SOL-USDT · ${duration.toUpperCase()} · ${days}D ANALYSIS`}
+          badge={`SOL-USDT · TRACK >=${settings.data?.minTrackAprPct ?? 55}% · HOT >=${settings.data?.aprAlertPct ?? 100}%`}
           flush
         >
           <div
@@ -226,18 +303,18 @@ export default function DualAssetsPage() {
             <StatBlock
               label="Current APR"
               value={latestSnapshot ? `${latestSnapshot.apr_pct.toFixed(2)}%` : "—"}
-              delta={latestSnapshot ? latestSnapshot.direction : ""}
+              delta={latestSnapshot ? `${labelDirection(latestSnapshot.direction)} · ${labelDuration(latestSnapshot.duration)}` : ""}
               deltaColor={
                 latestSnapshot && latestSnapshot.direction === "BuyLow"
                   ? colors.green
                   : colors.red
               }
-              sub={latestSnapshot ? formatICT(latestSnapshot.timestamp_ict) : "no data"}
+              sub={latestSnapshot ? formatICT(latestSnapshot.timestamp_ict) : disabled ? "no filters selected" : "no data"}
             />
             <StatBlock
               label={`${days}D Avg APR`}
               value={report ? `${report.overall_avg_apr.toFixed(2)}%` : "—"}
-              delta={report ? `target $${report.target_price}` : ""}
+              delta={report ? `target ${report.target_price ? "$" + report.target_price : "all"}` : ""}
               deltaColor={colors.amber}
               sub={report ? `${report.hourly_data.length} active hours` : ""}
             />
@@ -267,7 +344,7 @@ export default function DualAssetsPage() {
                   : ""
               }
               deltaColor={colors.cyan}
-              sub="cron 5min · rollup 00:05 ICT"
+              sub="public Bybit · cron 5min"
             />
           </div>
         </Panel>
@@ -455,7 +532,7 @@ export default function DualAssetsPage() {
         <Panel
           span={7}
           title="RECENT SNAPSHOTS"
-          badge={`${filteredSnapshots.length} ROWS · TARGET $${target}`}
+          badge={`${filteredSnapshots.length} ROWS · ${target == null ? "NO TARGET" : `TARGET $${target}`}`}
         >
           <div style={{ overflow: "auto", height: "100%", fontFamily: fonts.mono, fontSize: 10 }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -481,11 +558,11 @@ export default function DualAssetsPage() {
                     <Td>{formatICT(r.timestamp_ict)}</Td>
                     <Td align="right" color={colors.amber}>{pad2(r.hour_ict)}</Td>
                     <Td color={r.direction === "BuyLow" ? colors.green : colors.red}>
-                      {r.direction}
+                      {labelDirection(r.direction)}
                     </Td>
                     <Td align="right" color={colors.amber}>{r.apr_pct.toFixed(2)}%</Td>
                     <Td align="right">{r.index_price?.toFixed(2) ?? "—"}</Td>
-                    <Td color={colors.txt3}>{r.duration}</Td>
+                    <Td color={colors.txt3}>{labelDuration(r.duration)}</Td>
                   </tr>
                 ))}
                 {filteredSnapshots.length === 0 && (
@@ -494,7 +571,7 @@ export default function DualAssetsPage() {
                       colSpan={6}
                       style={{ padding: 16, textAlign: "center", color: colors.txt3, fontSize: 11 }}
                     >
-                      no snapshots for target ${target} yet
+                      {disabled ? "turn on at least one duration and direction" : "no snapshots for selected filters yet"}
                     </td>
                   </tr>
                 )}
@@ -513,6 +590,8 @@ export default function DualAssetsPage() {
               <thead style={{ position: "sticky", top: 0, background: colors.bg1, zIndex: 1 }}>
                 <tr style={{ color: colors.txt3, textAlign: "left", fontSize: 9, letterSpacing: "0.08em" }}>
                   <Th>DATE</Th>
+                  <Th>DIR</Th>
+                  <Th>DUR</Th>
                   <Th align="right">AVG</Th>
                   <Th align="right">MAX</Th>
                   <Th align="right">BEST H</Th>
@@ -529,6 +608,8 @@ export default function DualAssetsPage() {
                     }}
                   >
                     <Td>{d.date.slice(5)}</Td>
+                    <Td color={d.direction === "BuyLow" ? colors.green : colors.red}>{labelDirection(d.direction)}</Td>
+                    <Td color={colors.txt3}>{labelDuration(d.duration)}</Td>
                     <Td align="right" color={colors.amber}>
                       {d.avg_apr != null ? d.avg_apr.toFixed(2) + "%" : "—"}
                     </Td>
@@ -546,7 +627,7 @@ export default function DualAssetsPage() {
                 {(!summary.data || summary.data.count === 0) && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       style={{ padding: 16, textAlign: "center", color: colors.txt3, fontSize: 11 }}
                     >
                       no rollups yet · runs at 00:05 ICT
@@ -610,4 +691,12 @@ function formatICT(iso: string): string {
   const m = iso.match(/(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!m) return iso.slice(0, 16);
   return `${m[1]}-${m[2]} ${m[3]}:${m[4]}`;
+}
+
+function labelDuration(duration: string): string {
+  return duration.toLowerCase() === "8h" ? "8 Hours" : "1 Day";
+}
+
+function labelDirection(direction: string): string {
+  return direction === "BuyLow" ? "Buy Low" : direction === "SellHigh" ? "Sell High" : direction;
 }
