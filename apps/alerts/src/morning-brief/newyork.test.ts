@@ -10,8 +10,8 @@ const ASOF = new Date("2026-05-07T13:30:00.000Z"); // 20:30 BKK
 function makeInput(overrides: Partial<NewyorkBriefInput> = {}): NewyorkBriefInput {
   return {
     asOf: ASOF,
-    nySessionBias: "Constructive above BTC pivot; fade failed upside through cash open.",
-    usMarketSetup: "Nasdaq breadth firm, DXY flat, yields contained.",
+    nySessionBias: "ภาพยังบวกเหนือ BTC pivot; ถ้าขึ้นไม่ผ่านตอน cash open ให้ fade.",
+    usMarketSetup: "Nasdaq breadth แข็ง, DXY ทรงตัว, yields ไม่กดดัน.",
     levels: {
       BTC: {
         current: 63_200,
@@ -35,10 +35,10 @@ function makeInput(overrides: Partial<NewyorkBriefInput> = {}): NewyorkBriefInpu
         r2: { price: 158.5, tag: "liquidity" },
       },
     },
-    etfFlowWatch: "BTC ETF demand positive; ETH still lagging.",
-    cryptoLeverage: "Funding warm but not euphoric; OI rising into resistance.",
-    nyCatalysts: ["US jobless claims", "Fed speaker after cash open"],
-    actionCandidates: ["BTC breakout only above R1", "ETH relative strength catch-up if BTC holds S1"],
+    etfFlowWatch: "BTC ETF demand ยังบวก; ETH ยัง lag.",
+    cryptoLeverage: "Funding เริ่มอุ่นแต่ยังไม่ euphoric; OI เพิ่มเข้าหาแนวต้าน.",
+    nyCatalysts: ["US jobless claims", "Fed speaker หลัง cash open"],
+    actionCandidates: ["BTC breakout เฉพาะเหนือ R1", "ETH relative strength catch-up ถ้า BTC ยืน S1"],
     ...overrides,
   };
 }
@@ -47,20 +47,20 @@ describe("formatNewyorkBrief", () => {
   it("renders the fixed header and section set", () => {
     const out = formatNewyorkBrief(makeInput());
 
-    expect(out).toContain("🗽 *Pulse Newyork Brief*");
+    expect(out).toContain("🗽 *สรุป Newyork Brief*");
     expect(out).toContain("2026\\-05\\-07 20:30 BKK");
 
     for (const heading of [
-      "🎯 NY Session Bias",
-      "🇺🇸 US Market Setup",
-      "💰 ETF / Flow Watch",
-      "📊 Crypto Leverage",
-      "⚠️ NY Catalysts",
-      "🎯 Action Candidates",
+      "🎯 มุมมอง NY Session",
+      "🇺🇸 ภาพตลาดสหรัฐ",
+      "💰 จับตา ETF / Flow",
+      "📊 Leverage คริปโต",
+      "⚠️ Catalyst ฝั่ง NY",
+      "🎯 แผนรับมือ",
     ]) {
       expect(out).toContain(`*${heading}*`);
     }
-    expect(out).toContain("📍 *Support / Resistance*");
+    expect(out).toContain("📍 *แนวรับ / แนวต้าน*");
   });
 
   it("renders BTC, ETH, and SOL S/R levels with S1/S2/R1/R2 and required tags", () => {
@@ -74,15 +74,15 @@ describe("formatNewyorkBrief", () => {
   it("renders levels unavailable for missing S/R assets", () => {
     const out = formatNewyorkBrief(makeInput({ levels: { BTC: null } }));
 
-    expect(out).toContain("BTC: levels unavailable");
-    expect(out).toContain("ETH: levels unavailable");
-    expect(out).toContain("SOL: levels unavailable");
+    expect(out).toContain("BTC: ไม่มีข้อมูลแนวรับ/แนวต้าน");
+    expect(out).toContain("ETH: ไม่มีข้อมูลแนวรับ/แนวต้าน");
+    expect(out).toContain("SOL: ไม่มีข้อมูลแนวรับ/แนวต้าน");
   });
 
   it("includes ETF finalization note", () => {
     const out = formatNewyorkBrief(makeInput());
 
-    expect(out).toContain("Intraday ETF flow is not final until after US close\\.");
+    expect(out).toContain("ตัวเลข ETF ระหว่างวันยังไม่ final จนกว่าตลาดสหรัฐจะปิด\\.");
   });
 
   it("does not include portfolio, PnL, or exposure language", () => {
@@ -192,7 +192,7 @@ describe("runNewyorkBrief", () => {
 
     expect(r.sent).toBe(false);
     expect(r.reason).toBe("dry_run");
-    expect(r.text).toContain("🗽 *Pulse Newyork Brief*");
+    expect(r.text).toContain("🗽 *สรุป Newyork Brief*");
     expect(r.text).toContain("BTC 63,200");
     expect(r.text).toContain("20:30 BKK");
     expect(r.text).not.toContain("08:00 BKK");

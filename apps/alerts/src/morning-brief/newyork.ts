@@ -168,6 +168,13 @@ function fmtPrice(n: number): string {
   });
 }
 
+function thaiRegimeReason(reason: string): string {
+  return reason
+    .replace(/one risk-off trigger \(need 2\+\)/gi, "มี risk-off trigger 1 จุด (ต้องมี 2+)")
+    .replace(/(\d+)\/3 risk-on triggers \(need 3\)/gi, "มี risk-on trigger $1/3 จุด (ต้องมี 3)")
+    .replace(/BTC holding above weekly VWAP/gi, "BTC ยืนเหนือ weekly VWAP");
+}
+
 function buildBias(
   regime: RegimeSlice | null,
   macro: MacroResponse | null,
@@ -177,22 +184,23 @@ function buildBias(
     dxy == null
       ? null
       : dxy > 0.2
-        ? "DXY bid is a headwind for crypto beta."
+        ? "DXY แข็งเป็นแรงต้านของ crypto beta."
         : dxy < -0.2
-          ? "DXY fade supports risk beta."
-          : "DXY is not driving a strong directional impulse yet.";
+          ? "DXY อ่อนหนุน risk beta."
+          : "DXY ยังไม่เป็นตัวขับทิศทางหลัก.";
 
   if (!regime) {
-    return ["Range bias until NY cash open confirms.", dxyHint].filter(Boolean).join(" ");
+    return ["Range bias: รอ NY cash open ยืนยันก่อน.", dxyHint].filter(Boolean).join(" ");
   }
 
   const base =
     regime.regime === "Risk-On"
-      ? "Risk-On / constructive while BTC holds nearest support."
+      ? "Risk-On: ภาพยังบวกถ้า BTC ยืนเหนือแนวรับใกล้สุดได้."
       : regime.regime === "Risk-Off"
-        ? "Risk-Off / defensive unless NY reclaims resistance with volume."
-        : "Range / wait for NY open to break support or resistance.";
-  return [base, regime.reason, dxyHint].filter(Boolean).join(" ");
+        ? "Risk-Off: เล่น defensive จนกว่า NY จะ reclaim แนวต้านด้วย volume."
+        : "Range: รอ NY open เลือกทางผ่านแนวรับหรือแนวต้าน.";
+  const reason = regime.reason ? `สัญญาณระบบ: ${thaiRegimeReason(regime.reason)}.` : null;
+  return [base, reason, dxyHint].filter(Boolean).join(" ");
 }
 
 function buildUsMarketSetup(macro: MacroResponse | null): string {
@@ -203,8 +211,8 @@ function buildUsMarketSetup(macro: MacroResponse | null): string {
   ].filter(Boolean);
 
   return parts.length
-    ? `${parts.join(" · ")}. Watch US cash open breadth and DXY follow-through.`
-    : "US proxy macro unavailable; use BTC levels and funding/OI confirmation first.";
+    ? `${parts.join(" · ")}. จับตา breadth ตอน US cash open และ follow-through ของ DXY.`
+    : "ข้อมูล proxy macro ฝั่งสหรัฐยังไม่พร้อม ให้ใช้ BTC levels และ funding/OI ยืนยันก่อน.";
 }
 
 function finalizedEtfRow(etf: ETFFlowResponse | null): ETFFlowResponse["flows"][number] | null {
@@ -216,14 +224,14 @@ function finalizedEtfRow(etf: ETFFlowResponse | null): ETFFlowResponse["flows"][
 
 function buildEtfWatch(etf: ETFFlowResponse | null): string {
   const row = finalizedEtfRow(etf);
-  if (!row || !etf) return "Finalized BTC/ETH ETF flow unavailable.";
+  if (!row || !etf) return "ยังไม่มีตัวเลข BTC/ETH ETF flow ที่ finalized.";
   const source =
     etf._isProxy
-      ? " Source is proxy/fallback, treat with lower confidence."
+      ? " Source เป็น proxy/fallback ให้ลด confidence."
       : etf._todayPending
-        ? " Latest intraday row is pending; using prior finalized print."
+        ? " แถวล่าสุดยัง pending จึงใช้ตัวเลข finalized ก่อนหน้า."
         : "";
-  return `Last finalized ${row.date}: BTC ${fmtUsd(row.btc)} · ETH ${fmtUsd(row.eth)}. 7d: BTC ${fmtUsd(etf.summary.btc7dSum)} · ETH ${fmtUsd(etf.summary.eth7dSum)}.${source}`;
+  return `ล่าสุดที่ finalized ${row.date}: BTC ${fmtUsd(row.btc)} · ETH ${fmtUsd(row.eth)}. 7d: BTC ${fmtUsd(etf.summary.btc7dSum)} · ETH ${fmtUsd(etf.summary.eth7dSum)}.${source}`;
 }
 
 function mapLevels(rows: SymbolSupportResistance[]): NewyorkBriefInput["levels"] {
@@ -253,20 +261,20 @@ function mapLevel(level: SupportResistanceLevel | null): NewyorkLevelValue | nul
 function buildLeverage(funding: FundingCluster | null, oi: OiSlice[]): string {
   const fundingLine = funding
     ? `Funding 8h: BTC ${fmtPct(funding.btc, 4)} · ETH ${fmtPct(funding.eth, 4)} · SOL ${fmtPct(funding.sol, 4)} (${funding.lean}).`
-    : "Funding 8h unavailable.";
+    : "Funding 8h ยังไม่มีข้อมูล.";
 
   const oiParts = oi
     .filter((x) => x.oiUsd != null && Number.isFinite(x.oiUsd))
     .map((x) => `${x.asset} ${fmtUsdAbs(x.oiUsd as number)}`);
-  const oiLine = oiParts.length ? `Binance OI: ${oiParts.join(" · ")}.` : "OI unavailable.";
+  const oiLine = oiParts.length ? `Binance OI: ${oiParts.join(" · ")}.` : "OI ยังไม่มีข้อมูล.";
 
   const warning = funding
     ? funding.lean === "positive"
-      ? "Warning: do not chase late longs into R1/R2 if OI expands."
+      ? "เตือน: อย่า chase long ปลายทางเข้า R1/R2 ถ้า OI ขยาย."
       : funding.lean === "negative"
-        ? "Warning: short squeeze risk rises if price reclaims R1 with spot bid."
-        : "Warning: mixed funding favors level-by-level execution."
-    : "Warning: use levels first while leverage data warms up.";
+        ? "เตือน: มี short squeeze risk ถ้าราคา reclaim R1 พร้อม spot bid."
+        : "เตือน: funding ผสม เหมาะกับการเล่นทีละ level."
+    : "เตือน: ใช้ levels เป็นหลักระหว่างรอข้อมูล leverage.";
 
   return `${fundingLine} ${oiLine} ${warning}`;
 }
@@ -311,24 +319,24 @@ function buildActionCandidates(
 
   if (btc) {
     actions.push(
-      `BTC NY trigger: trade continuation only above R1 ${fmtPrice(btc.r1.price)} (${btc.r1.tag}); invalidate below S1 ${fmtPrice(btc.s1.price)} (${btc.s1.tag}).`,
+      `BTC NY trigger: เล่น continuation เฉพาะเมื่อผ่าน R1 ${fmtPrice(btc.r1.price)} (${btc.r1.tag}); invalidate ใต้ S1 ${fmtPrice(btc.s1.price)} (${btc.s1.tag}).`,
     );
   } else {
-    actions.push("BTC: wait for NY open confirmation; levels unavailable.");
+    actions.push("BTC: รอ NY open ยืนยันก่อน เพราะ levels ยังไม่พร้อม.");
   }
 
   if (eth && sol && btc) {
     actions.push(
-      `ETH/SOL beta: favor catch-up only if BTC holds S1; watch ETH R1 ${fmtPrice(eth.r1.price)} and SOL R1 ${fmtPrice(sol.r1.price)}.`,
+      `ETH/SOL beta: เล่น catch-up เฉพาะถ้า BTC ยืน S1 ได้; จับตา ETH R1 ${fmtPrice(eth.r1.price)} และ SOL R1 ${fmtPrice(sol.r1.price)}.`,
     );
   }
 
   if (funding?.lean === "positive") {
-    actions.push("Leverage: if funding stays positive into resistance, reduce breakout chase size.");
+    actions.push("Leverage: ถ้า funding ยังบวกตอนชนแนวต้าน ให้ลด size ของ breakout chase.");
   } else if (funding?.lean === "negative") {
-    actions.push("Leverage: negative funding near support can fuel squeeze setups after reclaim.");
+    actions.push("Leverage: funding ติดลบใกล้แนวรับอาจหนุน squeeze setup หลัง reclaim.");
   } else {
-    actions.push(`Playbook: ${bias} tape favors level-by-level execution, not blind direction.`);
+    actions.push(`Playbook: ${bias} ให้เล่นทีละ level ไม่ไล่ทิศทางแบบ blind.`);
   }
 
   return actions.slice(0, 3);

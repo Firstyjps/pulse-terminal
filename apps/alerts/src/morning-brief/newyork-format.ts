@@ -90,12 +90,12 @@ function renderLevel(label: string, level: NewyorkLevelValue): string {
 }
 
 function renderLevels(lines: string[], input: NewyorkBriefInput): void {
-  lines.push(`📍 *${escapeMarkdownV2("Support / Resistance")}*`);
+  lines.push(`📍 *${escapeMarkdownV2("แนวรับ / แนวต้าน")}*`);
 
   for (const asset of ASSETS) {
     const lv = input.levels?.[asset];
     if (!hasCompleteLevels(lv)) {
-      lines.push(`${asset}: ${escapeMarkdownV2("levels unavailable")}`);
+      lines.push(`${asset}: ${escapeMarkdownV2("ไม่มีข้อมูลแนวรับ/แนวต้าน")}`);
       continue;
     }
 
@@ -123,29 +123,29 @@ function trimTelegram(text: string): string {
 export function formatNewyorkBrief(input: NewyorkBriefInput): string {
   const lines: string[] = [];
 
-  lines.push(`🗽 *${escapeMarkdownV2("Pulse Newyork Brief")}*`);
+  lines.push(`🗽 *${escapeMarkdownV2("สรุป Newyork Brief")}*`);
   lines.push(escapeMarkdownV2(formatBkkTimestamp(input.asOf)));
   lines.push("");
 
-  renderSection(lines, "🎯 NY Session Bias", sentence(input.nySessionBias, "Neutral until US cash open confirms."));
-  renderSection(lines, "🇺🇸 US Market Setup", sentence(input.usMarketSetup, "Watch DXY, yields, and Nasdaq breadth into NY open."));
+  renderSection(lines, "🎯 มุมมอง NY Session", sentence(input.nySessionBias, "รอ US cash open ยืนยันก่อน"));
+  renderSection(lines, "🇺🇸 ภาพตลาดสหรัฐ", sentence(input.usMarketSetup, "จับตา DXY, yields และ Nasdaq breadth ช่วง NY open"));
   renderLevels(lines, input);
   renderSection(
     lines,
-    "💰 ETF / Flow Watch",
+    "💰 จับตา ETF / Flow",
     `${sentence(
       input.etfFlowWatch,
-      "Use finalized BTC/ETH ETF prints for direction.",
-    )} Intraday ETF flow is not final until after US close.`,
+      "ใช้ตัวเลข BTC/ETH ETF ที่ finalized แล้วเป็นหลัก.",
+    )} ตัวเลข ETF ระหว่างวันยังไม่ final จนกว่าตลาดสหรัฐจะปิด.`,
   );
   renderSection(
     lines,
-    "📊 Crypto Leverage",
-    sentence(input.cryptoLeverage, "Funding and OI need confirmation before chasing breakouts."),
+    "📊 Leverage คริปโต",
+    sentence(input.cryptoLeverage, "Funding และ OI ต้องยืนยันก่อน chase breakout."),
   );
 
   const catalysts = input.nyCatalysts?.filter((x) => x.trim()) ?? [];
-  renderSection(lines, "⚠️ NY Catalysts", catalysts.length ? catalysts.map((x) => `- ${x}`) : "No major NY catalysts loaded.");
+  renderSection(lines, "⚠️ Catalyst ฝั่ง NY", catalysts.length ? catalysts.map((x) => `- ${x}`) : "ยังไม่มี catalyst ฝั่ง NY ใน calendar.");
 
   const candidates = normalizeCandidates(input.actionCandidates)
     .map((x) => x.trim())
@@ -154,8 +154,8 @@ export function formatNewyorkBrief(input: NewyorkBriefInput): string {
     .map((x) => (x.startsWith("-") ? x : `- ${x}`));
   renderSection(
     lines,
-    "🎯 Action Candidates",
-    candidates.length ? candidates : "No action candidates until levels and leverage align.",
+    "🎯 แผนรับมือ",
+    candidates.length ? candidates : "ยังไม่มีแผนจนกว่า levels และ leverage จะเข้าทาง.",
   );
 
   return trimTelegram(lines.join("\n").trimEnd());
