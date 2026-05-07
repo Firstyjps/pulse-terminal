@@ -78,7 +78,7 @@ const stopSnapshotCron = startSnapshotCron();
 const stopPortfolioSnapshotCron = startPortfolioSnapshotCron();
 
 // ─────────────────────────────────────────────────────────────────
-// Morning Brief — Telegram push at 09:00 BKK daily (weekend brief drops
+// Morning Brief — Telegram push on configured BKK schedule (weekend brief drops
 // ETF sections — see morning-brief/README.md#weekend-mode).
 // Per .coordinator/telegram-morning-brief.md. Opt-in: skips entirely when
 // TELEGRAM_BOT_TOKEN is unset so unconfigured installs stay silent.
@@ -91,8 +91,62 @@ const TG_CHAT_IDS = TG_CHAT_RAW
   : [];
 const HUB_BASE = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
 const DASHBOARD_URL = process.env.PULSE_DASHBOARD_URL ?? "http://localhost:3000/morning";
-const MORNING_BRIEF_HOUR_BKK = parseBoundedInt(process.env.MORNING_BRIEF_HOUR_BKK, 6, 0, 23);
-const MORNING_BRIEF_MINUTE_BKK = parseBoundedInt(process.env.MORNING_BRIEF_MINUTE_BKK, 30, 0, 59);
+const MORNING_BRIEF_SCHEDULES = parseBkkSchedules({
+  times: process.env.MORNING_BRIEF_TIMES_BKK,
+  legacyHour: process.env.MORNING_BRIEF_HOUR_BKK,
+  legacyMinute: process.env.MORNING_BRIEF_MINUTE_BKK,
+});
+
+interface BkkSchedule {
+  hour: number;
+  minute: number;
+  key: string;
+}
+
+function parseBkkSchedules(opts: {
+  times?: string;
+  legacyHour?: string;
+  legacyMinute?: string;
+}): BkkSchedule[] {
+  const parsed = (opts.times ?? "")
+    .split(",")
+    .map((raw) => parseBkkTime(raw))
+    .filter((x): x is BkkSchedule => x != null);
+
+  if (parsed.length > 0) return dedupeSchedules(parsed);
+
+  if (opts.legacyHour != null || opts.legacyMinute != null) {
+    const hour = parseBoundedInt(opts.legacyHour, 6, 0, 23);
+    const minute = parseBoundedInt(opts.legacyMinute, 30, 0, 59);
+    return [{ hour, minute, key: scheduleKey(hour, minute) }];
+  }
+
+  return [
+    { hour: 6, minute: 30, key: scheduleKey(6, 30) },
+    { hour: 19, minute: 0, key: scheduleKey(19, 0) },
+  ];
+}
+
+function parseBkkTime(raw: string): BkkSchedule | null {
+  const m = raw.trim().match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = m[2] == null ? 0 : Number(m[2]);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+  return { hour, minute, key: scheduleKey(hour, minute) };
+}
+
+function dedupeSchedules(schedules: BkkSchedule[]): BkkSchedule[] {
+  const seen = new Set<string>();
+  return schedules
+    .sort((a, b) => a.hour - b.hour || a.minute - b.minute)
+    .filter((s) => {
+      if (seen.has(s.key)) return false;
+      seen.add(s.key);
+      return true;
+    });
+}
 
 function parseBoundedInt(raw: string | undefined, fallback: number, min: number, max: number): number {
   if (raw == null || raw.trim() === "") return fallback;
@@ -101,24 +155,36 @@ function parseBoundedInt(raw: string | undefined, fallback: number, min: number,
   return n;
 }
 
+function scheduleKey(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 function formatBkkTime(hour: number, minute: number): string {
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} BKK`;
+  return `${scheduleKey(hour, minute)} BKK`;
+}
+
+function formatBkkSchedules(schedules: BkkSchedule[]): string {
+  return schedules.map((s) => formatBkkTime(s.hour, s.minute)).join(", ");
 }
 
 let stopMorningBrief: () => void = () => {};
 if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
-  let lastFiredDate: string | null = null;
+  let firedDate: string | null = null;
+  const firedSlots = new Set<string>();
   const tick = async () => {
     const bkkNow = new Date(Date.now() + 7 * 60 * 60_000);
     const dateStr = bkkNow.toISOString().slice(0, 10);
     const hour = bkkNow.getUTCHours();
     const minute = bkkNow.getUTCMinutes();
-    const isDue =
-      hour === MORNING_BRIEF_HOUR_BKK &&
-      minute >= MORNING_BRIEF_MINUTE_BKK &&
-      lastFiredDate !== dateStr;
-    if (!isDue) return;
-    lastFiredDate = dateStr;
+    if (firedDate !== dateStr) {
+      firedDate = dateStr;
+      firedSlots.clear();
+    }
+    const due = MORNING_BRIEF_SCHEDULES.find(
+      (s) => hour === s.hour && minute >= s.minute && !firedSlots.has(s.key),
+    );
+    if (!due) return;
+    firedSlots.add(due.key);
     try {
       const r = await runMorningBrief({
         now: Date.now(),
@@ -131,13 +197,13 @@ if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
         const tag = r.recipients
           ? `recipients:${r.recipients.filter((x) => x.sent).length}/${r.recipients.length}`
           : `image:${r.imageSent ? "ok" : `skip(${r.imageError ?? "?"})`}`;
-        console.log(`[alerts] morning brief sent (${dateStr}) — ${tag}`);
+        console.log(`[alerts] morning brief sent (${dateStr} ${due.key}) — ${tag}`);
       } else {
         const partial = r.recipients?.some((x) => x.sent)
           ? ` (partial: ${r.recipients.filter((x) => x.sent).length}/${r.recipients.length})`
           : "";
         console.log(
-          `[alerts] morning brief skipped (${dateStr}) — ${r.reason ?? "?"}${r.error ? `: ${r.error}` : ""}${partial}`,
+          `[alerts] morning brief skipped (${dateStr} ${due.key}) — ${r.reason ?? "?"}${r.error ? `: ${r.error}` : ""}${partial}`,
         );
       }
     } catch (err) {
@@ -148,7 +214,7 @@ if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
   void tick(); // probe immediately so a target-hour late start still fires today
   stopMorningBrief = () => clearInterval(timer);
   console.log(
-    `[alerts] morning brief armed — ${formatBkkTime(MORNING_BRIEF_HOUR_BKK, MORNING_BRIEF_MINUTE_BKK)} daily, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}, recipients ${TG_CHAT_IDS.length}`,
+    `[alerts] morning brief armed — ${formatBkkSchedules(MORNING_BRIEF_SCHEDULES)} daily, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}, recipients ${TG_CHAT_IDS.length}`,
   );
 } else {
   console.log("[alerts] morning brief disabled — set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable");
