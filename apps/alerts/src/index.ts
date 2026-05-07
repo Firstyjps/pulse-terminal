@@ -91,6 +91,19 @@ const TG_CHAT_IDS = TG_CHAT_RAW
   : [];
 const HUB_BASE = process.env.PULSE_HUB_URL ?? "http://127.0.0.1:8081";
 const DASHBOARD_URL = process.env.PULSE_DASHBOARD_URL ?? "http://localhost:3000/morning";
+const MORNING_BRIEF_HOUR_BKK = parseBoundedInt(process.env.MORNING_BRIEF_HOUR_BKK, 6, 0, 23);
+const MORNING_BRIEF_MINUTE_BKK = parseBoundedInt(process.env.MORNING_BRIEF_MINUTE_BKK, 30, 0, 59);
+
+function parseBoundedInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  if (raw == null || raw.trim() === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < min || n > max) return fallback;
+  return n;
+}
+
+function formatBkkTime(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} BKK`;
+}
 
 let stopMorningBrief: () => void = () => {};
 if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
@@ -99,7 +112,12 @@ if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
     const bkkNow = new Date(Date.now() + 7 * 60 * 60_000);
     const dateStr = bkkNow.toISOString().slice(0, 10);
     const hour = bkkNow.getUTCHours();
-    if (hour !== 9 || lastFiredDate === dateStr) return;
+    const minute = bkkNow.getUTCMinutes();
+    const isDue =
+      hour === MORNING_BRIEF_HOUR_BKK &&
+      minute >= MORNING_BRIEF_MINUTE_BKK &&
+      lastFiredDate !== dateStr;
+    if (!isDue) return;
     lastFiredDate = dateStr;
     try {
       const r = await runMorningBrief({
@@ -127,10 +145,10 @@ if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
     }
   };
   const timer = setInterval(tick, 60_000);
-  void tick(); // probe immediately so a 09:00-late start still fires today
+  void tick(); // probe immediately so a target-hour late start still fires today
   stopMorningBrief = () => clearInterval(timer);
   console.log(
-    `[alerts] morning brief armed — 09:00 BKK daily, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}, recipients ${TG_CHAT_IDS.length}`,
+    `[alerts] morning brief armed — ${formatBkkTime(MORNING_BRIEF_HOUR_BKK, MORNING_BRIEF_MINUTE_BKK)} daily, hub ${HUB_BASE}, dashboard ${DASHBOARD_URL}, recipients ${TG_CHAT_IDS.length}`,
   );
 } else {
   console.log("[alerts] morning brief disabled — set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable");
