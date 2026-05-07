@@ -4,8 +4,14 @@
   "private": true,
   "description": "Crypto Macro Intelligence Terminal — monorepo merging 4 prior projects",
   "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.9.0 <26",
+    "pnpm": ">=9 <10"
+  },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@pulse/web --filter=@pulse/realtime",
+    "dev:all": "turbo run dev --filter=@pulse/web --filter=@pulse/realtime --filter=@pulse/alerts",
+    "dev:alerts": "pnpm --filter @pulse/alerts dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

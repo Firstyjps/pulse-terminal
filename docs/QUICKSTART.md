@@ -6,14 +6,14 @@ Step-by-step from a fresh machine to a running terminal + MCP setup. ~15 minutes
 
 | Tool | Version | Why |
 |------|---------|-----|
-| Node.js | 20.x or 22.x LTS | runtime for all 3 services |
+| Node.js | 24.15.0 recommended here; >=20.9.0 required | Next 16, better-sqlite3, and all Node services |
 | pnpm | 9.x | workspace package manager |
 | git | any | git init + version control |
 | Claude Desktop | latest | MCP client (only needed for AI tab) |
 
 Check:
 ```bash
-node -v        # >= 20.0.0
+node -v        # >= 20.9.0; .nvmrc and .node-version target 24.15.0
 pnpm -v        # >= 9.0.0
 git --version
 ```
@@ -22,6 +22,9 @@ Install pnpm if missing:
 ```bash
 npm install -g pnpm
 ```
+
+If your shell reports Node 18, switch before installing dependencies. Node 18
+will fail `next build` and can load the wrong `better-sqlite3` native binary.
 
 ---
 
@@ -60,7 +63,6 @@ cp .env.example .env.local
 
 The defaults work out of the box for **dashboards + MCP tools that use free APIs**. You only need to fill in keys for:
 - **Portfolio tab** → `BINANCE_API_KEY` + `BINANCE_API_SECRET` (read-only — see [SECURITY.md](../SECURITY.md))
-- **ETF tab with paid data** → `COINGLASS_API_KEY` (otherwise Farside scrape, free)
 - **Webhook alerts** → `ALERT_WEBHOOK_URL` (Discord/Slack-compatible)
 
 Open `.env.local` and skim the comments — every var is documented inline.
@@ -74,6 +76,9 @@ pnpm dev
 ```
 
 Turbo boots `apps/web` (port 3000) + `apps/realtime` (port 8080 WS, 8081 HTTP) concurrently.
+It does **not** start `apps/alerts`, so local development will not accidentally
+send Telegram/webhook messages. Use `pnpm dev:alerts` for alerts only, or
+`pnpm dev:all` when you intentionally want web + realtime + alerts together.
 
 Open http://localhost:3000 — you should see the Overview tab with live data within ~3 seconds.
 
@@ -85,6 +90,7 @@ If something fails: check `pulse:status` (after Phase C) or look at terminal out
 - Fundflow → 4 panels load (stablecoin, ETF, derivatives, TVL/DEX)
 - Derivatives → live funding ticks appear within 90 seconds
 - Backtest → "no data yet" until alerts cron has run for a few hours
+- Morning → Signal Feed is live; Overnight Digest, Macro Regime, and Action Items are placeholders until the digest/regime generator is wired
 
 ---
 
@@ -103,7 +109,7 @@ Output: `apps/mcp/dist/pulse-terminal.dxt` (or similar).
 1. Open Claude Desktop → Settings → Developer → MCP Servers
 2. Click **Install from file** → pick the `.dxt`
 3. Restart Claude Desktop
-4. Open a new chat → type `/mcp` → you should see `pulse-terminal` listed with 10 tools
+4. Open a new chat → type `/mcp` → you should see `pulse-terminal` listed with 19 tools
 
 **Test it:**
 > "ใช้ get_market_overview ดูภาพรวมตลาดให้หน่อย"
@@ -119,7 +125,7 @@ Optional but recommended — without this, alerts stop when you close your termi
 ```bash
 npm install -g pm2
 
-# Build production bundles
+# Build the Next production bundle; realtime/alerts run via tsx under pm2
 pnpm pulse:build
 
 # Start under pm2

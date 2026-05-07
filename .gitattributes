@@ -1,0 +1,20 @@
+# Keep the repo stable across Windows, WSL, and Linux deploys.
+* text=auto eol=lf
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.dxt binary
+*.sqlite binary
+*.db binary
+
+# Windows entrypoints may stay CRLF if added later.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

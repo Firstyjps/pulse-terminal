@@ -34,6 +34,18 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
+async function waitForHistoryRows(expected: number, timeoutMs = 1_000) {
+  const deadline = Date.now() + timeoutMs;
+  let rows = await readPortfolioHistory(path);
+
+  while (rows.length !== expected && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 20));
+    rows = await readPortfolioHistory(path);
+  }
+
+  return rows;
+}
+
 describe("captureSnapshot", () => {
   it("writes snapshot row when portfolio is configured", async () => {
     const snap = await captureSnapshot({
@@ -149,10 +161,8 @@ describe("startPortfolioSnapshotCron", () => {
       skipBackfill: true,
       intervalMs: 999_999,
     });
-    // fireIfDue is async; give it a microtask + io tick to land
-    await new Promise((r) => setTimeout(r, 20));
+    const rows = await waitForHistoryRows(1);
     stop();
-    const rows = await readPortfolioHistory(path);
     expect(rows).toHaveLength(1);
     expect(rows[0].dateBkk).toBe("2026-04-01");
   });
@@ -177,9 +187,8 @@ describe("startPortfolioSnapshotCron", () => {
       now: () => T_NOON_BKK, // outside cron fire window — only backfill should run
       intervalMs: 999_999,
     });
-    await new Promise((r) => setTimeout(r, 30));
+    const rows = await waitForHistoryRows(1);
     stop();
-    const rows = await readPortfolioHistory(path);
     expect(rows).toHaveLength(1);
     // sanity — file content is parseable JSONL
     const raw = readFileSync(path, "utf8").trim();

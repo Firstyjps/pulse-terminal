@@ -4,9 +4,10 @@ Real-time spot BTC/ETH ETF flow data backs `/api/flows/etf`, the Overview page, 
 
 ## Source priority (auto-fallback)
 
-1. **Coinglass v4 OpenAPI** — if `COINGLASS_API_KEY` is set. Paid (Hobbyist tier, $29/mo).
-2. **Farside.co.uk via curl-impersonate** — free, real data, Cloudflare-protected source.
-3. **Synthesized proxy** — green/red mock that flags `_isProxy: true` so the UI shows a banner.
+1. **Farside.co.uk via curl-impersonate** — free, real data, Cloudflare-protected source.
+2. **Synthesized proxy** — green/red mock that flags `_isProxy: true` so the UI shows a banner.
+
+Coinglass support was removed on 2026-05-01 by product decision; ETF data stays on the free Farside path with explicit proxy fallback.
 
 The adapter lives at [packages/sources/src/etf.ts](../packages/sources/src/etf.ts); the Farside scraper at [packages/sources/src/farside.ts](../packages/sources/src/farside.ts).
 
@@ -52,12 +53,11 @@ If it prints `true`: the Farside fallback failed, the adapter dropped to proxy. 
 
 ## Local dev (Windows / macOS)
 
-curl-impersonate releases include macOS arm64/x64 builds; Windows requires WSL or just use the Coinglass key path. The adapter degrades to the proxy gracefully, so dev still loads with mock data.
+curl-impersonate releases include macOS arm64/x64 builds; Windows requires WSL. Without curl-impersonate, the adapter degrades to the proxy gracefully, so dev still loads with mock data clearly flagged via `_isProxy: true`.
 
 ## Refresh cadence
 
 - Farside HTML scrape: 10 min revalidate (`packages/sources/src/etf.ts` `revalidate: 600`)
-- Coinglass: same 10 min revalidate
 - Cron pre-warm: handled implicitly by the snapshot poller in `apps/realtime`
 
 ## Failure modes

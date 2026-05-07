@@ -69,7 +69,7 @@ Use these in:
 |----------|--------|------|-----------|
 | `getOverview()` | CoinGecko `/global` + alternative.me + DefiLlama | none | 120s |
 | `getStablecoins()` | DefiLlama `/stablecoins` | none | 600s |
-| `getETFFlows()` | Coinglass (paid) → Farside (scrape) → proxy | optional `COINGLASS_API_KEY` | 1800s |
+| `getETFFlows()` | Farside (scrape) → proxy | none | 1800s |
 | `getFutures()` | Binance fapi (premiumIndex, openInterestHist, klines) | none | 60s |
 | `getDexVolume()` | DefiLlama `/overview/dexs` | none | 600s |
 | `getTVL()` | DefiLlama `/v2/historicalChainTvl` + `/v2/chains` | none | 600s |

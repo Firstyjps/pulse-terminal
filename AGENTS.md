@@ -36,7 +36,7 @@ The build is split into **8 roles**. Each role owns one slice of the monorepo an
 - [x] Create root configs (done)
 - [ ] Run `pnpm install` from root and verify workspace wiring (`pnpm ls -r`)
 - [ ] Verify `turbo run typecheck` reaches every workspace
-- [ ] Wire turbo so `pnpm dev` boots `apps/web` + `apps/realtime` concurrently
+- [x] Wire turbo so `pnpm dev` boots `apps/web` + `apps/realtime` concurrently
 **Hands off to:** everyone
 
 ---
@@ -253,11 +253,11 @@ All originals fully ported and deleted from disk — no `_legacy/` retained.
 | 3 — Sources    | Claude | Phase 1 done | overview · stablecoins · etf+farside · futures · dex · tvl · funding (Binance/Bybit/OKX) · OI · `_helpers` · `format` · `snapshot`+`summarizeSnapshot` |
 | 4 — Charts     | Claude | Phase 1 done | Sparkline (SVG) · Candlestick (LWC v4.2) · FlowAreaChart · FlowBarChart with Cell coloring · FlowChart · DepthChart |
 | 5 — i18n       | —      | REMOVED 2026-04-30 | package deleted; product is English-only |
-| 6 — Web        | Claude | Phase 1 done | configs · 5 routes + `/design` showcase · 6 flow API routes + `/api/snapshot` + `/api/analyze` (streaming Anthropic) · `/api/markets` · MetricStrip · Dashboard · AnalysisPanel · MarketsTable · live derivatives |
+| 6 — Web        | Claude | Phase 1+6 active | Next 16 dashboard · 10 user routes · 35 API routes · MCP-first UI · options/dual-assets/history/morning surfaces · `/api/analyze` and `AnalysisPanel` removed |
 | 7 — Realtime   | Claude | Phase 1+2 done | contracts (subscribe/unsubscribe/ack) · server with heartbeat + backpressure + per-client subscription filtering + channel matching · REST poller + native Binance/Bybit/OKX WS streams (reconnect/backoff, ping per venue, env-toggle via `PULSE_NATIVE_STREAMS`) |
-| 8 — MCP        | Claude | Phase 1+2 done | 10 tools (7 ported + 3 new: get_funding_summary, get_oi_snapshot, detect_anomalies) · `detect_anomalies` now backed by shared `scanAnomalies()` in `@pulse/sources` so MCP/alerts/web stay in sync · manifest.json · pack-dxt.mjs |
+| 8 — MCP        | Claude | Phase 1+5A done | 19 tools across fundflow, derivatives, options, dual-assets, markets, and intelligence · `detect_anomalies` backed by shared `scanAnomalies()` · manifest.json · pack-dxt.mjs |
 
-### Phase 3 (active — MCP-first refactor)
+### Phase 3 (complete — MCP-first refactor)
 
 | Sub-phase | Owner | Status | Notes |
 |-----------|-------|--------|-------|
@@ -270,6 +270,11 @@ All originals fully ported and deleted from disk — no `_legacy/` retained.
 | Phase D · split sources  | Cursor | ✅ done | `index.ts` browser-safe, `server.ts` server-only · dynImport hack + webpack fallback list **removed** · replaced with `extensionAlias .js → .ts/.tsx` · all consumers rewired |
 
 **🎉 Phase 3 complete — system runs 24/7 via pm2.**
+
+### Foundation hygiene (2026-05-07)
+- Node runtime is enforced in root `package.json` plus `.nvmrc` / `.node-version` (`24.15.0`). Use Node `>=20.9.0 <26`; Node 18 is unsupported by Next 16 and `better-sqlite3@12`.
+- `.gitattributes` pins text files to LF so Windows/WSL checkouts do not create whole-repo CRLF churn.
+- `pnpm dev` starts only `@pulse/web` + `@pulse/realtime`; use `pnpm dev:alerts` or `pnpm dev:all` when alerts cron is intentional.
 
 ### Outstanding manual steps for project owner
 1. Run `pm2 startup` (Linux/macOS) or `pnpm dlx pm2-installer install` (Windows) to enable boot-time auto-start
@@ -296,7 +301,7 @@ All originals fully ported and deleted from disk — no `_legacy/` retained.
 
 ---
 
-## Phase 3 — MCP-first refactor (active)
+## Phase 3 — MCP-first refactor (complete)
 
 **Context:** user uses Claude Pro/Max subscription via MCP — no Anthropic API budget. Optimize for personal use, 24/7 on user's own machine, MCP latency < 50ms per tool call.
 

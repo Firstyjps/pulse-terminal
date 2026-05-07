@@ -11,20 +11,22 @@ Monorepo consolidating seven prior projects — all ported, originals removed fr
 ## Quick start (development)
 
 ```bash
+node -v                              # must be >=20.9.0; .nvmrc/.node-version target 24.15.0
 pnpm install
-cp .env.example .env.local           # only needed if using portfolio/Coinglass
+cp .env.example .env.local           # only needed if using portfolio/webhooks
 pnpm dev                             # turbo: web + realtime concurrently
+# pnpm dev:all                       # opt-in: web + realtime + alerts cron
 ```
 
 - Web → http://localhost:3000
 - Realtime WS → ws://localhost:8080
-- Hub HTTP cache → http://127.0.0.1:8081 (after Phase B v0)
+- Hub HTTP cache → http://127.0.0.1:8081
 
 ## Production (24/7 on your machine, pm2)
 
 ```bash
 npm install -g pm2
-pnpm pulse:build                     # builds realtime + alerts + web
+pnpm pulse:build                     # builds the Next production bundle
 pnpm pulse:start                     # boots all 3 under pm2
 pm2 save                             # persist process list
 pm2 startup                          # generate auto-start command (run as printed)
@@ -45,25 +47,31 @@ The MCP server is **not** in pm2 — it's spawned by Claude Desktop on demand vi
 | `/`                  | Overview — hero, MetricStrip, MacroOverlay (DXY/SPX/Gold), PortfolioPanel, AlertsFeed |
 | `/markets`           | Top 20 coins + click-to-load candlestick (15m/1h/4h/1d) |
 | `/fundflow`          | Stablecoins · ETF · Derivatives · TVL · DEX panels |
+| `/intel`             | News, on-chain, whale alerts, social buzz |
 | `/derivatives`       | Live funding-rate stream (WS, real-time) |
+| `/options`           | Multi-exchange options chain, IV smile, term structure |
+| `/dual-assets`       | Bybit Dual Assets APR tracker and hourly analysis |
 | `/backtest`          | Hit-rate per anomaly pattern (4h/24h/72h/7d lookahead) |
+| `/history`           | Snapshot history and export tools |
+| `/morning`           | Morning surface; signal feed is live, digest/regime/action blocks are still placeholders |
+| `/settings`          | Local settings and webhook/test controls |
 | `/design`            | Visual catalog of `@pulse/ui` + `@pulse/charts` |
 
 ## Structure
 
 ```
 apps/
-├── web/        Next.js 16 dashboard (App Router, 6 tabs, 11+ API routes)
-├── realtime/   WS server (Binance/Bybit/OKX native streams) + HTTP cache (Phase B v0)
+├── web/        Next.js 16 dashboard (App Router, 10 user routes, 35 API routes)
+├── realtime/   WS server (Binance/Bybit/OKX native streams) + HTTP cache
 ├── alerts/     Cron worker — runs scanAnomalies every 15min, JSONL log + webhook
-└── mcp/        MCP server for Claude Desktop (17 tools, stdio transport, .dxt bundle)
+└── mcp/        MCP server for Claude Desktop (19 tools, stdio transport, .dxt bundle)
 
 packages/
-├── ui/         Design tokens + 9 React components (purple/cyan glassmorphism)
+├── ui/         Design tokens + reusable React terminal components
 ├── sources/    Data adapters — every external API + format helpers + anomaly scanner
 │               · "@pulse/sources" — browser-safe (types, format, helpers, anomaly types)
 │               · "@pulse/sources/server" — Node-only (farside, portfolio, signed adapters)
-└── charts/     6 chart components (LWC v4.2 · recharts · SVG)
+└── charts/     Shared chart components (LWC v4.2 · recharts · SVG)
 ```
 
 ## MCP setup (Claude Desktop)
@@ -74,12 +82,13 @@ pnpm --filter @pulse/mcp pack-dxt
 # Drop apps/mcp/dist/*.dxt into Claude Desktop → Settings → MCP servers
 ```
 
-Available tools (17):
+Available tools (19):
 
 - **Data** — `get_market_overview`, `get_stablecoin_flows`, `get_etf_flows`, `get_futures`, `get_dex_leaderboard`, `get_tvl_breakdown`, `get_fundflow_snapshot`
 - **Derivatives** — `get_funding_summary`, `get_oi_snapshot` (cross-venue: Binance / Bybit / OKX / Deribit)
 - **Options (Phase 5A)** — `get_options_chain`, `get_iv_smile`, `get_options_arbitrage`
 - **Bybit Dual Assets (Phase 5A)** — `get_dual_assets_apr`, `get_best_dual_assets_hour`, `get_dual_assets_daily_summary`
+- **Markets** — `get_order_book`, `get_whale_flow`
 - **Analysis** — `detect_anomalies`, `grade_signal` (Phase 4 — rubric-returner for grading findings)
 
 Tools query the local hub at `:8081` for sub-50ms latency, with graceful fallback to direct upstream fetch when the hub is unreachable.
