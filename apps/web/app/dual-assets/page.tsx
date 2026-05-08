@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Panel, WsRow, Workspace, StatBlock, colors, fonts } from "@pulse/ui";
+import { type CSSProperties, useMemo, useState } from "react";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Clock3,
+  Database,
+  Filter,
+  Flame,
+  RefreshCw,
+  ShieldCheck,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { useFlow } from "../../lib/use-flow";
+import styles from "./dual-assets.module.css";
 
 interface HourlyAprStat {
   hour_ict: number;
   avg_apr: number;
   max_apr: number;
   min_apr: number;
-  avg_price: number;
+  avg_price: number | null;
   avg_iv: number | null;
   samples: number;
 }
@@ -33,10 +46,10 @@ interface Snapshot {
   hour_ict: number;
   product_id: string;
   coin_pair: string;
-  direction: string;
+  direction: Direction;
   target_price: number;
   apr_pct: number;
-  duration: string;
+  duration: Duration;
   settlement_utc: string | null;
   index_price: number | null;
   is_vip_only: number;
@@ -46,8 +59,8 @@ interface Snapshot {
 interface DailySummary {
   date: string;
   coin_pair: string;
-  direction: string;
-  duration: string;
+  direction: Direction;
+  duration: Duration;
   target_price: number;
   avg_apr: number | null;
   max_apr: number | null;
@@ -59,26 +72,18 @@ interface DailySummary {
 }
 
 interface Settings {
+  pairs: string[];
+  directions: Direction[];
+  durations: Duration[];
+  durationLabels: Record<Duration, string>;
   minTrackAprPct: number;
   aprAlertPct: number;
-  durations: Duration[];
-  directions: Direction[];
-  durationLabels: Record<Duration, string>;
+  intervalMs: number;
+  schedulerEnabled: boolean;
+  bybitKeyConfigured: boolean;
   authRequiredForTracking: false;
 }
 
-/**
- * Dual Assets — Bybit Earn APR analytics.
- *
- *   Row 1 (h-stats, 116px): KPIs (current APR / 7d avg / best hour / sample count)
- *   Row 2 (h-chart, 360px): HOURLY APR HEATMAP c-8 + RECOMMENDATION c-4
- *   Row 3 (h-table, 340px): RECENT SNAPSHOTS c-7 + DAILY SUMMARY c-5
- *
- * Target selector is dynamic — pulled from whatever strikes Bybit served in
- * the recent snapshots (DUAL_ASSETS_TARGETS=all in tracker config). Filters
- * down to the most recent ~50 rows for the picker so we always reflect the
- * live product menu.
- */
 const DURATIONS = [
   { value: "8h", label: "8 Hours" },
   { value: "1d", label: "1 Day" },
@@ -87,610 +92,450 @@ const DIRECTIONS = [
   { value: "BuyLow", label: "Buy Low" },
   { value: "SellHigh", label: "Sell High" },
 ] as const;
+
 type Duration = (typeof DURATIONS)[number]["value"];
 type Direction = (typeof DIRECTIONS)[number]["value"];
+type Days = 7 | 14 | 30;
+
+const DEFAULT_PAIR = "SOL-USDT";
 
 export default function DualAssetsPage() {
-  const [days, setDays] = useState<7 | 14 | 30>(7);
+  const [days, setDays] = useState<Days>(7);
   const [selectedDurations, setSelectedDurations] = useState<Duration[]>(["8h", "1d"]);
   const [selectedDirections, setSelectedDirections] = useState<Direction[]>(["BuyLow", "SellHigh"]);
-  const [target, setTarget] = useState<number | null>(null);
-  const disabled = selectedDurations.length === 0 || selectedDirections.length === 0;
 
   const durationParam = selectedDurations.length ? selectedDurations.join(",") : "none";
   const directionParam = selectedDirections.length ? selectedDirections.join(",") : "none";
+  const disabled = selectedDurations.length === 0 || selectedDirections.length === 0;
 
   const settings = useFlow<Settings>("/api/dual-assets/settings");
-
-  const snapshots = useFlow<{ count: number; records: Snapshot[] }>(
-    `/api/dual-assets/snapshots?coin_pair=SOL-USDT&duration=${durationParam}&direction=${directionParam}&limit=500`,
+  const snapshots = useFlow<{ count: number; records: Snapshot[]; filters: unknown }>(
+    `/api/dual-assets/snapshots?coin_pair=${DEFAULT_PAIR}&duration=${durationParam}&direction=${directionParam}&limit=500`,
   );
-
-  // Dynamic target list — distinct strikes from recent snapshots filtered by
-  // selected duration. Sorted desc so near-spot strikes (high APR) sit near top.
-  const availableTargets = useMemo(() => {
-    if (!snapshots.data) return [];
-    const set = new Set<number>();
-    for (const r of snapshots.data.records) {
-      set.add(r.target_price);
-    }
-    return [...set].sort((a, b) => b - a);
-  }, [snapshots.data]);
-
-  // Default target = nearest-to-spot strike on first load.
-  useEffect(() => {
-    if (disabled) {
-      setTarget(null);
-      return;
-    }
-    if ((target === null || !availableTargets.includes(target)) && availableTargets.length > 0 && snapshots.data?.records[0]) {
-      const spot = snapshots.data.records[0].index_price ?? availableTargets[0];
-      const nearest = availableTargets.reduce((a, b) =>
-        Math.abs(b - spot) < Math.abs(a - spot) ? b : a,
-      );
-      setTarget(nearest);
-    }
-  }, [availableTargets, disabled, target, snapshots.data]);
-
-  const bestHour = useFlow<BestHourReport | { error: string }>(
-    `/api/dual-assets/best-hour?coin_pair=SOL-USDT&target=${target ?? 0}&days=${days}&duration=${durationParam}&direction=${directionParam}`,
+  const best8h = useFlow<BestHourReport | { error: string }>(
+    `/api/dual-assets/best-hour?coin_pair=${DEFAULT_PAIR}&days=${days}&duration=8h&direction=${directionParam}`,
+  );
+  const best1d = useFlow<BestHourReport | { error: string }>(
+    `/api/dual-assets/best-hour?coin_pair=${DEFAULT_PAIR}&days=${days}&duration=1d&direction=${directionParam}`,
   );
   const summary = useFlow<{ count: number; summaries: DailySummary[] }>(
-    `/api/dual-assets/summary?coin_pair=SOL-USDT&target=${target ?? 0}&days=30&duration=${durationParam}&direction=${directionParam}`,
+    `/api/dual-assets/summary?coin_pair=${DEFAULT_PAIR}&days=30&duration=${durationParam}&direction=${directionParam}`,
   );
 
-  const report =
-    bestHour.data && !("error" in bestHour.data) ? (bestHour.data as BestHourReport) : null;
-  const reportError =
-    bestHour.data && "error" in bestHour.data ? bestHour.data.error : null;
+  const visibleRows = useMemo(() => {
+    if (disabled) return [];
+    return dedupeBestRows(snapshots.data?.records ?? []);
+  }, [disabled, snapshots.data]);
 
-  const hourlyMap = useMemo(() => {
-    const m = new Map<number, HourlyAprStat>();
-    if (!report) return m;
-    for (const h of report.hourly_data) m.set(h.hour_ict, h);
-    return m;
-  }, [report]);
-
-  const filteredSnapshots = useMemo(() => {
-    if (disabled || !snapshots.data || target == null) return [];
-    return snapshots.data.records
-      .filter((r) => r.target_price === target)
-      .slice(0, 30);
-  }, [disabled, snapshots.data, target]);
-
-  const latestSnapshot = filteredSnapshots[0];
-  const maxHourlyApr = report
-    ? Math.max(...report.hourly_data.map((h) => h.avg_apr), 0.001)
-    : 0.001;
-
-  const spot = snapshots.data?.records[0]?.index_price ?? null;
-  const toggleDuration = (duration: Duration) => {
-    setSelectedDurations((prev) =>
-      prev.includes(duration) ? prev.filter((item) => item !== duration) : [...prev, duration],
-    );
-  };
-  const toggleDirection = (direction: Direction) => {
-    setSelectedDirections((prev) =>
-      prev.includes(direction) ? prev.filter((item) => item !== direction) : [...prev, direction],
-    );
-  };
-
-  const durationToggle = (
-    <span style={{ display: "flex", gap: 1, background: colors.line }}>
-      {DURATIONS.map((d) => {
-        const active = selectedDurations.includes(d.value);
-        return (
-          <button
-            key={d.value}
-            onClick={() => {
-              toggleDuration(d.value);
-              setTarget(null);
-            }}
-            style={{
-              background: active ? colors.bg2 : colors.bg1,
-              border: "none",
-              color: active ? colors.amberBright : colors.txt3,
-              padding: "3px 12px",
-              fontFamily: fonts.mono,
-              fontSize: 9,
-              letterSpacing: "0.10em",
-              fontWeight: active ? 700 : 400,
-              cursor: "pointer",
-              textTransform: "uppercase",
-            }}
-          >
-            {d.label}
-          </button>
-        );
-      })}
-    </span>
+  const opportunityRows = useMemo(
+    () => visibleRows.slice().sort((a, b) => b.apr_pct - a.apr_pct || b.timestamp_utc.localeCompare(a.timestamp_utc)).slice(0, 18),
+    [visibleRows],
   );
-  const directionToggle = (
-    <span style={{ display: "flex", gap: 1, background: colors.line }}>
-      {DIRECTIONS.map((d) => {
-        const active = selectedDirections.includes(d.value);
-        return (
-          <button
-            key={d.value}
-            onClick={() => {
-              toggleDirection(d.value);
-              setTarget(null);
-            }}
-            style={{
-              background: active ? colors.bg2 : colors.bg1,
-              border: "none",
-              color: active ? (d.value === "BuyLow" ? colors.green : colors.red) : colors.txt3,
-              padding: "3px 12px",
-              fontFamily: fonts.mono,
-              fontSize: 9,
-              letterSpacing: "0.10em",
-              fontWeight: active ? 700 : 400,
-              cursor: "pointer",
-              textTransform: "uppercase",
-            }}
-          >
-            {d.label}
-          </button>
-        );
-      })}
-    </span>
-  );
-  const headerActions = (
-    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      {durationToggle}
-      {directionToggle}
-      <span
-        style={{
-          display: "flex",
-          gap: 1,
-          background: colors.line,
-          maxWidth: 380,
-          overflowX: "auto",
-        }}
-      >
-      {availableTargets.length === 0 && (
-        <span style={{ padding: "3px 12px", color: colors.txt4, fontSize: 9, fontFamily: fonts.mono }}>
-          NO STRIKES YET
-        </span>
+
+  const bestReports = useMemo(() => {
+    const items: Array<{ duration: Duration; label: string; report: BestHourReport | null; error: string | null }> = [];
+    if (selectedDurations.includes("8h")) {
+      items.push({ duration: "8h", label: "8 Hours", ...unwrapReport(best8h.data) });
+    }
+    if (selectedDurations.includes("1d")) {
+      items.push({ duration: "1d", label: "1 Day", ...unwrapReport(best1d.data) });
+    }
+    return items;
+  }, [best8h.data, best1d.data, selectedDurations]);
+
+  const topRow = opportunityRows[0] ?? null;
+  const hotRows = visibleRows.filter((row) => row.apr_pct >= (settings.data?.aprAlertPct ?? 100));
+  const bestAvg = bestReports
+    .map((item) => item.report?.best_hours[0]?.avg_apr)
+    .filter((value): value is number => typeof value === "number");
+  const bestHour = bestReports
+    .map((item) => ({ label: item.label, hour: item.report?.best_hours[0]?.hour_ict, apr: item.report?.best_hours[0]?.avg_apr }))
+    .filter((item) => item.hour != null)
+    .sort((a, b) => (b.apr ?? 0) - (a.apr ?? 0))[0];
+
+  const loading = settings.loading || snapshots.loading || best8h.loading || best1d.loading || summary.loading;
+  const error = settings.error ?? snapshots.error ?? best8h.error ?? best1d.error ?? summary.error;
+
+  return (
+    <div className={styles.page}>
+      <section className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.bybit}>BYB<span>I</span>T</div>
+          <div>
+            <p className={styles.eyebrow}>Connected Pulse implementation</p>
+            <h1>Dual Assets Manager</h1>
+            <p className={styles.heroCopy}>
+              Public Bybit data to Pulse SQLite, API, MCP, alerts, and this live dashboard. No separate Dual-assets_MD runtime.
+            </p>
+          </div>
+        </div>
+        <div className={styles.heroStatus}>
+          <StatusPill icon={ShieldCheck} label="Tracking" value={`>=${formatPct(settings.data?.minTrackAprPct ?? 55)}`} />
+          <StatusPill icon={Flame} label="Hot Alert" value={`>=${formatPct(settings.data?.aprAlertPct ?? 100)}`} tone="hot" />
+          <StatusPill icon={Database} label="Rows" value={String(visibleRows.length)} />
+          <StatusPill icon={Activity} label="Auth" value={settings.data?.authRequiredForTracking === false ? "Public" : "Check"} />
+        </div>
+      </section>
+
+      <section className={styles.filterPanel}>
+        <div className={styles.filterTitle}>
+          <Filter size={16} />
+          <div>
+            <strong>Market Filters</strong>
+            <span>{DEFAULT_PAIR} / multi-toggle controls</span>
+          </div>
+        </div>
+        <ToggleGroup
+          label="Duration"
+          items={DURATIONS}
+          selected={selectedDurations}
+          onToggle={(value) => setSelectedDurations((prev) => toggle(prev, value))}
+        />
+        <ToggleGroup
+          label="Direction"
+          items={DIRECTIONS}
+          selected={selectedDirections}
+          onToggle={(value) => setSelectedDirections((prev) => toggle(prev, value))}
+        />
+        <div className={styles.dayTabs}>
+          {([7, 14, 30] as const).map((item) => (
+            <button key={item} className={days === item ? styles.active : ""} onClick={() => setDays(item)}>
+              {item}D
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {error ? (
+        <div className={styles.error}>
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      ) : null}
+
+      <section className={styles.kpiGrid}>
+        <KpiCard
+          icon={TrendingUp}
+          label="Live Best APR"
+          value={topRow ? formatPct(topRow.apr_pct) : "--"}
+          note={topRow ? `${labelDirection(topRow.direction)} / ${labelDuration(topRow.duration)} / target ${formatUsd(topRow.target_price)}` : disabled ? "No filters selected" : "Waiting for tracked rows"}
+          tone={topRow && topRow.apr_pct >= (settings.data?.aprAlertPct ?? 100) ? "hot" : "good"}
+        />
+        <KpiCard
+          icon={Clock3}
+          label="Best Hour"
+          value={bestHour?.hour != null ? `${pad2(bestHour.hour)}:00` : "--"}
+          note={bestHour ? `${bestHour.label} / avg ${formatPct(bestHour.apr)}` : disabled ? "No filters selected" : "Collecting hourly baseline"}
+          tone="good"
+        />
+        <KpiCard
+          icon={Flame}
+          label="Hot Rows"
+          value={disabled ? "--" : String(hotRows.length)}
+          note={`alert threshold ${formatPct(settings.data?.aprAlertPct ?? 100)}`}
+          tone={hotRows.length > 0 ? "hot" : "neutral"}
+        />
+        <KpiCard
+          icon={Database}
+          label="Snapshots"
+          value={snapshots.data ? String(snapshots.data.count) : "--"}
+          note={loading ? "Loading live Pulse API" : "deduped visible rows"}
+          tone="neutral"
+        />
+      </section>
+
+      {disabled ? (
+        <section className={styles.emptyState}>
+          <AlertTriangle size={22} />
+          <strong>No rows by design</strong>
+          <span>Turn on at least one duration and one direction. When all toggles are off, Pulse sends `none` filters and returns an empty result.</span>
+        </section>
+      ) : (
+        <>
+          <section className={styles.opportunityPanel}>
+            <PanelHeader
+              title="Live Opportunities"
+              subtitle="Best/latest useful APY rows across selected durations and directions"
+              badge={`${opportunityRows.length} visible`}
+            />
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>APR</th>
+                    <th>Direction</th>
+                    <th>Duration</th>
+                    <th>Target</th>
+                    <th>Index</th>
+                    <th>Time ICT</th>
+                    <th>Product</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {opportunityRows.map((row) => (
+                    <tr key={`${row.timestamp_utc}-${row.product_id}-${row.direction}-${row.target_price}`}>
+                      <td className={row.apr_pct >= (settings.data?.aprAlertPct ?? 100) ? styles.hotText : styles.goodText}>
+                        {formatPct(row.apr_pct)}
+                      </td>
+                      <td><DirectionBadge direction={row.direction} /></td>
+                      <td><span className={styles.durationBadge}>{labelDuration(row.duration)}</span></td>
+                      <td>{formatUsd(row.target_price)}</td>
+                      <td>{row.index_price == null ? "--" : formatUsd(row.index_price)}</td>
+                      <td>{formatICT(row.timestamp_ict)}</td>
+                      <td className={styles.productCell}>{row.product_id || "--"}{row.is_vip_only ? " / VIP" : ""}</td>
+                    </tr>
+                  ))}
+                  {opportunityRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className={styles.noRows}>No tracked rows for current filters.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className={styles.baselineGrid}>
+            {bestReports.map((item) => (
+              <BaselinePanel
+                key={item.duration}
+                label={item.label}
+                duration={item.duration}
+                report={item.report}
+                error={item.error}
+                rows={visibleRows.filter((row) => row.duration === item.duration)}
+                summaries={(summary.data?.summaries ?? []).filter((row) => row.duration === item.duration)}
+              />
+            ))}
+          </section>
+        </>
       )}
-      {availableTargets.map((t) => {
-        const distancePct = spot ? ((t - spot) / spot) * 100 : 0;
-        const isNearSpot = Math.abs(distancePct) < 0.5;
-        return (
-          <button
-            key={t}
-            onClick={() => setTarget(t)}
-            title={spot ? `${distancePct >= 0 ? "+" : ""}${distancePct.toFixed(2)}% from spot $${spot.toFixed(2)}` : ""}
-            style={{
-              background: target === t ? colors.bg2 : colors.bg1,
-              border: "none",
-              color: target === t ? colors.amber : isNearSpot ? colors.amberBright : colors.txt3,
-              padding: "3px 10px",
-              fontFamily: fonts.mono,
-              fontSize: 9,
-              letterSpacing: "0.06em",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            ${t}
-          </button>
-        );
-      })}
-      </span>
-    </span>
-  );
 
-  return (
-    <Workspace>
-      {/* Row 1 — KPI strip */}
-      <WsRow height="stats">
-        <Panel
-          span={12}
-          title="DUAL ASSETS · BYBIT"
-          badge={`SOL-USDT · TRACK >=${settings.data?.minTrackAprPct ?? 55}% · HOT >=${settings.data?.aprAlertPct ?? 100}%`}
-          flush
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 1,
-              background: colors.line,
-              height: "100%",
-            }}
-          >
-            <StatBlock
-              label="Current APR"
-              value={latestSnapshot ? `${latestSnapshot.apr_pct.toFixed(2)}%` : "—"}
-              delta={latestSnapshot ? `${labelDirection(latestSnapshot.direction)} · ${labelDuration(latestSnapshot.duration)}` : ""}
-              deltaColor={
-                latestSnapshot && latestSnapshot.direction === "BuyLow"
-                  ? colors.green
-                  : colors.red
-              }
-              sub={latestSnapshot ? formatICT(latestSnapshot.timestamp_ict) : disabled ? "no filters selected" : "no data"}
-            />
-            <StatBlock
-              label={`${days}D Avg APR`}
-              value={report ? `${report.overall_avg_apr.toFixed(2)}%` : "—"}
-              delta={report ? `target ${report.target_price ? "$" + report.target_price : "all"}` : ""}
-              deltaColor={colors.amber}
-              sub={report ? `${report.hourly_data.length} active hours` : ""}
-            />
-            <StatBlock
-              label="Best Hour (ICT)"
-              value={report && report.best_hours[0] ? `${pad2(report.best_hours[0].hour_ict)}:00` : "—"}
-              delta={
-                report && report.best_hours[0]
-                  ? `${report.best_hours[0].avg_apr.toFixed(2)}% avg`
-                  : ""
-              }
-              deltaColor={colors.green}
-              sub={
-                report && report.best_hours[0]
-                  ? `n=${report.best_hours[0].samples} · max ${report.best_hours[0].max_apr.toFixed(1)}%`
-                  : ""
-              }
-            />
-            <StatBlock
-              label="Snapshots Captured"
-              value={
-                snapshots.data ? snapshots.data.count.toLocaleString() : "—"
-              }
-              delta={
-                summary.data
-                  ? `${summary.data.count} daily rollups`
-                  : ""
-              }
-              deltaColor={colors.cyan}
-              sub="public Bybit · cron 5min"
-            />
-          </div>
-        </Panel>
-      </WsRow>
-
-      {/* Row 2 — Heatmap + Recommendation */}
-      <WsRow height="chart">
-        <Panel
-          span={8}
-          title="APR BY HOUR · ICT"
-          badge={report ? `${report.hourly_data.length}/24 ACTIVE` : "—"}
-          actions={
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {headerActions}
-              <span style={{ display: "flex", gap: 1, background: colors.line }}>
-                {([7, 14, 30] as const).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setDays(d)}
-                    style={{
-                      background: days === d ? colors.bg2 : colors.bg1,
-                      border: "none",
-                      color: days === d ? colors.amber : colors.txt3,
-                      padding: "3px 10px",
-                      fontFamily: fonts.mono,
-                      fontSize: 9,
-                      letterSpacing: "0.08em",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {d}D
-                  </button>
-                ))}
-              </span>
-            </span>
-          }
-        >
-          {reportError ? (
-            <div
-              style={{
-                display: "grid",
-                placeItems: "center",
-                height: "100%",
-                color: colors.txt3,
-                fontFamily: fonts.mono,
-                fontSize: 11,
-                textAlign: "center",
-                padding: 16,
-              }}
-            >
-              {reportError}
-              <span style={{ color: colors.txt4, fontSize: 10, marginTop: 8 }}>
-                cron is collecting · check back in a few hours
-              </span>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(24, 1fr)",
-                gap: 2,
-                padding: "8px 4px 4px",
-                height: "100%",
-                alignContent: "stretch",
-              }}
-            >
-              {Array.from({ length: 24 }, (_, h) => {
-                const stat = hourlyMap.get(h);
-                const intensity = stat ? Math.min(stat.avg_apr / maxHourlyApr, 1) : 0;
-                const bg = stat
-                  ? `rgba(255, 176, 0, ${0.12 + intensity * 0.65})`
-                  : "rgba(255,255,255,0.03)";
-                const isBest = stat && report?.best_hours[0]?.hour_ict === h;
-                return (
-                  <div
-                    key={h}
-                    title={
-                      stat
-                        ? `${pad2(h)}:00 · avg ${stat.avg_apr.toFixed(2)}% · max ${stat.max_apr.toFixed(1)}% · n=${stat.samples}`
-                        : `${pad2(h)}:00 · no data`
-                    }
-                    style={{
-                      background: bg,
-                      border: isBest ? `1px solid ${colors.amber}` : `1px solid transparent`,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "flex-end",
-                      padding: 4,
-                      fontFamily: fonts.mono,
-                      fontSize: 9,
-                      color: stat ? colors.txt1 : colors.txt4,
-                      minHeight: 60,
-                      cursor: stat ? "pointer" : "default",
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 600, color: stat ? colors.amber : colors.txt4 }}>
-                      {stat ? `${stat.avg_apr.toFixed(0)}%` : "—"}
-                    </div>
-                    <div style={{ color: colors.txt4, fontSize: 9 }}>{pad2(h)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Panel>
-
-        <Panel span={4} title="RECOMMENDATION" badge={report ? "LIVE" : "—"}>
-          <div style={{ padding: "6px 4px", fontFamily: fonts.mono, fontSize: 11, lineHeight: 1.6 }}>
-            {report ? (
-              <>
-                <div
-                  style={{
-                    background: colors.bg2,
-                    border: `1px solid ${colors.amber}`,
-                    padding: "10px 12px",
-                    color: colors.amber,
-                    fontSize: 12,
-                    marginBottom: 12,
-                    fontFamily: "'IBM Plex Sans Thai', 'Inter', sans-serif",
-                    lineHeight: 1.55,
-                  }}
-                >
-                  ▸ {report.recommendation}
-                </div>
-
-                {report.best_hours.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ color: colors.txt3, fontSize: 9, letterSpacing: "0.1em", marginBottom: 6 }}>
-                      ▸ TOP 3 HOURS
-                    </div>
-                    {report.best_hours.slice(0, 3).map((h, i) => (
-                      <div
-                        key={h.hour_ict}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "auto 1fr auto",
-                          gap: 8,
-                          padding: "4px 0",
-                          borderBottom: i < 2 ? `1px dashed ${colors.line}` : "none",
-                        }}
-                      >
-                        <span style={{ color: colors.txt3, width: 24 }}>#{i + 1}</span>
-                        <span style={{ color: colors.amber, fontWeight: 600 }}>{pad2(h.hour_ict)}:00 ICT</span>
-                        <span style={{ color: colors.green }}>{h.avg_apr.toFixed(2)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {report.cold_hours.length > 0 && (
-                  <div>
-                    <div style={{ color: colors.txt3, fontSize: 9, letterSpacing: "0.1em", marginBottom: 6 }}>
-                      ▸ COLD HOURS (avoid)
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {report.cold_hours.map((h) => (
-                        <span
-                          key={h}
-                          style={{
-                            color: colors.red,
-                            background: "rgba(255,77,94,0.08)",
-                            padding: "2px 6px",
-                            border: `1px solid ${colors.red}40`,
-                            fontSize: 10,
-                          }}
-                        >
-                          {pad2(h)}:00
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ color: colors.txt3, padding: "8px 4px" }}>
-                {reportError ?? "loading…"}
-              </div>
-            )}
-          </div>
-        </Panel>
-      </WsRow>
-
-      {/* Row 3 — Snapshots + Daily summary */}
-      <WsRow height="table">
-        <Panel
-          span={7}
-          title="RECENT SNAPSHOTS"
-          badge={`${filteredSnapshots.length} ROWS · ${target == null ? "NO TARGET" : `TARGET $${target}`}`}
-        >
-          <div style={{ overflow: "auto", height: "100%", fontFamily: fonts.mono, fontSize: 10 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={{ position: "sticky", top: 0, background: colors.bg1, zIndex: 1 }}>
-                <tr style={{ color: colors.txt3, textAlign: "left", fontSize: 9, letterSpacing: "0.08em" }}>
-                  <Th>TIME (ICT)</Th>
-                  <Th align="right">HOUR</Th>
-                  <Th>DIR</Th>
-                  <Th align="right">APR</Th>
-                  <Th align="right">PRICE</Th>
-                  <Th>DUR</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSnapshots.map((r, i) => (
-                  <tr
-                    key={i}
-                    style={{
-                      borderBottom: `1px dashed ${colors.line}`,
-                      color: colors.txt2,
-                    }}
-                  >
-                    <Td>{formatICT(r.timestamp_ict)}</Td>
-                    <Td align="right" color={colors.amber}>{pad2(r.hour_ict)}</Td>
-                    <Td color={r.direction === "BuyLow" ? colors.green : colors.red}>
-                      {labelDirection(r.direction)}
-                    </Td>
-                    <Td align="right" color={colors.amber}>{r.apr_pct.toFixed(2)}%</Td>
-                    <Td align="right">{r.index_price?.toFixed(2) ?? "—"}</Td>
-                    <Td color={colors.txt3}>{labelDuration(r.duration)}</Td>
-                  </tr>
-                ))}
-                {filteredSnapshots.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      style={{ padding: 16, textAlign: "center", color: colors.txt3, fontSize: 11 }}
-                    >
-                      {disabled ? "turn on at least one duration and direction" : "no snapshots for selected filters yet"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-
-        <Panel
-          span={5}
-          title="DAILY SUMMARY"
-          badge={summary.data ? `${summary.data.count} DAYS` : "—"}
-        >
-          <div style={{ overflow: "auto", height: "100%", fontFamily: fonts.mono, fontSize: 10 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={{ position: "sticky", top: 0, background: colors.bg1, zIndex: 1 }}>
-                <tr style={{ color: colors.txt3, textAlign: "left", fontSize: 9, letterSpacing: "0.08em" }}>
-                  <Th>DATE</Th>
-                  <Th>DIR</Th>
-                  <Th>DUR</Th>
-                  <Th align="right">AVG</Th>
-                  <Th align="right">MAX</Th>
-                  <Th align="right">BEST H</Th>
-                  <Th align="right">N</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {(summary.data?.summaries ?? []).map((d, i) => (
-                  <tr
-                    key={i}
-                    style={{
-                      borderBottom: `1px dashed ${colors.line}`,
-                      color: colors.txt2,
-                    }}
-                  >
-                    <Td>{d.date.slice(5)}</Td>
-                    <Td color={d.direction === "BuyLow" ? colors.green : colors.red}>{labelDirection(d.direction)}</Td>
-                    <Td color={colors.txt3}>{labelDuration(d.duration)}</Td>
-                    <Td align="right" color={colors.amber}>
-                      {d.avg_apr != null ? d.avg_apr.toFixed(2) + "%" : "—"}
-                    </Td>
-                    <Td align="right" color={colors.green}>
-                      {d.max_apr != null ? d.max_apr.toFixed(1) + "%" : "—"}
-                    </Td>
-                    <Td align="right">
-                      {d.best_hour_ict != null ? pad2(d.best_hour_ict) + ":00" : "—"}
-                    </Td>
-                    <Td align="right" color={colors.txt3}>
-                      {d.sample_count}
-                    </Td>
-                  </tr>
-                ))}
-                {(!summary.data || summary.data.count === 0) && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      style={{ padding: 16, textAlign: "center", color: colors.txt3, fontSize: 11 }}
-                    >
-                      no rollups yet · runs at 00:05 ICT
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      </WsRow>
-    </Workspace>
+      <section className={styles.runbook}>
+        <PanelHeader title="Connection Contract" subtitle="Pulse owns the runtime now" badge="live" />
+        <div className={styles.contractGrid}>
+          <ContractItem label="Source" value="Bybit public Advanced Earn DualAssets endpoints" />
+          <ContractItem label="Store" value="apps/alerts/data/dual-assets.sqlite" />
+          <ContractItem label="Visibility" value={`Track APY >=${formatPct(settings.data?.minTrackAprPct ?? 55)}`} />
+          <ContractItem label="Alert" value={`Hot APR >=${formatPct(settings.data?.aprAlertPct ?? 100)}`} />
+          <ContractItem label="Durations" value="8 Hours and 1 Day only" />
+          <ContractItem label="Directions" value="Buy Low and Sell High" />
+        </div>
+      </section>
+    </div>
   );
 }
 
-function Th({ children, align }: { children: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th
-      style={{
-        padding: "6px 8px",
-        textAlign: align ?? "left",
-        fontWeight: 400,
-        textTransform: "uppercase",
-        borderBottom: `1px solid ${colors.line}`,
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align,
-  color,
+function BaselinePanel({
+  label,
+  duration,
+  report,
+  error,
+  rows,
+  summaries,
 }: {
-  children: React.ReactNode;
-  align?: "left" | "right";
-  color?: string;
+  label: string;
+  duration: Duration;
+  report: BestHourReport | null;
+  error: string | null;
+  rows: Snapshot[];
+  summaries: DailySummary[];
+}) {
+  const hourly = report?.hourly_data ?? [];
+  const maxAvg = Math.max(...hourly.map((item) => item.avg_apr), 1);
+  return (
+    <article className={styles.baselinePanel}>
+      <PanelHeader
+        title={`${label} Baseline`}
+        subtitle="Computed independently, no cross-duration averaging"
+        badge={duration}
+      />
+      {error ? <div className={styles.panelNote}>{error}</div> : null}
+      <div className={styles.heatmap}>
+        {Array.from({ length: 24 }, (_, hour) => {
+          const stat = hourly.find((item) => item.hour_ict === hour);
+          const intensity = stat ? Math.max(0.1, stat.avg_apr / maxAvg) : 0;
+          return (
+            <div
+              key={hour}
+              className={styles.hourCell}
+              style={{ "--intensity": intensity } as CSSProperties}
+              title={stat ? `${pad2(hour)}:00 avg ${formatPct(stat.avg_apr)} max ${formatPct(stat.max_apr)}` : `${pad2(hour)}:00 no data`}
+            >
+              <strong>{stat ? Math.round(stat.avg_apr) : "--"}</strong>
+              <span>{pad2(hour)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className={styles.baselineTables}>
+        <MiniTable
+          title="Top Rows"
+          rows={rows.slice(0, 6).map((row) => ({
+            key: `${row.timestamp_utc}-${row.product_id}`,
+            a: formatPct(row.apr_pct),
+            b: labelDirection(row.direction),
+            c: formatUsd(row.target_price),
+          }))}
+        />
+        <MiniTable
+          title="Daily Summary"
+          rows={summaries.slice(0, 6).map((row) => ({
+            key: `${row.date}-${row.direction}-${row.target_price}`,
+            a: row.date.slice(5),
+            b: `${labelDirection(row.direction)} ${formatUsd(row.target_price)}`,
+            c: row.avg_apr == null ? "--" : formatPct(row.avg_apr),
+          }))}
+        />
+      </div>
+    </article>
+  );
+}
+
+function ToggleGroup<T extends string>({
+  label,
+  items,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  items: ReadonlyArray<{ value: T; label: string }>;
+  selected: T[];
+  onToggle: (value: T) => void;
 }) {
   return (
-    <td
-      style={{
-        padding: "5px 8px",
-        textAlign: align ?? "left",
-        color: color ?? colors.txt2,
-        fontVariantNumeric: "tabular-nums",
-      }}
-    >
-      {children}
-    </td>
+    <div className={styles.toggleGroup}>
+      <span>{label}</span>
+      <div>
+        {items.map((item) => (
+          <button
+            key={item.value}
+            className={selected.includes(item.value) ? styles.active : ""}
+            onClick={() => onToggle(item.value)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  note,
+  tone,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  note: string;
+  tone: "hot" | "good" | "neutral";
+}) {
+  return (
+    <article className={`${styles.kpiCard} ${styles[tone]}`}>
+      <div><Icon size={18} /></div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <p>{note}</p>
+    </article>
+  );
 }
 
-function formatICT(iso: string): string {
-  // e.g. "2026-04-29T18:25:00.000+07:00" → "04-29 18:25"
-  const m = iso.match(/(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-  if (!m) return iso.slice(0, 16);
-  return `${m[1]}-${m[2]} ${m[3]}:${m[4]}`;
+function StatusPill({
+  icon: Icon,
+  label,
+  value,
+  tone = "neutral",
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  tone?: "hot" | "neutral";
+}) {
+  return (
+    <div className={`${styles.statusPill} ${tone === "hot" ? styles.hotPill : ""}`}>
+      <Icon size={15} />
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function PanelHeader({ title, subtitle, badge }: { title: string; subtitle: string; badge: string }) {
+  return (
+    <div className={styles.panelHeader}>
+      <div>
+        <h2>{title}</h2>
+        <p>{subtitle}</p>
+      </div>
+      <span>{badge}</span>
+    </div>
+  );
+}
+
+function MiniTable({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ key: string; a: string; b: string; c: string }>;
+}) {
+  return (
+    <div className={styles.miniTable}>
+      <strong>{title}</strong>
+      {rows.length === 0 ? <span className={styles.noRows}>No rows</span> : null}
+      {rows.map((row) => (
+        <div key={row.key}>
+          <span>{row.a}</span>
+          <span>{row.b}</span>
+          <span>{row.c}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContractItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.contractItem}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function DirectionBadge({ direction }: { direction: Direction }) {
+  return <span className={`${styles.directionBadge} ${direction === "BuyLow" ? styles.buyLow : styles.sellHigh}`}>{labelDirection(direction)}</span>;
+}
+
+function unwrapReport(data: BestHourReport | { error: string } | null): { report: BestHourReport | null; error: string | null } {
+  if (!data) return { report: null, error: null };
+  if ("error" in data) return { report: null, error: data.error };
+  return { report: data, error: null };
+}
+
+function dedupeBestRows(rows: Snapshot[]): Snapshot[] {
+  const map = new Map<string, Snapshot>();
+  for (const row of rows) {
+    const key = [row.timestamp_utc, row.coin_pair, row.direction, row.target_price, row.duration].join("|");
+    const previous = map.get(key);
+    if (
+      !previous ||
+      row.apr_pct > previous.apr_pct ||
+      (row.apr_pct === previous.apr_pct && row.is_vip_only > previous.is_vip_only) ||
+      (row.apr_pct === previous.apr_pct && row.is_vip_only === previous.is_vip_only && (row.id ?? 0) > (previous.id ?? 0))
+    ) {
+      map.set(key, row);
+    }
+  }
+  return [...map.values()].sort((a, b) => b.timestamp_utc.localeCompare(a.timestamp_utc) || b.apr_pct - a.apr_pct);
+}
+
+function toggle<T extends string>(items: T[], value: T): T[] {
+  return items.includes(value) ? items.filter((item) => item !== value) : [...items, value];
 }
 
 function labelDuration(duration: string): string {
@@ -699,4 +544,23 @@ function labelDuration(duration: string): string {
 
 function labelDirection(direction: string): string {
   return direction === "BuyLow" ? "Buy Low" : direction === "SellHigh" ? "Sell High" : direction;
+}
+
+function formatPct(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}%` : "--";
+}
+
+function formatUsd(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? `$${value.toLocaleString("en-US", { minimumFractionDigits: value < 100 ? 2 : 0, maximumFractionDigits: 2 })}`
+    : "--";
+}
+
+function formatICT(value: string): string {
+  const match = value.match(/(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  return match ? `${match[1]}-${match[2]} ${match[3]}:${match[4]}` : value.slice(0, 16);
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
 }
