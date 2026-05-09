@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { colors, fonts } from "@pulse/ui";
 import { fmtDateICT, fmtTimeShortICT } from "../lib/time";
+import type { HealthStatus, TerminalTelemetry, WsStatus } from "../lib/use-terminal-telemetry";
 
 interface NavItem {
   id: string;
@@ -49,7 +50,7 @@ const KEY_TO_HREF = NAV.flatMap((g) => g.items).reduce<Record<string, string>>(
 /**
  * TerminalNav — 140px left rail with F-key shortcuts + STATUS block.
  */
-export function TerminalNav() {
+export function TerminalNav({ telemetry }: { telemetry?: TerminalTelemetry }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -197,7 +198,7 @@ export function TerminalNav() {
             );
           })}
 
-          {group.section === "SYSTEM" && <StatusBlock />}
+          {group.section === "SYSTEM" && <StatusBlock telemetry={telemetry} />}
         </div>
       ))}
 
@@ -212,8 +213,8 @@ export function TerminalNav() {
           letterSpacing: "0.06em",
         }}
       >
-        <div><span style={{ color: colors.green }}>●</span> SOCKET LIVE</div>
-        <div><span style={{ color: colors.amber }}>●</span> MCP READY</div>
+        <div><span style={{ color: wsColor(telemetry?.wsStatus) }}>●</span> WS {wsLabel(telemetry?.wsStatus)}</div>
+        <div><span style={{ color: hubColor(telemetry) }}>●</span> HUB {hubLabel(telemetry)}</div>
         <div><span style={{ color: colors.txt3 }}>●</span> {fmtDateICT(new Date())}</div>
       </div>
     </nav>
@@ -263,27 +264,87 @@ function MiniBlock({ title, rows }: { title: string; rows: { k: string; v: React
   );
 }
 
-function StatusBlock() {
-  const [latency, setLatency] = useState(14);
+function StatusBlock({ telemetry }: { telemetry?: TerminalTelemetry }) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     const id = setInterval(() => {
       setNow(new Date());
-      setLatency(12 + Math.floor(Math.random() * 8));
     }, 5000);
     return () => clearInterval(id);
   }, []);
+
+  const latency = telemetry?.healthLatencyMs;
+  const alerts =
+    telemetry?.alertsConfigured === false
+      ? "OFF"
+      : telemetry?.alertEvents == null
+        ? "CHECK"
+        : `${telemetry.alertEvents} EVTS`;
+  const streams =
+    telemetry?.wsStatus === "open"
+      ? `${telemetry.wsMessages} MSG`
+      : wsLabel(telemetry?.wsStatus);
 
   return (
     <MiniBlock
       title="STATUS"
       rows={[
-        { k: "ALERTS",  v: <span>12 ARMED</span> },
-        { k: "STREAMS", v: <span>3</span> },
-        { k: "UPLINK",  v: <span style={{ color: latency < 20 ? colors.green : colors.amber }}>{latency}ms</span> },
+        { k: "ALERTS",  v: <span>{alerts}</span> },
+        { k: "STREAMS", v: <span style={{ color: wsColor(telemetry?.wsStatus) }}>{streams}</span> },
+        { k: "UPLINK",  v: <span style={{ color: latencyTone(latency) }}>{latency == null ? "--" : `${latency}ms`}</span> },
         { k: "ICT",     v: <span>{fmtTimeShortICT(now)}</span> },
       ]}
     />
   );
+}
+
+function wsLabel(status?: WsStatus): string {
+  if (status === "open") return "OPEN";
+  if (status === "connecting") return "CONNECT";
+  if (status === "error") return "ERROR";
+  if (status === "closed") return "CLOSED";
+  return "CHECK";
+}
+
+function wsColor(status?: WsStatus): string {
+  if (status === "open") return colors.green;
+  if (status === "connecting") return colors.amber;
+  if (status === "error" || status === "closed") return colors.red;
+  return colors.txt4;
+}
+
+function hubLabel(telemetry?: TerminalTelemetry): string {
+  if (!telemetry) return "CHECK";
+  if (telemetry.hubOk === true) return telemetry.hubLatencyMs == null ? "OK" : `OK ${telemetry.hubLatencyMs}MS`;
+  if (telemetry.hubOk === false) return "DOWN";
+  return healthLabel(telemetry.healthStatus);
+}
+
+function hubColor(telemetry?: TerminalTelemetry): string {
+  if (telemetry?.hubOk === true) return colors.green;
+  if (telemetry?.hubOk === false) return colors.red;
+  return healthColor(telemetry?.healthStatus);
+}
+
+function healthLabel(status?: HealthStatus): string {
+  if (status === "healthy") return "HEALTHY";
+  if (status === "degraded") return "DEGRADED";
+  if (status === "unhealthy") return "UNHEALTHY";
+  if (status === "offline") return "OFFLINE";
+  return "CHECK";
+}
+
+function healthColor(status?: HealthStatus): string {
+  if (status === "healthy") return colors.green;
+  if (status === "degraded" || status === "checking") return colors.amber;
+  if (status === "unhealthy" || status === "offline") return colors.red;
+  return colors.txt4;
+}
+
+function latencyTone(latency?: number | null): string {
+  if (latency == null) return colors.txt4;
+  if (latency < 250) return colors.green;
+  if (latency < 1000) return colors.amber;
+  return colors.red;
 }

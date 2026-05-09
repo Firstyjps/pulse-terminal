@@ -3,11 +3,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { HubCache } from "./cache.js";
-import {
-  buildHealthV2,
-  type AprReader,
-  type OptionsReader,
-} from "./hub-health.js";
+import { buildHealthV2, type AprReader } from "./hub-health.js";
 import { getDepth, listDepthSymbols } from "./binance-depth-stream.js";
 import type { RegimeStore } from "./regime/index.js";
 
@@ -15,8 +11,6 @@ interface Routes {
   cache: HubCache;
   /** Optional APR store reader. Omit to suppress the `apr` block. */
   apr?: AprReader;
-  /** Optional options-cache reader. Omit to suppress the `options` block. */
-  options?: OptionsReader;
   /** Optional regime store. Omit to disable `/regime` (returns 404). */
   regime?: RegimeStore;
 }
@@ -61,11 +55,12 @@ function handle(req: IncomingMessage, res: ServerResponse, routes: Routes) {
   const { cache } = routes;
 
   // GET /health — v2 per docs/HUB-HEALTH-V2.md
+  // Runtime currently emits v1-compatible fields + APR only. Options health is
+  // intentionally omitted until Role 7 owns a cheap in-memory options cache.
   if (url.pathname === "/health") {
     const body = buildHealthV2({
       cache,
       apr: routes.apr,
-      options: routes.options,
     });
     return send(res, 200, body);
   }

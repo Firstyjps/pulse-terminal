@@ -1,19 +1,21 @@
 "use client";
 
 import { colors, fonts } from "@pulse/ui";
+import type { HealthStatus } from "../lib/use-terminal-telemetry";
 
 /**
  * TerminalBotBar — bottom 22px status row.
- * "● READY · CMD :overview · PROFILE Macro·Default · LATENCY 14ms"
  */
 export function TerminalBotBar({
   cmd = ":overview",
   profile = "MACRO·DEFAULT",
-  latencyMs = 14,
+  latencyMs,
+  healthStatus = "checking",
 }: {
   cmd?: string;
   profile?: string;
-  latencyMs?: number;
+  latencyMs?: number | null;
+  healthStatus?: HealthStatus;
 }) {
   const segStyle: React.CSSProperties = {
     padding: "0 10px",
@@ -40,14 +42,14 @@ export function TerminalBotBar({
       }}
     >
       <span style={segStyle}>
-        <span className="live-dot" />
-        READY
+        <span className={`live-dot ${healthDotClass(healthStatus)}`} />
+        {healthLabel(healthStatus)}
       </span>
       <span style={segStyle}><span className="dim">CMD</span> {cmd}</span>
       <span style={segStyle}><span className="dim">PROFILE</span> {profile}</span>
       <span style={segStyle}>
         <span className="dim">LATENCY</span>{" "}
-        <span className="mono-num" style={{ color: colors.txt2 }}>{latencyMs}MS</span>
+        <span className="mono-num" style={{ color: latencyTone(latencyMs) }}>{latencyMs == null ? "--" : `${latencyMs}MS`}</span>
       </span>
       <span style={{ marginLeft: "auto", display: "flex", height: "100%" }}>
         <span style={segStyle}><span className="dim">F1–F10</span> Tabs</span>
@@ -58,4 +60,25 @@ export function TerminalBotBar({
       </span>
     </div>
   );
+}
+
+function healthLabel(status: HealthStatus): string {
+  if (status === "healthy") return "HEALTHY";
+  if (status === "degraded") return "DEGRADED";
+  if (status === "unhealthy") return "UNHEALTHY";
+  if (status === "offline") return "OFFLINE";
+  return "CHECKING";
+}
+
+function healthDotClass(status: HealthStatus): string {
+  if (status === "healthy") return "";
+  if (status === "degraded" || status === "checking") return "amber";
+  return "red";
+}
+
+function latencyTone(latency?: number | null): string {
+  if (latency == null) return colors.txt4;
+  if (latency < 250) return colors.green;
+  if (latency < 1000) return colors.amber;
+  return colors.red;
 }

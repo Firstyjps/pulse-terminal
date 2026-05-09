@@ -3,8 +3,8 @@
   "name": "pulse-terminal",
   "display_name": "Pulse Terminal",
   "version": "0.1.0",
-  "description": "Live crypto macro + derivatives intelligence \u00e2\u20ac\u201d overview, stablecoins, ETFs, perp futures, DEX volume, TVL, funding rates, open interest, and cross-source anomaly detection.",
-  "long_description": "Exposes 19 read-only MCP tools that pull real-time crypto market and derivatives data so Claude can analyse fund flows + leverage without an API key on the model side. Sources: CoinGecko (overview), DefiLlama (stablecoins / DEX / TVL), Binance/Bybit/OKX public endpoints (funding, OI, futures, options), Deribit (options), alternative.me (Fear & Greed), Farside (real spot ETF flows), Etherscan + Mempool.space (whale flows).",
+  "description": "Live crypto macro + derivatives intelligence - overview, stablecoins, ETFs, perp futures, DEX volume, TVL, funding rates, open interest, and cross-source anomaly detection.",
+  "long_description": "Exposes 20 read-only MCP tools that pull real-time crypto market and derivatives data so Claude can analyse fund flows + leverage without an API key on the model side. Sources: CoinGecko (overview), DefiLlama (stablecoins / DEX / TVL), Binance/Bybit/OKX public endpoints (funding, OI, futures, options), Deribit (options), alternative.me (Fear & Greed), Farside (real spot ETF flows), Etherscan + Mempool.space (whale flows).",
   "author": {
     "name": "Firsty"
   },
@@ -21,11 +21,11 @@
   "license": "MIT",
   "server": {
     "type": "node",
-    "entry_point": "dist/index.mjs",
+    "entry_point": "dist/index.js",
     "mcp_config": {
       "command": "node",
       "args": [
-        "${__dirname}/dist/index.mjs"
+        "${__dirname}/dist/index.js"
       ],
       "env": {
         "PULSE_HUB_URL": "${user_config.pulse_hub_url}"
@@ -86,6 +86,10 @@
       "description": "Cross-venue options mispricings (bid > ask between exchanges)"
     },
     {
+      "name": "get_dual_assets_settings",
+      "description": "Current Pulse Dual Assets settings and resolved local SQLite path"
+    },
+    {
       "name": "get_dual_assets_apr",
       "description": "Bybit Dual Assets APR snapshots (SQLite, 5min cadence)"
     },
@@ -127,7 +131,7 @@
       "linux"
     ],
     "runtimes": {
-      "node": ">=18.0.0"
+      "node": ">=20.9.0"
     }
   }
 }

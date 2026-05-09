@@ -2,7 +2,7 @@
 /**
  * Pulse Terminal — MCP Server
  *
- * Exposes 19 read-only tools to Claude Desktop (or any MCP client) so the model can
+ * Exposes 20 read-only tools to Claude Desktop (or any MCP client) so the model can
  * fetch live crypto market + derivatives data without an API key on the server side.
  * Tools are grouped by domain; see `./tools/*.ts` for the implementations.
  *

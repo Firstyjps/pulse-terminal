@@ -18,7 +18,7 @@ function stubCache(): HubCache {
     fundingList: () => [],
     oi: new Map(),
     oiList: () => [],
-    health: { lastError: undefined, lastErrorTs: undefined },
+    health: {},
   } as unknown as HubCache;
 }
 
@@ -145,5 +145,29 @@ describe("/regime endpoint", () => {
     const r = await getJson(port, "/regime");
     expect(r.status).toBe(404);
     expect(r.body.error).toContain("not wired");
+  });
+});
+
+describe("/health endpoint", () => {
+  let port: number;
+  let stop: (() => void) | null = null;
+
+  beforeEach(async () => {
+    port = await pickPort();
+  });
+
+  afterEach(() => {
+    if (stop) {
+      stop();
+      stop = null;
+    }
+  });
+
+  it("omits options block because the runtime has no wired options reader", async () => {
+    stop = startHttpServer(port, { cache: stubCache() });
+    const r = await getJson(port, "/health");
+    expect(r.status).toBe(200);
+    expect(r.body._version).toBe(2);
+    expect(r.body.options).toBeUndefined();
   });
 });

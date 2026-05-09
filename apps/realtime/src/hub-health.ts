@@ -1,8 +1,9 @@
 // Hub /health v2 — implements the contract at docs/HUB-HEALTH-V2.md.
 //
-// Pure builder: takes a HubCache + plug-in readers (APR store, options cache),
-// returns the v2 response body. No I/O, no time mocking — callers wire deps.
-// Tests in hub-health.test.ts exercise the status-derivation matrix.
+// Pure builder: takes a HubCache + plug-in readers (APR store, future options
+// cache), returns the v2 response body. No I/O, no time mocking — callers wire
+// deps. The production realtime HTTP route intentionally omits `options` until
+// a cheap in-memory options cache exists in Role 7.
 
 import type { HubCache } from "./cache.js";
 

@@ -6,7 +6,8 @@ type FundingMessage = { type: "funding"; exchange: string; symbol: string; rate:
 type OIMessage = { type: "oi"; exchange: string; symbol: string; oi: number; oiUsd: number; ts: number };
 type FlowAlertMessage = { type: "flow.alert"; category: string; severity: "low" | "med" | "high"; payload: unknown; ts: number };
 type HeartbeatMessage = { type: "heartbeat"; ts: number };
-export type ServerMessage = FundingMessage | OIMessage | FlowAlertMessage | HeartbeatMessage;
+type AckMessage = { type: "ack"; channels: string[]; ts: number };
+export type ServerMessage = FundingMessage | OIMessage | FlowAlertMessage | HeartbeatMessage | AckMessage;
 
 export interface PulseClientOpts {
   url: string;

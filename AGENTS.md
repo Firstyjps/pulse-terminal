@@ -77,7 +77,9 @@ getStablecoins(): Promise<StablecoinFlow>
 getETFFlows(opts?): Promise<ETFFlowResponse>
 getTVL(): Promise<TvlResponse>
 getDexVolume(): Promise<DexVolumeResponse>
-getMarketSnapshot(n: number): Promise<CoinSnapshot[]>
+getFullSnapshot(): Promise<FundflowSnapshot>
+collectDailySnapshot(): Promise<MarketSnapshot>
+getSnapshotHistory(days?: number): MarketSnapshot[]
 
 // derivatives (NEW — port from Funding_Oi)
 getFundingRates(opts: { exchange?, symbol? }): Promise<FundingRate[]>
@@ -124,18 +126,24 @@ are gone. New labels go in EN as bare string literals at the call site.
 **Goal:** Next.js 16 app — the user-facing terminal.
 **Owns:** `apps/web/**`
 **Depends on:** `packages/{ui, sources, charts}`
-**Layout:** 5 tabs in nav
+**Layout:** 11 terminal routes in nav
 1. **Overview** — Pulse Command hero, key macro pulses, alerts feed
 2. **Markets** — Top-N coin table (CryptoTerminal style) + candlestick
-3. **Fundflow** — CFA Dashboard (stablecoin/ETF/TVL/DEX)
-4. **Derivatives** — funding rates + OI heatmap (live via WS)
-5. **AI Analyst** — CFA AnalysisPanel, expanded
+3. **Fundflow** — stablecoin/ETF/TVL/DEX dashboard
+4. **Intel** — MCP-first signal and intelligence surface
+5. **History** — snapshot history + export/clear APIs
+6. **Morning** — morning brief operator surface
+7. **Derivatives** — funding rates + OI heatmap (live via WS)
+8. **Options** — multi-exchange options chain and IV views
+9. **Backtest** — alerts JSONL hit-rate replay and signal grading
+10. **Dual Assets** — Bybit APR tracker/operator dashboard
+11. **Settings** — local notification/test controls
 **Phase 1 tasks:**
 - [ ] Scaffold Next.js 16 (App Router, TS, Tailwind) — copy from `Crypto-Fundflow-Analyzer/`
-- [ ] Set up tab routing (`/`, `/markets`, `/fundflow`, `/derivatives`, `/analyst`)
+- [x] Set up terminal routing (`/`, `/markets`, `/fundflow`, `/intel`, `/history`, `/morning`, `/derivatives`, `/options`, `/backtest`, `/dual-assets`, `/settings`)
 - [ ] Wire `<ThreeBackground>` + `<NavBar>` from `@pulse/ui`
 - [ ] Port `Crypto-Fundflow-Analyzer/components/Dashboard.tsx` → Tab 3
-- [ ] Port `Crypto-Fundflow-Analyzer/components/AnalysisPanel.tsx` → Tab 5
+- [x] Remove `AnalysisPanel`; analysis lives in Claude Desktop via MCP tools
 - [ ] Build hero page (Tab 1) using Pulse Command layout
 **Source of truth:** `Pulse Command/`, `Crypto-Fundflow-Analyzer/`
 
@@ -175,6 +183,8 @@ get_tvl_breakdown({ chain? })                  // TVL by chain
 get_dex_leaderboard({ days?: number })         // top DEXs by volume
 detect_anomalies()                             // cross-source signal — NEW
 get_oi_snapshot()                              // open interest — NEW
+grade_signal({ finding, market_context? })     // rubric for LLM grading
+get_dual_assets_settings()                     // Bybit Dual Assets settings
 ```
 **Phase 1 tasks:**
 - [ ] Port `Crypto-Fundflow-Analyzer/mcp-server/src/index.ts`
@@ -253,9 +263,9 @@ All originals fully ported and deleted from disk — no `_legacy/` retained.
 | 3 — Sources    | Claude | Phase 1 done | overview · stablecoins · etf+farside · futures · dex · tvl · funding (Binance/Bybit/OKX) · OI · `_helpers` · `format` · `snapshot`+`summarizeSnapshot` |
 | 4 — Charts     | Claude | Phase 1 done | Sparkline (SVG) · Candlestick (LWC v4.2) · FlowAreaChart · FlowBarChart with Cell coloring · FlowChart · DepthChart |
 | 5 — i18n       | —      | REMOVED 2026-04-30 | package deleted; product is English-only |
-| 6 — Web        | Claude | Phase 1+6 active | Next 16 dashboard · 10 user routes · 35 API routes · MCP-first UI · options/dual-assets/history/morning surfaces · `/api/analyze` and `AnalysisPanel` removed |
+| 6 — Web        | Claude | Phase 1+6 active | Next 16 dashboard · 11 nav routes · 36 API routes · MCP-first UI · options/dual-assets/history/morning surfaces · `/api/analyze` and `AnalysisPanel` removed |
 | 7 — Realtime   | Claude | Phase 1+2 done | contracts (subscribe/unsubscribe/ack) · server with heartbeat + backpressure + per-client subscription filtering + channel matching · REST poller + native Binance/Bybit/OKX WS streams (reconnect/backoff, ping per venue, env-toggle via `PULSE_NATIVE_STREAMS`) |
-| 8 — MCP        | Claude | Phase 1+5A done | 19 tools across fundflow, derivatives, options, dual-assets, markets, and intelligence · `detect_anomalies` backed by shared `scanAnomalies()` · manifest.json · pack-dxt.mjs |
+| 8 — MCP        | Claude | Phase 1+5A done | 20 tools across fundflow, derivatives, options, dual-assets, markets, and intelligence · `detect_anomalies` backed by shared `scanAnomalies()` · manifest.json · pack-dxt.mjs |
 
 ### Phase 3 (complete — MCP-first refactor)
 
@@ -269,7 +279,7 @@ All originals fully ported and deleted from disk — no `_legacy/` retained.
 | Phase C · pm2            | Cursor | ✅ done | `web` 84MB · `realtime` 93MB · `alerts` 87MB online · `pm2 save` persisted · user must run `pm2 startup` (or `pnpm dlx pm2-installer install` on Win) for boot auto-start |
 | Phase D · split sources  | Cursor | ✅ done | `index.ts` browser-safe, `server.ts` server-only · dynImport hack + webpack fallback list **removed** · replaced with `extensionAlias .js → .ts/.tsx` · all consumers rewired |
 
-**🎉 Phase 3 complete — system runs 24/7 via pm2.**
+**🎉 Phase 3 complete — production runs 24/7 via pm2 on Hetzner. Local PM2 may be stopped unless an explicit local runtime verification is in progress.**
 
 ### Foundation hygiene (2026-05-07)
 - Node runtime is enforced in root `package.json` plus `.nvmrc` / `.node-version` (`24.15.0`). Use Node `>=20.9.0 <26`; Node 18 is unsupported by Next 16 and `better-sqlite3@12`.
@@ -466,5 +476,4 @@ packages/sources/
 3. **On-chain layer** — Etherscan/Glassnode token transfers, exchange wallet outflows
 4. **Multi-portfolio** — Bybit + OKX read-only sync alongside Binance
 5. **LLM-graded backtest** — feed signals + outcomes back through Claude for pattern strength critique
-6. **MCP `grade_signal` tool** — given a finding, ask Claude for confidence + reasoning
-7. **Tool chaining** in MCP instructions — high-severity → auto-fetch funding details next
+6. **Tool chaining** in MCP instructions — high-severity → auto-fetch funding details next

@@ -10,6 +10,7 @@ import { TerminalBotBar } from "./TerminalBotBar";
 import { BottomTabNav } from "./BottomTabNav";
 import { useIsMobile } from "../lib/use-media";
 import { useUiScale } from "../lib/use-ui-scale";
+import { useTerminalTelemetry } from "../lib/use-terminal-telemetry";
 
 const SHELL_BYPASS_ROUTES = ["/chart-popup"];
 
@@ -47,7 +48,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const isMobile = useIsMobile();
+  const telemetry = useTerminalTelemetry();
   useUiScale();
 
   if (isMobile) {
@@ -69,7 +72,7 @@ function Frame({ children }: { children: React.ReactNode }) {
           overflow: "hidden",
         }}
       >
-        <TerminalStatusBar compact />
+        <TerminalStatusBar compact feedStatus={feedStatusFromTelemetry(telemetry)} />
         <TerminalTicker />
         <main
           style={{
@@ -99,7 +102,7 @@ function Frame({ children }: { children: React.ReactNode }) {
         overflow: "hidden",
       }}
     >
-      <TerminalStatusBar />
+      <TerminalStatusBar feedStatus={feedStatusFromTelemetry(telemetry)} />
       <TerminalTicker />
       <div
         style={{
@@ -109,10 +112,29 @@ function Frame({ children }: { children: React.ReactNode }) {
           minHeight: 0,
         }}
       >
-        <TerminalNav />
+        <TerminalNav telemetry={telemetry} />
         <main style={{ overflow: "auto", minHeight: 0, minWidth: 0 }}>{children}</main>
       </div>
-      <TerminalBotBar />
+      <TerminalBotBar
+        cmd={commandFromPath(pathname)}
+        healthStatus={telemetry.healthStatus}
+        latencyMs={telemetry.healthLatencyMs}
+      />
     </div>
   );
+}
+
+function feedStatusFromTelemetry(
+  telemetry: ReturnType<typeof useTerminalTelemetry>,
+): "connecting" | "live" | "stale" | "offline" {
+  if (telemetry.wsStatus === "open") return "live";
+  if (telemetry.wsStatus === "connecting") return "connecting";
+  if (telemetry.wsLastTs && Date.now() - telemetry.wsLastTs < 120_000) return "stale";
+  return "offline";
+}
+
+function commandFromPath(pathname: string | null): string {
+  if (!pathname || pathname === "/") return ":overview";
+  const slug = pathname.split("/").filter(Boolean)[0] ?? "overview";
+  return `:${slug}`;
 }
