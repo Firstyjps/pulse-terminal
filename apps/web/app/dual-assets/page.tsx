@@ -5,12 +5,14 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  CheckCircle2,
   Clock3,
   Database,
   Filter,
   Flame,
-  RefreshCw,
+  Gauge,
   ShieldCheck,
+  Target,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -32,6 +34,17 @@ interface BestHourReport {
   target_price: number | null;
   coin_pair: string;
   overall_avg_apr: number;
+  confidence: {
+    score: number;
+    label: "low" | "medium" | "high";
+    reasons: string[];
+  };
+  trend: {
+    direction: "rising" | "falling" | "flat" | "insufficient";
+    latest_avg_apr: number | null;
+    previous_avg_apr: number | null;
+    change_pct: number | null;
+  };
   best_hours: HourlyAprStat[];
   hot_hours: number[];
   cold_hours: number[];
@@ -128,7 +141,7 @@ export default function DualAssetsPage() {
   }, [disabled, snapshots.data]);
 
   const opportunityRows = useMemo(
-    () => visibleRows.slice().sort((a, b) => b.apr_pct - a.apr_pct || b.timestamp_utc.localeCompare(a.timestamp_utc)).slice(0, 18),
+    () => visibleRows.slice().sort((a, b) => b.apr_pct - a.apr_pct || b.timestamp_utc.localeCompare(a.timestamp_utc)).slice(0, 10),
     [visibleRows],
   );
 
@@ -145,36 +158,94 @@ export default function DualAssetsPage() {
 
   const topRow = opportunityRows[0] ?? null;
   const hotRows = visibleRows.filter((row) => row.apr_pct >= (settings.data?.aprAlertPct ?? 100));
-  const bestAvg = bestReports
-    .map((item) => item.report?.best_hours[0]?.avg_apr)
-    .filter((value): value is number => typeof value === "number");
-  const bestHour = bestReports
-    .map((item) => ({ label: item.label, hour: item.report?.best_hours[0]?.hour_ict, apr: item.report?.best_hours[0]?.avg_apr }))
-    .filter((item) => item.hour != null)
-    .sort((a, b) => (b.apr ?? 0) - (a.apr ?? 0))[0];
+  const decision = bestReports
+    .map((item) => ({ ...item, best: item.report?.best_hours[0] ?? null }))
+    .filter((item): item is typeof item & { best: HourlyAprStat } => item.best != null)
+    .sort((a, b) => b.best.avg_apr - a.best.avg_apr)[0] ?? null;
+  const decisionReport = decision?.report ?? null;
+  const decisionBest = decision?.best ?? null;
+  const decisionSampleCount = decisionReport?.hourly_data.reduce((sum, item) => sum + item.samples, 0) ?? 0;
+  const decisionEdgePct =
+    decisionReport && decisionBest && decisionReport.overall_avg_apr > 0
+      ? ((decisionBest.avg_apr - decisionReport.overall_avg_apr) / decisionReport.overall_avg_apr) * 100
+      : null;
+  const bestWindowHours = useMemo(() => {
+    const set = new Set<number>();
+    for (const item of bestReports) {
+      for (const hour of item.report?.best_hours.slice(0, 2) ?? []) set.add(hour.hour_ict);
+    }
+    return set;
+  }, [bestReports]);
 
   const loading = settings.loading || snapshots.loading || best8h.loading || best1d.loading || summary.loading;
   const error = settings.error ?? snapshots.error ?? best8h.error ?? best1d.error ?? summary.error;
 
   return (
     <div className={styles.page}>
-      <section className={styles.hero}>
-        <div className={styles.heroMain}>
+      <section className={styles.header}>
+        <div className={styles.headerMain}>
           <div className={styles.bybit}>BYB<span>I</span>T</div>
           <div>
-            <p className={styles.eyebrow}>Connected Pulse implementation</p>
-            <h1>Dual Assets Manager</h1>
+            <p className={styles.eyebrow}>Decision dashboard · {DEFAULT_PAIR}</p>
+            <h1>Dual Assets Entry Timing</h1>
             <p className={styles.heroCopy}>
-              Public Bybit data to Pulse SQLite, API, MCP, alerts, and this live dashboard. No separate Dual-assets_MD runtime.
+              Finds when Bybit Dual Asset APY is worth entering, based on live Pulse SQLite snapshots.
             </p>
           </div>
         </div>
-        <div className={styles.heroStatus}>
+        <div className={styles.headerStatus}>
           <StatusPill icon={ShieldCheck} label="Tracking" value={`>=${formatPct(settings.data?.minTrackAprPct ?? 55)}`} />
           <StatusPill icon={Flame} label="Hot Alert" value={`>=${formatPct(settings.data?.aprAlertPct ?? 100)}`} tone="hot" />
           <StatusPill icon={Database} label="Rows" value={String(visibleRows.length)} />
           <StatusPill icon={Activity} label="Auth" value={settings.data?.authRequiredForTracking === false ? "Public" : "Check"} />
         </div>
+      </section>
+
+      <section className={styles.decisionPanel}>
+        <div className={styles.decisionMain}>
+          <span className={styles.sectionLabel}>Best entry answer</span>
+          <h2>{decisionBest ? formatWindow(decisionBest.hour_ict) : "--"}</h2>
+          <p>
+            {decision
+              ? `${decision.label} has the strongest average APY over the last ${days}D. ${decisionReport?.recommendation ?? ""}`
+              : disabled
+                ? "Turn on at least one duration and one direction to compute a best entry window."
+                : "Collecting enough hourly baseline to make a decision."}
+          </p>
+        </div>
+        <div className={styles.decisionStats}>
+          <DecisionStat
+            icon={BarChart3}
+            label={`Average APY · ${days}D`}
+            value={formatPct(decisionReport?.overall_avg_apr)}
+            note={decision ? `${decision.label} selected baseline` : "No baseline"}
+          />
+          <DecisionStat
+            icon={TrendingUp}
+            label="Best-hour APY"
+            value={formatPct(decisionBest?.avg_apr)}
+            note={decisionEdgePct == null ? "Edge unavailable" : `${formatSignedPct(decisionEdgePct)} vs average`}
+            tone="good"
+          />
+          <DecisionStat
+            icon={Gauge}
+            label="Confidence"
+            value={decisionReport ? titleCase(decisionReport.confidence.label) : "--"}
+            note={decisionReport ? `${decisionReport.confidence.score}/100 · ${decisionSampleCount.toLocaleString("en-US")} samples` : "No report"}
+          />
+          <DecisionStat
+            icon={Clock3}
+            label="Trend"
+            value={decisionReport ? titleCase(decisionReport.trend.direction) : "--"}
+            note={decisionReport?.trend.change_pct == null ? "No daily trend" : `${formatSignedPct(decisionReport.trend.change_pct)} vs previous period`}
+          />
+        </div>
+      </section>
+
+      <section className={styles.durationGrid}>
+        {bestReports.map((item) => (
+          <DurationDecisionCard key={item.duration} item={item} days={days} />
+        ))}
       </section>
 
       <section className={styles.filterPanel}>
@@ -213,37 +284,6 @@ export default function DualAssetsPage() {
         </div>
       ) : null}
 
-      <section className={styles.kpiGrid}>
-        <KpiCard
-          icon={TrendingUp}
-          label="Live Best APR"
-          value={topRow ? formatPct(topRow.apr_pct) : "--"}
-          note={topRow ? `${labelDirection(topRow.direction)} / ${labelDuration(topRow.duration)} / target ${formatUsd(topRow.target_price)}` : disabled ? "No filters selected" : "Waiting for tracked rows"}
-          tone={topRow && topRow.apr_pct >= (settings.data?.aprAlertPct ?? 100) ? "hot" : "good"}
-        />
-        <KpiCard
-          icon={Clock3}
-          label="Best Hour"
-          value={bestHour?.hour != null ? `${pad2(bestHour.hour)}:00` : "--"}
-          note={bestHour ? `${bestHour.label} / avg ${formatPct(bestHour.apr)}` : disabled ? "No filters selected" : "Collecting hourly baseline"}
-          tone="good"
-        />
-        <KpiCard
-          icon={Flame}
-          label="Hot Rows"
-          value={disabled ? "--" : String(hotRows.length)}
-          note={`alert threshold ${formatPct(settings.data?.aprAlertPct ?? 100)}`}
-          tone={hotRows.length > 0 ? "hot" : "neutral"}
-        />
-        <KpiCard
-          icon={Database}
-          label="Snapshots"
-          value={snapshots.data ? String(snapshots.data.count) : "--"}
-          note={loading ? "Loading live Pulse API" : "deduped visible rows"}
-          tone="neutral"
-        />
-      </section>
-
       {disabled ? (
         <section className={styles.emptyState}>
           <AlertTriangle size={22} />
@@ -255,34 +295,62 @@ export default function DualAssetsPage() {
           <section className={styles.opportunityPanel}>
             <PanelHeader
               title="Live Opportunities"
-              subtitle="Best/latest useful APY rows across selected durations and directions"
-              badge={`${opportunityRows.length} visible`}
+              subtitle="Current rows ranked by APY. Highlighted rows land inside a best entry hour."
+              badge={`${opportunityRows.length} shown`}
             />
+            <div className={styles.tableSummary}>
+              <DecisionStat
+                icon={Target}
+                label="Current best APY"
+                value={topRow ? formatPct(topRow.apr_pct) : "--"}
+                note={topRow ? `${labelDirection(topRow.direction)} · ${labelDuration(topRow.duration)} · target ${formatUsd(topRow.target_price)}` : "No row"}
+                tone={topRow && topRow.apr_pct >= (settings.data?.aprAlertPct ?? 100) ? "hot" : "good"}
+              />
+              <DecisionStat
+                icon={Flame}
+                label="Hot rows"
+                value={String(hotRows.length)}
+                note={`Alert threshold ${formatPct(settings.data?.aprAlertPct ?? 100)}`}
+                tone={hotRows.length > 0 ? "hot" : "neutral"}
+              />
+              <DecisionStat
+                icon={Database}
+                label="Snapshots"
+                value={snapshots.data ? String(snapshots.data.count) : "--"}
+                note={loading ? "Loading live Pulse API" : "Deduped visible rows"}
+              />
+            </div>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>APR</th>
+                    <th>APY</th>
                     <th>Direction</th>
                     <th>Duration</th>
-                    <th>Target</th>
-                    <th>Index</th>
+                    <th>Target Gap</th>
                     <th>Time ICT</th>
+                    <th>Access</th>
                     <th>Product</th>
                   </tr>
                 </thead>
                 <tbody>
                   {opportunityRows.map((row) => (
-                    <tr key={`${row.timestamp_utc}-${row.product_id}-${row.direction}-${row.target_price}`}>
+                    <tr
+                      key={`${row.timestamp_utc}-${row.product_id}-${row.direction}-${row.target_price}`}
+                      className={bestWindowHours.has(row.hour_ict) ? styles.bestWindowRow : undefined}
+                    >
                       <td className={row.apr_pct >= (settings.data?.aprAlertPct ?? 100) ? styles.hotText : styles.goodText}>
                         {formatPct(row.apr_pct)}
                       </td>
                       <td><DirectionBadge direction={row.direction} /></td>
                       <td><span className={styles.durationBadge}>{labelDuration(row.duration)}</span></td>
-                      <td>{formatUsd(row.target_price)}</td>
-                      <td>{row.index_price == null ? "--" : formatUsd(row.index_price)}</td>
+                      <td>
+                        <strong>{formatUsd(row.target_price)}</strong>
+                        <span className={styles.gapText}>{formatTargetGap(row)}</span>
+                      </td>
                       <td>{formatICT(row.timestamp_ict)}</td>
-                      <td className={styles.productCell}>{row.product_id || "--"}{row.is_vip_only ? " / VIP" : ""}</td>
+                      <td>{row.is_vip_only ? "VIP" : "Public"}</td>
+                      <td className={styles.productCell}>{row.product_id || "--"}</td>
                     </tr>
                   ))}
                   {opportunityRows.length === 0 ? (
@@ -347,18 +415,45 @@ function BaselinePanel({
     <article className={styles.baselinePanel}>
       <PanelHeader
         title={`${label} Baseline`}
-        subtitle="Computed independently, no cross-duration averaging"
+        subtitle="Hourly APY baseline. Green = good entry zone, amber = neutral, red = avoid."
         badge={duration}
       />
       {error ? <div className={styles.panelNote}>{error}</div> : null}
+      <div className={styles.baselineSummary}>
+        <DecisionStat
+          icon={Clock3}
+          label="Best window"
+          value={report?.best_hours[0] ? formatWindow(report.best_hours[0].hour_ict) : "--"}
+          note={report?.best_hours[0] ? `Avg ${formatPct(report.best_hours[0].avg_apr)}` : "No hourly baseline"}
+          tone="good"
+        />
+        <DecisionStat
+          icon={BarChart3}
+          label="Average APY"
+          value={formatPct(report?.overall_avg_apr)}
+          note={report ? `${report.period_days}D · ${report.confidence.label} confidence` : "No report"}
+        />
+      </div>
+      <div className={styles.heatmapLegend}>
+        <span><i className={styles.legendGood} /> Good</span>
+        <span><i className={styles.legendNeutral} /> Neutral</span>
+        <span><i className={styles.legendAvoid} /> Avoid</span>
+      </div>
       <div className={styles.heatmap}>
         {Array.from({ length: 24 }, (_, hour) => {
           const stat = hourly.find((item) => item.hour_ict === hour);
           const intensity = stat ? Math.max(0.1, stat.avg_apr / maxAvg) : 0;
+          const tier = !stat
+            ? styles.noDataHour
+            : report?.hot_hours.includes(hour)
+              ? styles.goodHour
+              : report?.cold_hours.includes(hour)
+                ? styles.avoidHour
+                : styles.neutralHour;
           return (
             <div
               key={hour}
-              className={styles.hourCell}
+              className={`${styles.hourCell} ${tier}`}
               style={{ "--intensity": intensity } as CSSProperties}
               title={stat ? `${pad2(hour)}:00 avg ${formatPct(stat.avg_apr)} max ${formatPct(stat.max_apr)}` : `${pad2(hour)}:00 no data`}
             >
@@ -421,25 +516,70 @@ function ToggleGroup<T extends string>({
   );
 }
 
-function KpiCard({
+function DecisionStat({
   icon: Icon,
   label,
   value,
   note,
-  tone,
+  tone = "neutral",
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   note: string;
-  tone: "hot" | "good" | "neutral";
+  tone?: "hot" | "good" | "neutral";
 }) {
   return (
-    <article className={`${styles.kpiCard} ${styles[tone]}`}>
+    <article className={`${styles.decisionStat} ${styles[tone]}`}>
       <div><Icon size={18} /></div>
       <span>{label}</span>
       <strong>{value}</strong>
       <p>{note}</p>
+    </article>
+  );
+}
+
+function DurationDecisionCard({
+  item,
+  days,
+}: {
+  item: { duration: Duration; label: string; report: BestHourReport | null; error: string | null };
+  days: Days;
+}) {
+  const best = item.report?.best_hours[0] ?? null;
+  const edge =
+    best && item.report && item.report.overall_avg_apr > 0
+      ? ((best.avg_apr - item.report.overall_avg_apr) / item.report.overall_avg_apr) * 100
+      : null;
+  const samples = item.report?.hourly_data.reduce((sum, stat) => sum + stat.samples, 0) ?? 0;
+  return (
+    <article className={styles.durationCard}>
+      <div className={styles.durationTop}>
+        <span>{item.label}</span>
+        <strong>{best ? formatWindow(best.hour_ict) : "--"}</strong>
+      </div>
+      {item.error ? <p className={styles.panelNote}>{item.error}</p> : null}
+      <div className={styles.durationMetrics}>
+        <DecisionStat
+          icon={TrendingUp}
+          label="Best-hour APY"
+          value={formatPct(best?.avg_apr)}
+          note={edge == null ? "Edge unavailable" : `${formatSignedPct(edge)} vs avg`}
+          tone="good"
+        />
+        <DecisionStat
+          icon={BarChart3}
+          label={`Average APY · ${days}D`}
+          value={formatPct(item.report?.overall_avg_apr)}
+          note={`${samples.toLocaleString("en-US")} samples`}
+        />
+        <DecisionStat
+          icon={CheckCircle2}
+          label="Confidence"
+          value={item.report ? titleCase(item.report.confidence.label) : "--"}
+          note={item.report ? `${item.report.confidence.score}/100` : "No report"}
+        />
+      </div>
     </article>
   );
 }
@@ -550,10 +690,29 @@ function formatPct(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}%` : "--";
 }
 
+function formatSignedPct(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
 function formatUsd(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value)
     ? `$${value.toLocaleString("en-US", { minimumFractionDigits: value < 100 ? 2 : 0, maximumFractionDigits: 2 })}`
     : "--";
+}
+
+function formatSignedUsd(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${sign}${formatUsd(Math.abs(value))}`;
+}
+
+function formatTargetGap(row: Snapshot): string {
+  if (row.index_price == null || !Number.isFinite(row.index_price) || row.index_price === 0) return "index --";
+  const diff = row.target_price - row.index_price;
+  const pct = (diff / row.index_price) * 100;
+  return `${formatSignedUsd(diff)} / ${formatSignedPct(pct)} from index`;
 }
 
 function formatICT(value: string): string {
@@ -563,4 +722,13 @@ function formatICT(value: string): string {
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0");
+}
+
+function formatWindow(hour: number | null | undefined): string {
+  if (typeof hour !== "number" || !Number.isFinite(hour)) return "--";
+  return `${pad2(hour)}:00-${pad2((hour + 1) % 24)}:00 ICT`;
+}
+
+function titleCase(value: string): string {
+  return value ? value.slice(0, 1).toUpperCase() + value.slice(1) : value;
 }
