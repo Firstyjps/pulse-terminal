@@ -14,12 +14,12 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: "overview",    label: "OVERVIEW", glyph: "◆", href: "/",            fkey: "F1"  },
-  { id: "morning",     label: "MORNING",  glyph: "☀", href: "/morning",     fkey: "F11" },
+  { id: "morning",     label: "MORNING",  glyph: "☀", href: "/morning",     fkey: "F10" },
   { id: "markets",     label: "MARKETS",  glyph: "▦", href: "/markets",     fkey: "F2"  },
   { id: "intel",       label: "INTEL",    glyph: "ℹ", href: "/intel",       fkey: "F4"  },
   { id: "derivatives", label: "DERIV",    glyph: "Ξ", href: "/derivatives", fkey: "F6"  },
   { id: "options",     label: "OPTIONS",  glyph: "Σ", href: "/options",     fkey: "F7"  },
-  { id: "settings",    label: "SETTINGS", glyph: "⚙", href: "/settings",    fkey: "F10" },
+  { id: "settings",    label: "SETTINGS", glyph: "⚙", href: "/settings",    fkey: "F11" },
 ];
 
 /**

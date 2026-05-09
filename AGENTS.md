@@ -132,15 +132,15 @@ are gone. New labels go in EN as bare string literals at the call site.
 3. **Fundflow** — stablecoin/ETF/TVL/DEX dashboard
 4. **Intel** — MCP-first signal and intelligence surface
 5. **History** — snapshot history + export/clear APIs
-6. **Morning** — morning brief operator surface
-7. **Derivatives** — funding rates + OI heatmap (live via WS)
-8. **Options** — multi-exchange options chain and IV views
-9. **Backtest** — alerts JSONL hit-rate replay and signal grading
-10. **Dual Assets** — Bybit APR tracker/operator dashboard
+6. **Derivatives** — funding rates + OI heatmap (live via WS)
+7. **Options** — multi-exchange options chain and IV views
+8. **Backtest** — alerts JSONL hit-rate replay and signal grading
+9. **Dual Assets** — Bybit APR tracker/operator dashboard
+10. **Morning** — morning brief operator surface
 11. **Settings** — local notification/test controls
 **Phase 1 tasks:**
 - [ ] Scaffold Next.js 16 (App Router, TS, Tailwind) — copy from `Crypto-Fundflow-Analyzer/`
-- [x] Set up terminal routing (`/`, `/markets`, `/fundflow`, `/intel`, `/history`, `/morning`, `/derivatives`, `/options`, `/backtest`, `/dual-assets`, `/settings`)
+- [x] Set up terminal routing (`/`, `/markets`, `/fundflow`, `/intel`, `/history`, `/derivatives`, `/options`, `/backtest`, `/dual-assets`, `/morning`, `/settings`)
 - [ ] Wire `<ThreeBackground>` + `<NavBar>` from `@pulse/ui`
 - [ ] Port `Crypto-Fundflow-Analyzer/components/Dashboard.tsx` → Tab 3
 - [x] Remove `AnalysisPanel`; analysis lives in Claude Desktop via MCP tools

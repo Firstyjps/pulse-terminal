@@ -22,7 +22,6 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { id: "fundflow",  label: "FUNDFLOW",  key: "F3",  href: "/fundflow" },
       { id: "intel",     label: "INTEL",     key: "F4",  href: "/intel" },
       { id: "history",   label: "HISTORY",   key: "F5",  href: "/history" },
-      { id: "morning",   label: "MORNING",   key: "F11", href: "/morning" },
     ],
   },
   {
@@ -37,7 +36,8 @@ const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "SYSTEM",
     items: [
-      { id: "settings", label: "SETTINGS", key: "F10", href: "/settings" },
+      { id: "morning",  label: "MORNING",  key: "F10", href: "/morning" },
+      { id: "settings", label: "SETTINGS", key: "F11", href: "/settings" },
     ],
   },
 ];
