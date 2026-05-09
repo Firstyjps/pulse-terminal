@@ -1,6 +1,8 @@
 .page {
   min-height: 100%;
   padding: 14px;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   color: #e8f4f1;
   background:
@@ -10,12 +12,32 @@
   font-family: "IBM Plex Sans", system-ui, sans-serif;
 }
 
+.page *,
+.page *::before,
+.page *::after {
+  box-sizing: border-box;
+}
+
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
   gap: 10px;
   align-items: stretch;
   margin-bottom: 10px;
+}
+
+.header,
+.headerMain,
+.headerStatus,
+.decisionPanel,
+.durationGrid,
+.filterPanel,
+.opportunityPanel,
+.baselineGrid,
+.baselinePanel,
+.runbook {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .headerMain,
@@ -684,6 +706,8 @@
 @media (max-width: 720px) {
   .page {
     padding: 12px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .headerMain {
@@ -714,7 +738,16 @@
   }
 
   .decisionMain p {
+    max-width: 100%;
     font-size: 13px;
+  }
+
+  .header h1 {
+    font-size: 20px;
+  }
+
+  .heroCopy {
+    max-width: 100%;
   }
 
   .durationTop {
