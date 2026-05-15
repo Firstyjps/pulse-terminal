@@ -1,5 +1,43 @@
-import { describe, expect, it } from "vitest";
-import { withFallback } from "./_helpers.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fetchJson, withFallback } from "./_helpers.js";
+
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  globalThis.fetch = originalFetch;
+});
+
+describe("fetchJson", () => {
+  it("uses Next revalidation by default", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ ok: true }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await fetchJson<{ ok: boolean }>("https://example.test/data", { revalidate: 600 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.test/data",
+      expect.objectContaining({
+        next: { revalidate: 600 },
+      }),
+    );
+  });
+
+  it("uses no-store without Next revalidation for oversized responses", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ ok: true }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await fetchJson<{ ok: boolean }>("https://example.test/large", { cache: "no-store" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.test/large",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("next");
+  });
+});
 
 describe("withFallback", () => {
   it("returns the first non-null loader value", async () => {

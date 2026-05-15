@@ -5,21 +5,28 @@ const UA = "PulseTerminal/1.0";
 
 export interface FetchOpts {
   revalidate?: number;     // Next.js cache hint, seconds
+  cache?: RequestCache;
   headers?: Record<string, string>;
   retries?: number;
   retryDelayMs?: number;
 }
 
 export async function fetchJson<T>(url: string, opts: FetchOpts = {}): Promise<T> {
-  const { revalidate = 120, headers = {}, retries = 0, retryDelayMs = 800 } = opts;
+  const { revalidate = 120, cache, headers = {}, retries = 0, retryDelayMs = 800 } = opts;
 
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(url, {
-        next: { revalidate },
+      const init: RequestInit & { next?: { revalidate: number } } = {
         headers: { "User-Agent": UA, ...headers },
-      } as RequestInit);
+      };
+      if (cache) {
+        init.cache = cache;
+      } else {
+        init.next = { revalidate };
+      }
+
+      const res = await fetch(url, init);
       if (!res.ok) throw new Error(`${url} → ${res.status}`);
       return (await res.json()) as T;
     } catch (err) {

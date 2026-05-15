@@ -16,7 +16,7 @@ export async function getDexVolume(): Promise<DexVolumeResponse> {
   const [overview, chains] = await Promise.all([
     fetchJson<LlamaTotal>(
       "https://api.llama.fi/overview/dexs?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=false",
-      { revalidate: 600 },
+      { cache: "no-store" },
     ),
     fetchJson<LlamaChainList>(
       "https://api.llama.fi/overview/dexs?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true",
