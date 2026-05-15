@@ -10,7 +10,7 @@ afterEach(() => {
 
 describe("fetchJson", () => {
   it("uses Next revalidation by default", async () => {
-    const fetchMock = vi.fn(async () => Response.json({ ok: true }));
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ ok: true }));
     globalThis.fetch = fetchMock as typeof fetch;
 
     await fetchJson<{ ok: boolean }>("https://example.test/data", { revalidate: 600 });
@@ -24,7 +24,7 @@ describe("fetchJson", () => {
   });
 
   it("uses no-store without Next revalidation for oversized responses", async () => {
-    const fetchMock = vi.fn(async () => Response.json({ ok: true }));
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ ok: true }));
     globalThis.fetch = fetchMock as typeof fetch;
 
     await fetchJson<{ ok: boolean }>("https://example.test/large", { cache: "no-store" });
@@ -35,7 +35,11 @@ describe("fetchJson", () => {
         cache: "no-store",
       }),
     );
-    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("next");
+    const init = fetchMock.mock.calls[0]?.[1] as
+      | (RequestInit & { next?: unknown })
+      | undefined;
+    expect(init).toBeDefined();
+    expect(init).not.toHaveProperty("next");
   });
 });
 
