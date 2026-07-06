@@ -9,8 +9,8 @@ import {
   buildBtcEtfFlowsBarChartSvg,
   svgToPng,
 } from "@pulse/alerts/morning-brief/chart";
-import { getETFFlows } from "@pulse/sources/server";
-import type { RegisterFn } from "../_helpers.js";
+import { getETFFlows, type FundflowSnapshot } from "@pulse/sources/server";
+import { hubFetch, type RegisterFn } from "../_helpers.js";
 
 function pngImage(png: Uint8Array) {
   return {
@@ -49,7 +49,13 @@ export const registerBriefChartTools: RegisterFn = (server) => {
             return errText("no BTC kline data available");
           svg = buildBtcPriceChartSvg(klines);
         } else {
-          const etf = await getETFFlows();
+          // Read ETF flows from the realtime hub cache first (same source the
+          // get_etf_flows text tool uses) so the chart and the brief text always
+          // agree. Only re-scrape via getETFFlows() as a last-resort fallback if
+          // the hub is unreachable — this avoids concurrent Farside scrapes that
+          // hit Cloudflare and silently drop to random proxy data.
+          const cached = await hubFetch<FundflowSnapshot>("/snapshot");
+          const etf = cached?.etf ?? (await getETFFlows());
           const flows = etf?.flows ?? [];
           if (!flows.length) return errText("no ETF flow data available");
           svg = buildBtcEtfFlowsBarChartSvg(flows);
