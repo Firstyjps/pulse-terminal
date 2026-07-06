@@ -18,6 +18,7 @@ import { registerOptionsTools } from "./tools/options.js";
 import { registerDualAssetsTools } from "./tools/dual-assets.js";
 import { registerIntelligenceTools } from "./tools/intelligence.js";
 import { registerMarketsTools } from "./tools/markets.js";
+import { registerBriefChartTools } from "./tools/brief-chart.js";
 
 const server = new McpServer(
   {
@@ -41,6 +42,7 @@ registerOptionsTools(server);
 registerDualAssetsTools(server);
 registerIntelligenceTools(server);
 registerMarketsTools(server);
+registerBriefChartTools(server);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

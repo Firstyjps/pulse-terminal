@@ -9,6 +9,10 @@
     "./portfolio-snapshot/history": {
       "types": "./src/portfolio-snapshot/history.ts",
       "default": "./src/portfolio-snapshot/history.ts"
+    },
+    "./morning-brief/chart": {
+      "types": "./src/morning-brief/chart.ts",
+      "default": "./src/morning-brief/chart.ts"
     }
   },
   "scripts": {
