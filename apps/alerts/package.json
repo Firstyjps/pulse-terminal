@@ -13,6 +13,10 @@
     "./morning-brief/chart": {
       "types": "./src/morning-brief/chart.ts",
       "default": "./src/morning-brief/chart.ts"
+    },
+    "./morning-brief/compose": {
+      "types": "./src/morning-brief/compose.ts",
+      "default": "./src/morning-brief/compose.ts"
     }
   },
   "scripts": {
