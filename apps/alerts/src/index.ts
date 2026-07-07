@@ -114,8 +114,12 @@ function formatBkkSchedules(schedules: BkkSchedule[]): string {
     .join(", ");
 }
 
+// hiyuki retired 2026-07-07 — KhunQuant is the market-brief face now.
+// Collectors above keep running; only the Telegram brief send is gated off.
+// Set HIYUKI_BRIEF_ENABLED=1 to re-enable the legacy hiyuki brief.
+const BRIEF_ENABLED = process.env.HIYUKI_BRIEF_ENABLED === "1";
 let stopMorningBrief: () => void = () => {};
-if (TG_TOKEN && TG_CHAT_IDS.length > 0) {
+if (BRIEF_ENABLED && TG_TOKEN && TG_CHAT_IDS.length > 0) {
   const scheduleState: BriefScheduleState = { dateBkk: null, firedSlotKeys: new Set() };
   const tick = async () => {
     const now = Date.now();
