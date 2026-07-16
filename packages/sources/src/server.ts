@@ -43,7 +43,7 @@ export type {
 } from "./portfolio/aggregate.js";
 export { parseWallets, getEvmWallets, getSolanaWallets } from "./_wallets.js";
 export type { ParsedWallet, WalletChain } from "./_wallets.js";
-export { getDepth } from "./depth.js";
+export { getDepth, analyzeOrderBook } from "./depth.js";
 export type { DepthBook } from "./depth.js";
 export { getWhaleFlow } from "./whale-flow.js";
 export type { WhaleTransfer, WhaleFlowResponse } from "./whale-flow.js";

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getDepth, getWhaleFlow } from "@pulse/sources/server";
+import { analyzeOrderBook, getDepth, getWhaleFlow } from "@pulse/sources/server";
 
 import { json, text, type RegisterFn } from "../_helpers.js";
 
@@ -8,7 +8,8 @@ export const registerMarketsTools: RegisterFn = (server) => {
     "get_order_book",
     "Top-N bids/asks for a Binance spot pair. Sourced from realtime hub's WS depth stream " +
       "(BTCUSDT/ETHUSDT/SOLUSDT cached @100ms cadence) — falls back to Binance REST /depth when hub unreachable. " +
-      "Use for spread analysis, liquidity gaps, and book imbalance signals.",
+      "Raw top-of-book only — spans a few dollars on liquid pairs. Use for spread/microstructure checks; " +
+      "for support/resistance levels use analyze_order_book instead.",
     {
       symbol: z.string().optional().default("BTCUSDT"),
       limit: z.number().int().min(5).max(100).optional().default(20),
@@ -19,6 +20,26 @@ export const registerMarketsTools: RegisterFn = (server) => {
         return json(book);
       } catch (err) {
         return text(`Failed to fetch depth for ${symbol}: ${(err as Error).message}`);
+      }
+    },
+  );
+
+  server.tool(
+    "analyze_order_book",
+    "Deep order-book analysis for a Binance spot pair (REST depth=5000, clusters within ±5% of mid). " +
+      "Pre-computed: support/resistance liquidity walls (qty-weighted price, size in base+USD, distance % from mid), " +
+      "cumulative bid/ask depth + bid/ask ratio at ±0.5/1/2/5%, spread, and book coverage. " +
+      "Use THIS for support/resistance in market briefs — report wall prices with their distance % and size, " +
+      "and the ±1%/±2% imbalance ratios. Check `coverage` before citing outer bands (a shallow fallback book " +
+      "is labeled source=hub-shallow).",
+    {
+      symbol: z.string().optional().default("BTCUSDT"),
+    },
+    async ({ symbol = "BTCUSDT" }) => {
+      try {
+        return json(await analyzeOrderBook(symbol));
+      } catch (err) {
+        return text(`Order book analysis failed for ${symbol}: ${(err as Error).message}`);
       }
     },
   );
