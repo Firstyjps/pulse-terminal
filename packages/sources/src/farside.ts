@@ -1,13 +1,16 @@
 // Cloudflare blocks farside.co.uk for default curl/Node TLS fingerprints.
-// Workaround: shell out to curl-impersonate (Chrome 116 TLS+HTTP/2 fingerprint).
-// On boxes without curl-impersonate the call falls back to system `curl`,
-// which will probably get a 403 challenge — flow data ends up null and the
-// upstream caller (etf.ts) drops to the synthesized proxy path.
+// Workaround: shell out to curl-impersonate. Cloudflare rotates which
+// fingerprints it challenges (Chrome 116 got blocked 2026-07 while Firefox 117
+// still passed), so curlGet probes a list of candidate binaries and uses the
+// first one that returns a real table instead of a challenge page. When every
+// candidate fails, flow data ends up null and the upstream caller (etf.ts)
+// serves its last good scrape — or, with nothing real to serve, the
+// synthesized proxy path.
 //
 // Install on Linux/macOS:
 //   mkdir -p ~/bin && cd ~/bin
 //   curl -sSL https://github.com/lwthiker/curl-impersonate/releases/download/v0.6.1/curl-impersonate-v0.6.1.x86_64-linux-gnu.tar.gz | tar xz
-// Then point at it via env: FARSIDE_CURL=$HOME/bin/curl_chrome116
+// Then point at a preferred binary via env: FARSIDE_CURL=$HOME/bin/curl_ff117
 //
 // This file is **server-only** — re-exported through `@pulse/sources/server`
 // only, never the browser-safe `@pulse/sources` barrel.
@@ -29,49 +32,38 @@ const URLS = {
   eth: "https://farside.co.uk/ethereum-etf/",
 };
 
-/** Resolve a curl binary that can pass Cloudflare. Order:
+/** Curl binaries that may pass Cloudflare, in preference order:
  *   1. FARSIDE_CURL env (explicit override)
- *   2. ~/bin/curl_chrome116 (default install location)
- *   3. curl-impersonate-chrome on PATH
- *   4. plain curl (will likely 403, but won't crash) */
-function resolveCurlBin(): string {
+ *   2. ~/bin/curl_ff117, ~/bin/curl_chrome116 (default install locations)
+ *   3. curl-impersonate-ff / curl-impersonate-chrome on PATH
+ *   4. plain curl (will likely get challenged, but won't crash) */
+function candidateBins(): string[] {
+  const bins: string[] = [];
   const fromEnv = process.env.FARSIDE_CURL;
-  if (fromEnv && existsSync(fromEnv)) return fromEnv;
-  const homeBin = resolve(homedir(), "bin/curl_chrome116");
-  if (existsSync(homeBin)) return homeBin;
-  return "curl-impersonate-chrome"; // PATH lookup; execFile will fall through to the second branch on ENOENT
+  if (fromEnv && existsSync(fromEnv)) bins.push(fromEnv);
+  for (const name of ["bin/curl_ff117", "bin/curl_chrome116"]) {
+    const p = resolve(homedir(), name);
+    if (existsSync(p)) bins.push(p);
+  }
+  bins.push("curl-impersonate-ff", "curl-impersonate-chrome", "curl");
+  return bins;
 }
 
+// No -A / -H overrides here: the curl-impersonate wrappers pin a full header
+// set matching their TLS fingerprint, and overriding the UA creates a
+// TLS-vs-header mismatch that Cloudflare flags as a bot.
 async function curlGet(url: string): Promise<string | null> {
-  const bin = resolveCurlBin();
-  const args = [
-    "-sSL",
-    "--compressed",
-    "--max-time",
-    "20",
-    "-A",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-    "-H",
-    "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "-H",
-    "Accept-Language: en-US,en;q=0.9",
-    url,
-  ];
-  try {
-    const { stdout } = await execFileP(bin, args, { maxBuffer: 16 * 1024 * 1024 });
-    return stdout;
-  } catch (err) {
-    // If curl-impersonate-chrome wasn't on PATH, retry with plain curl as a last resort.
-    if ((err as NodeJS.ErrnoException).code === "ENOENT" && bin !== "curl") {
-      try {
-        const { stdout } = await execFileP("curl", args, { maxBuffer: 16 * 1024 * 1024 });
-        return stdout;
-      } catch {
-        return null;
-      }
+  const args = ["-sSL", "--compressed", "--max-time", "20", url];
+  for (const bin of candidateBins()) {
+    try {
+      const { stdout } = await execFileP(bin, args, { maxBuffer: 16 * 1024 * 1024 });
+      // A challenge/block page has no data table — try the next fingerprint.
+      if (stdout.includes("tabletext")) return stdout;
+    } catch {
+      // Binary missing or curl error — try the next candidate.
     }
-    return null;
   }
+  return null;
 }
 
 const MONTHS: Record<string, number> = {

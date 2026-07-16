@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./farside.js", () => ({ fetchFarsideEtf: vi.fn() }));
-import { getETFFlows, pickFinalizedLast } from "./etf.js";
+import { __setEtfLastGoodForTests, getETFFlows, pickFinalizedLast } from "./etf.js";
 import { fetchFarsideEtf } from "./farside.js";
 import type { ETFFlow } from "./types.js";
 
@@ -24,10 +24,43 @@ const FARSIDE_FIXTURE: ETFFlow[] = [
 
 beforeEach(() => {
   mockFarside.mockReset();
+  // The module-level last-good cache would otherwise leak state across tests
+  __setEtfLastGoodForTests(null);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("getETFFlows — last-good cache (stale-real beats fresh-fake)", () => {
+  it("serves the cached scrape within the refresh window without re-hitting Farside", async () => {
+    mockFarside.mockResolvedValue(FARSIDE_FIXTURE);
+    await getETFFlows();
+    expect(mockFarside).toHaveBeenCalledTimes(1);
+    const r = await getETFFlows();
+    expect(mockFarside).toHaveBeenCalledTimes(1); // no second scrape
+    expect(r._source).toBe("farside");
+    expect(r.flows).toEqual(FARSIDE_FIXTURE);
+  });
+
+  it("serves last good scrape as 'farside-stale' when a later scrape fails", async () => {
+    // Cache is older than the 30-min refresh window but well within 48h
+    __setEtfLastGoodForTests({ flows: FARSIDE_FIXTURE, ts: Date.now() - 3_600_000 });
+    mockFarside.mockRejectedValue(new Error("Cloudflare 403"));
+    const r = await getETFFlows();
+    expect(r._source).toBe("farside-stale");
+    expect(r._isProxy).toBe(false);
+    expect(r._fallbackReason).toBe("farside_threw");
+    expect(r.flows).toEqual(FARSIDE_FIXTURE);
+  });
+
+  it("drops to proxy when the last good scrape is older than 48h", async () => {
+    __setEtfLastGoodForTests({ flows: FARSIDE_FIXTURE, ts: Date.now() - 49 * 3_600_000 });
+    mockFarside.mockResolvedValue(null);
+    const r = await getETFFlows();
+    expect(r._source).toBe("proxy");
+    expect(r._isProxy).toBe(true);
+  });
 });
 
 describe("getETFFlows — Farside happy path (primary source)", () => {

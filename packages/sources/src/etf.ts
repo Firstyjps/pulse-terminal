@@ -36,21 +36,47 @@ function generateProxyData(): ETFFlow[] {
   return result;
 }
 
+// Last successful Farside scrape, kept in-memory so a long-running process
+// (the realtime hub polls every 90s) neither hammers Farside/Cloudflare nor
+// silently swaps real numbers for synthesized ones on a transient block.
+// ETF flows only change once per trading day — stale-real beats fresh-fake.
+let lastGood: { flows: ETFFlow[]; ts: number } | null = null;
+const FARSIDE_REFRESH_MS = 30 * 60_000; // reuse a good scrape for 30 min
+const LAST_GOOD_MAX_AGE_MS = 48 * 3_600_000; // serve stale-real up to 48h
+
+/** Test-only: override or clear the module-level last-good cache. */
+export function __setEtfLastGoodForTests(
+  v: { flows: ETFFlow[]; ts: number } | null,
+): void {
+  lastGood = v;
+}
+
 export async function getETFFlows(): Promise<ETFFlowResponse> {
   let flows: ETFFlow[] | null = null;
   let source: ETFSource = "proxy";
   let fallbackReason: ETFFallbackReason | undefined;
 
-  try {
-    const farside = await fetchFarsideEtf();
-    if (farside && farside.length > 5) {
-      flows = farside;
-      source = "farside";
-    } else {
-      fallbackReason = "farside_empty";
+  if (lastGood && Date.now() - lastGood.ts < FARSIDE_REFRESH_MS) {
+    flows = lastGood.flows;
+    source = "farside";
+  } else {
+    try {
+      const farside = await fetchFarsideEtf();
+      if (farside && farside.length > 5) {
+        flows = farside;
+        source = "farside";
+        lastGood = { flows: farside, ts: Date.now() };
+      } else {
+        fallbackReason = "farside_empty";
+      }
+    } catch {
+      fallbackReason = "farside_threw";
     }
-  } catch {
-    fallbackReason = "farside_threw";
+
+    if (!flows && lastGood && Date.now() - lastGood.ts < LAST_GOOD_MAX_AGE_MS) {
+      flows = lastGood.flows;
+      source = "farside-stale";
+    }
   }
 
   if (!flows) {

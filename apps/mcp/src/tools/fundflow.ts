@@ -45,8 +45,10 @@ export const registerFundflowTools: RegisterFn = (server) => {
   server.tool(
     "get_etf_flows",
     "Spot Bitcoin/Ethereum ETF daily flows in USD, 7d & 30d cumulative sums, " +
-      "and full cumulative since-inception totals. Source: Farside-scraped proxy " +
-      "(flagged via _isProxy=true).",
+      "and full cumulative since-inception totals. Source: Farside scrape " +
+      "(_source=farside-stale means last good scrape <48h old). Returns an " +
+      "error instead of numbers when only synthetic placeholder data exists — " +
+      "in that case report 'no ETF data this round', never invent figures.",
     {
       symbol: z
         .enum(["btc", "eth", "both"])
@@ -57,6 +59,13 @@ export const registerFundflowTools: RegisterFn = (server) => {
     async ({ symbol = "both" }) => {
       const cached = await hubFetch<FundflowSnapshot>("/snapshot");
       const data = cached?.etf ?? (await getETFFlows());
+      if (data._isProxy) {
+        return text(
+          "ETF flow data unavailable this round: the Farside scrape is blocked and no " +
+            "recent real snapshot exists. (The synthetic fallback series was suppressed — " +
+            "do NOT report ETF numbers; say the data is unavailable.)",
+        );
+      }
       if (symbol === "both") return json(data);
       const isBtc = symbol === "btc";
       return json({

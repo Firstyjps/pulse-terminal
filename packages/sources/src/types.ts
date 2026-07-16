@@ -58,7 +58,8 @@ export interface ETFFlow {
   ethCumulative: number;
 }
 
-export type ETFSource = "farside" | "proxy";
+/** "farside-stale" = live scrape failed; serving the last good scrape (<48h). */
+export type ETFSource = "farside" | "farside-stale" | "proxy";
 
 /** Why Farside was skipped or failed — surfaces silent operational drift. */
 export type ETFFallbackReason =
@@ -79,7 +80,8 @@ export interface ETFFlowResponse {
   };
   _source?: ETFSource;
   _isProxy?: boolean;
-  /** Populated when `_source === "proxy"` so dashboards/alerts can detect Farside drift. */
+  /** Populated when the live scrape failed (`_source` "proxy" or "farside-stale")
+   *  so dashboards/alerts can detect Farside drift. */
   _fallbackReason?: ETFFallbackReason;
   /**
    * True when the most recent flow row is dated today (UTC) AND has both

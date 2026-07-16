@@ -56,6 +56,13 @@ export const registerBriefChartTools: RegisterFn = (server) => {
           // hit Cloudflare and silently drop to random proxy data.
           const cached = await hubFetch<FundflowSnapshot>("/snapshot");
           const etf = cached?.etf ?? (await getETFFlows());
+          if (etf?._isProxy) {
+            return errText(
+              "ETF flow data unavailable (Farside scrape blocked, no recent real snapshot) — " +
+                "chart suppressed rather than rendering synthetic placeholder data. " +
+                "Skip the ETF chart this round.",
+            );
+          }
           const flows = etf?.flows ?? [];
           if (!flows.length) return errText("no ETF flow data available");
           svg = buildBtcEtfFlowsBarChartSvg(flows);
