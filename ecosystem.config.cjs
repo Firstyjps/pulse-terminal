@@ -22,24 +22,7 @@ const alertsLogPath = path.resolve(__dirname, "apps/alerts/data/alerts.jsonl");
 
 module.exports = {
   apps: [
-    {
-      name: "pulse-web",
-      cwd: "./apps/web",
-      script: "node_modules/next/dist/bin/next",
-      args: "start -p 3000",
-      env: {
-        NODE_ENV: "production",
-        NEXT_PUBLIC_WS_URL: "ws://localhost:8080",
-        PULSE_HUB_URL: "http://127.0.0.1:8081",
-        ALERT_LOG_PATH: alertsLogPath,
-      },
-      autorestart: true,
-      max_memory_restart: "512M",
-      out_file: "../../logs/web.out.log",
-      error_file: "../../logs/web.err.log",
-      merge_logs: true,
-      time: true,
-    },
+
     {
       name: "pulse-realtime",
       cwd: "./apps/realtime",
