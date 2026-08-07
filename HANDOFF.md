@@ -41,7 +41,7 @@ User direction (loose): pro multi-pane (TradingView Pro vibe) but the `frontend-
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Hetzner CX22 · Singapore · 2GB RAM + 2GB swap · Ubuntu 24.04   │
-│ Public IP: 5.223.65.230 · Tailscale IP: 100.90.142.81          │
+│ Public IP: <server-ip> · Tailscale IP: <tailscale-ip>          │
 │                                                                 │
 │ Docker (proxy-net 172.20.0.0/16):                              │
 │   • proxy-npm-1   :80/:443/:81  Nginx Proxy Manager + LE certs │
@@ -57,8 +57,8 @@ User direction (loose): pro multi-pane (TradingView Pro vibe) but the `frontend-
 External access:
   Internet → 80/443 → NPM → cryptopulse.buzz/   → 172.20.0.1:3000 (web)
                                           /ws    → 172.20.0.1:8080 (WS)
-  Laptop  → Tailscale → 100.90.142.81:8081      → hub HTTP (MCP)
-  SSH     → 5.223.65.230:22 (key auth only)
+  Laptop  → Tailscale → <tailscale-ip>:8081      → hub HTTP (MCP)
+  SSH     → <server-ip>:22 (key auth only)
 
 Firewall (ufw):
   22, 80, 443, 8000 (uvicorn legacy)        → public
@@ -116,7 +116,7 @@ packages/
 | Backtest math | ✅ reads JSONL, joins Binance 1h klines, computes hit-rate + avg move per pattern |
 | Binance portfolio | ✅ read-only key, IP-whitelisted, LD prefix patch handles Earn assets |
 | Tailscale tunnel | ✅ `pulse-hetzner-sg` host, laptop ↔ server stable |
-| MCP via Claude Desktop | ✅ 10 tools, .mjs bundle, queries `http://100.90.142.81:8081` (configured per-install) |
+| MCP via Claude Desktop | ✅ 10 tools, .mjs bundle, queries `http://<tailscale-ip>:8081` (configured per-install) |
 | pm2 24/7 | ✅ all 3 services online, pm2 save persisted |
 | Vitest | ✅ 19/19 passing in `packages/sources` |
 | Toast notifications | ✅ AlertWatcher polls `/api/alerts/recent` every 60s, fires on new med/high |
@@ -148,9 +148,9 @@ packages/
 |------|-------|----------|
 | `~/pulse-terminal/.env.local` (server, chmod 600) | server | `BINANCE_API_KEY`, `BINANCE_API_SECRET`, `NEXT_PUBLIC_WS_URL=wss://cryptopulse.buzz/ws`, `PULSE_HUB_URL=http://127.0.0.1:8081`, `WS_PORT=8080`, `HUB_HTTP_PORT=8081`, `PULSE_NATIVE_STREAMS=binance,bybit,okx`, `ALERT_*` vars |
 | `apps/web/.env.local` (server) | symlink → root `.env.local` (Next.js auto-loads from app dir at build time) |
-| `apps/mcp/.env` (laptop) | local | `PULSE_HUB_URL=http://100.90.142.81:8081` (Tailscale IP) — baked into .dxt at user_config time |
-| `~/.ssh/hetzner_ed25519_win` (laptop) | local | SSH private key for `ssh hetzner` alias |
-| `~/.ssh/config` (laptop) | local | `Host hetzner` mapped to deploy@5.223.65.230 |
+| `apps/mcp/.env` (laptop) | local | `PULSE_HUB_URL=http://<tailscale-ip>:8081` (Tailscale IP) — baked into .dxt at user_config time |
+| `~/.ssh/<ssh-key>` (laptop) | local | SSH private key for `ssh hetzner` alias |
+| `~/.ssh/config` (laptop) | local | `Host hetzner` mapped to <user>@<server-ip> |
 
 **Coinglass + ALERT_WEBHOOK_URL** are blank — opt-in.
 
@@ -178,7 +178,7 @@ tar -czf /tmp/pulse.tar.gz \
   --exclude=node_modules --exclude=.next --exclude=_legacy \
   --exclude=.pm2 --exclude=logs --exclude=.git --exclude=dist \
   --exclude='*.dxt' --exclude=.env.local .
-scp -i ~/.ssh/hetzner_ed25519_win /tmp/pulse.tar.gz deploy@5.223.65.230:~/
+scp -i ~/.ssh/<ssh-key> /tmp/pulse.tar.gz <user>@<server-ip>:~/
 ssh hetzner "cd ~ && tar xzf pulse.tar.gz -C pulse-terminal && rm pulse.tar.gz && cd pulse-terminal && pnpm install && pnpm pulse:build && pm2 restart all --update-env"
 ```
 
@@ -229,7 +229,7 @@ Other relevant skills:
 - Don't remove `@pulse/sources/server` split — it eliminated webpack hacks; regressing means turbopack breaks
 - Don't add `@anthropic-ai/sdk` back — Phase A explicitly removed it (MCP-first decision per `docs/ADR-001-mcp-first.md`)
 - Don't redirect the user to Claude API — they have no Anthropic budget
-- Don't hardcode the Tailscale IP (`100.90.142.81`) anywhere except local laptop's `apps/mcp/.env` — it's user-installed via .dxt user_config
+- Don't hardcode the Tailscale IP (`<tailscale-ip>`) anywhere except local laptop's `apps/mcp/.env` — it's user-installed via .dxt user_config
 
 ### Current branding tokens (in `packages/ui/src/tokens.ts`)
 ```

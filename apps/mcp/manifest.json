@@ -118,7 +118,7 @@
     "pulse_hub_url": {
       "type": "string",
       "title": "Pulse Hub URL",
-      "description": "Where the local hub HTTP cache lives. Default: http://127.0.0.1:8081 (local). For remote deploy via Tailscale: http://<tailscale-ip>:8081 (e.g. http://100.90.142.81:8081).",
+      "description": "Where the local hub HTTP cache lives. Default: http://127.0.0.1:8081 (local). For remote deploy via Tailscale: http://<tailscale-ip>:8081 (e.g. http://<tailscale-ip>:8081).",
       "required": false,
       "default": "http://127.0.0.1:8081"
     }
